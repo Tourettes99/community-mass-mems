@@ -1,0 +1,38 @@
+[build]
+  # Set the base directory to where your client code is
+  base = "client"
+  
+  # The directory to publish (relative to base)
+  publish = "build"
+  
+  # Build command
+  command = "npm install && CI=false npm run build"
+
+  # Functions directory (relative to root)
+  functions = "netlify/functions"
+
+[dev]
+  # Local dev settings
+  functions = "netlify/functions"
+  publish = "client/build"
+  
+[[redirects]]
+  # SPA redirect rule
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  # API redirect rule
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Environment settings
+[build.environment]
+  # Specify Node version
+  NODE_VERSION = "18.16.0"
+  # Disable Python build warnings
+  PYTHON_VERSION = "3.8"
+  # Set CI to false to prevent treating warnings as errors
+  CI = "false"
