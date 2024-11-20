@@ -16,6 +16,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import LinkIcon from '@mui/icons-material/Link';
 import { styled } from '@mui/material/styles';
+import { uploadMemory } from '../api';
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   background: 'rgba(255, 255, 255, 0.9)',
@@ -120,13 +121,7 @@ const UploadForm = ({ onUploadSuccess }) => {
     formData.append('type', fileType);
     
     try {
-      const response = await fetch('http://localhost:5000/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) throw new Error('Upload failed');
-      
+      await uploadMemory(formData);
       onUploadSuccess();
       setSnackbar({ open: true, message: 'File uploaded successfully!', severity: 'success' });
     } catch (error) {

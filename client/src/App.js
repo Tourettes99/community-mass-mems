@@ -18,6 +18,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import UploadForm from './components/UploadForm';
 import MemoryGrid from './components/MemoryGrid';
+import { fetchMemories } from './api';
 
 // RAL 2005 color (luminous orange)
 const theme = createTheme({
@@ -45,8 +46,17 @@ function App() {
     if (!hasVisited) {
       setShowWelcome(true);
     }
-    fetchMemories();
+    loadMemories();
   }, []);
+
+  const loadMemories = async () => {
+    try {
+      const data = await fetchMemories();
+      setMemories(data);
+    } catch (error) {
+      console.error('Error loading memories:', error);
+    }
+  };
 
   const handlePlayIntro = async () => {
     console.log('Play button clicked');
@@ -86,16 +96,6 @@ function App() {
       } catch (err) {
         console.error('Alternative method failed:', err);
       }
-    }
-  };
-
-  const fetchMemories = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/memories');
-      const data = await response.json();
-      setMemories(data);
-    } catch (error) {
-      console.error('Error fetching memories:', error);
     }
   };
 
@@ -191,7 +191,7 @@ function App() {
             <Typography variant="h4" component="h1" gutterBottom align="center" color="primary">
               R1 Community Memories
             </Typography>
-            <UploadForm onUploadSuccess={fetchMemories} />
+            <UploadForm onUploadSuccess={loadMemories} />
           </Paper>
 
           <MemoryGrid memories={memories} />

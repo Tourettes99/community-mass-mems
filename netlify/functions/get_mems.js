@@ -1,10 +1,10 @@
-import { MongoClient } = require("mongodb");
+const { MongoClient } = require("mongodb");
 
 // Create a new MongoClient
 const mongoClient = new MongoClient(process.env.MONGODB_URI);
 const clientPromise = mongoClient.connect();
 
-export const handler = async (event, context) => {
+exports.handler = async (event, context) => {
     try {
         // Get database connection
         const database = (await clientPromise).db(process.env.MONGODB_DATABASE);
@@ -17,15 +17,10 @@ export const handler = async (event, context) => {
             statusCode: 200,
             headers: {
                 "Content-Type": "application/json",
-                // Add CORS headers
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
             },
             body: JSON.stringify(results),
         };
     } catch (error) {
-        console.error("Function error:", error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message }),

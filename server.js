@@ -23,66 +23,19 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: '*',
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.ALLOWED_ORIGINS || 'https://your-netlify-app.netlify.app'
+    : 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Range', 'Accept'],
-  exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type']
+  exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
+  credentials: true
 }));
 
 app.use(express.json());
 
-// Serve the introduction audio file
-app.get('/audio/introduction', (req, res) => {
-  const audioPath = path.join(__dirname, 'episode 1. introduktion.mp3');
-  console.log('Attempting to serve audio from:', audioPath);
-  
-  // Check if file exists
-  if (!fs.existsSync(audioPath)) {
-    console.error('Audio file not found at:', audioPath);
-    return res.status(404).send('Audio file not found');
-  }
-
-  // Set appropriate headers
-  res.set({
-    'Content-Type': 'audio/mpeg',
-    'Accept-Ranges': 'bytes',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET',
-    'Access-Control-Allow-Headers': 'Content-Type, Range',
-    'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length'
-  });
-
-  // Stream the file
-  const stat = fs.statSync(audioPath);
-  const fileSize = stat.size;
-  const range = req.headers.range;
-
-  if (range) {
-    const parts = range.replace(/bytes=/, "").split("-");
-    const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-    const chunksize = (end - start) + 1;
-    const file = fs.createReadStream(audioPath, {start, end});
-    
-    res.status(206);
-    res.set('Content-Range', `bytes ${start}-${end}/${fileSize}`);
-    res.set('Content-Length', chunksize);
-    file.pipe(res);
-  } else {
-    res.set('Content-Length', fileSize);
-    fs.createReadStream(audioPath).pipe(res);
-  }
-});
-
 // Serve static files with CORS headers
-app.use('/uploads', express.static(uploadsDir));
 app.use('/uploads', (req, res, next) => {
-  console.log('Received request for:', req.path);
-  
-  if (req.path.match(/\.(mp3|wav|ogg)$/i)) {
-    console.log('Audio file requested:', req.path);
-  }
-
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
@@ -119,9 +72,15 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/r1memorie
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => {
-  console.log('Connected to MongoDB');
+  console.log('Connected to MongoDB successfully');
+  console.log('Database URL:', process.env.MONGODB_URI ? 'Using environment variable' : 'Using localhost');
 }).catch(err => {
-  console.error('MongoDB connection error:', err);
+  console.error('MongoDB connection error details:', {
+    message: err.message,
+    code: err.code,
+    name: err.name
+  });
+  console.error('Full error:', err);
 });
 
 // Memory Schema
@@ -170,42 +129,65 @@ async function getUrlMetadata(url) {
     const response = await fetch(url);
     const html = await response.text();
     const $ = cheerio.load(html);
-
-    // Special handling for Patreon URLs
-    const isPatreon = url.includes('patreon.com');
     
-    return {
-      title: isPatreon ? 'Support R1 Memories on Patreon' : $('meta[property="og:title"]').attr('content') || $('title').text(),
-      description: isPatreon ? 'Join our community and support R1 Memories' : $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content'),
-      image: isPatreon ? 'https://c5.patreon.com/external/logo/downloads_wordmark_white_on_coral.png' : $('meta[property="og:image"]').attr('content'),
-      url: url,
-      siteName: isPatreon ? 'Patreon' : $('meta[property="og:site_name"]').attr('content'),
-      type: isPatreon ? 'patreon' : $('meta[property="og:type"]').attr('content')
+    // Get OpenGraph data
+    const ogTitle = $('meta[property="og:title"]').attr('content');
+    const ogDescription = $('meta[property="og:description"]').attr('content');
+    const ogImage = $('meta[property="og:image"]').attr('content');
+    const ogSiteName = $('meta[property="og:site_name"]').attr('content');
+    const ogType = $('meta[property="og:type"]').attr('content');
+
+    // Get Twitter Card data as fallback
+    const twitterTitle = $('meta[name="twitter:title"]').attr('content');
+    const twitterDescription = $('meta[name="twitter:description"]').attr('content');
+    const twitterImage = $('meta[name="twitter:image"]').attr('content');
+    const twitterCard = $('meta[name="twitter:card"]').attr('content');
+
+    // Get standard meta tags as final fallback
+    const metaDescription = $('meta[name="description"]').attr('content');
+    const title = $('title').text();
+    
+    // Get the favicon
+    let favicon = $('link[rel="icon"]').attr('href') || 
+                 $('link[rel="shortcut icon"]').attr('href') ||
+                 '/favicon.ico';
+
+    // Ensure favicon has absolute URL
+    try {
+      favicon = new URL(favicon, url).href;
+    } catch (e) {
+      console.warn('Failed to parse favicon URL:', e);
+      favicon = '';
+    }
+
+    // Combine all data with fallbacks
+    const metadata = {
+      title: ogTitle || twitterTitle || title || '',
+      description: ogDescription || twitterDescription || metaDescription || '',
+      image: ogImage || twitterImage || '',
+      siteName: ogSiteName || new URL(url).hostname || '',
+      type: ogType || twitterCard || 'website',
+      favicon: favicon,
+      url: url
     };
+
+    console.log('Extracted metadata:', metadata);
+    return metadata;
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
-    return null;
+    const fallbackMetadata = {
+      title: url,
+      description: '',
+      image: '',
+      siteName: new URL(url).hostname,
+      type: 'website',
+      favicon: '',
+      url: url
+    };
+    console.log('Using fallback metadata:', fallbackMetadata);
+    return fallbackMetadata;
   }
 }
-
-// Add route to get URL metadata
-app.get('/api/url-metadata', async (req, res) => {
-  const { url } = req.query;
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
-  }
-
-  try {
-    const metadata = await getUrlMetadata(url);
-    if (!metadata) {
-      return res.status(404).json({ error: 'Could not fetch metadata' });
-    }
-    res.json(metadata);
-  } catch (error) {
-    console.error('Error in /api/url-metadata:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
