@@ -9,6 +9,21 @@
   CI = "false"
   GENERATE_SOURCEMAP = "false"
 
+# Production context: all deploys from the Production branch set in your site's
+# deploy contexts will inherit these settings.
+[context.production]
+  command = "cd client && npm install && CI=false npm run build"
+
+# Deploy Preview context: all deploys generated from a pull/merge request will
+# inherit these settings.
+[context.deploy-preview]
+  command = "cd client && npm install && CI=false npm run build"
+
+# Branch Deploy context: all deploys that are not from a pull/merge request or
+# from the Production branch will inherit these settings.
+[context.branch-deploy]
+  command = "cd client && npm install && CI=false npm run build"
+
 [dev]
   functions = "netlify/functions"
   publish = "client/build"
