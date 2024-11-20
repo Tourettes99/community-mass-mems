@@ -9,6 +9,17 @@ const fs = require('fs');
 const app = express();
 const router = express.Router();
 
+// MongoDB connection
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  throw new Error('Please define the MONGODB_URI environment variable inside .env');
+}
+
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('Could not connect to MongoDB:', err));
+
 // Middleware
 app.use(cors({
   origin: '*',
@@ -19,12 +30,6 @@ app.use(cors({
 }));
 
 app.use(express.json());
-
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/r1memories', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-});
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
