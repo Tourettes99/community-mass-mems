@@ -1,3 +1,5 @@
+// API function for R1 Memories
+// Updated with MongoDB Atlas connection
 const express = require('express');
 const serverless = require('serverless-http');
 const mongoose = require('mongoose');
