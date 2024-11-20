@@ -15,12 +15,8 @@ const router = express.Router();
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env');
+  console.error('MONGODB_URI is not defined');
 }
-
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('Could not connect to MongoDB:', err));
 
 // Middleware
 app.use(cors({
@@ -32,6 +28,11 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('Could not connect to MongoDB:', err));
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
@@ -47,26 +48,37 @@ const Memory = mongoose.model('Memory', memorySchema);
 
 // Routes
 router.get('/memories', async (req, res) => {
+  console.log('GET /memories request received');
   try {
     const memories = await Memory.find().sort({ timestamp: -1 });
+    console.log('Found memories:', memories.length);
     res.json(memories);
   } catch (error) {
+    console.error('Error fetching memories:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 router.post('/memories', async (req, res) => {
+  console.log('POST /memories request received', req.body);
   try {
     const memory = new Memory(req.body);
     await memory.save();
+    console.log('Memory saved:', memory);
     res.status(201).json(memory);
   } catch (error) {
+    console.error('Error saving memory:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Add the router to the app
-app.use('/.netlify/functions/api', router);
+// Test route
+router.get('/test', (req, res) => {
+  res.json({ message: 'API is working!' });
+});
+
+// Use the router without the full path prefix
+app.use('/', router);
 
 // Export the handler
 module.exports.handler = serverless(app);
