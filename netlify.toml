@@ -7,10 +7,21 @@
 [build.environment]
   NODE_VERSION = "18.16.0"
   CI = "false"
+  GENERATE_SOURCEMAP = "false"
 
 [dev]
   functions = "netlify/functions"
   publish = "client/build"
+  
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/manifest.json"
+    [headers.values]
+    Content-Type = "application/json"
 
 [[redirects]]
   from = "/api/*"
