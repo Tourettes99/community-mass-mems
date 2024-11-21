@@ -3,6 +3,7 @@ const { Buffer } = require('buffer');
 const { extractUrlMetadata, extractFileMetadata } = require('./utils/metadata');
 const { connectToDatabase } = require('./mongodb');
 const logger = require('./utils/logger');
+const fetch = require('node-fetch');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,7 +95,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    const { type, url, content, tags, file, fileName, contentType } = data;
+    let { type, url, content, tags, file, fileName, contentType } = data;
 
     if (!type) {
       logger.warn('Missing type field');
@@ -105,52 +106,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Validate based on type
-    if (type === 'url' || type === 'image') {
-      if (!url || !url.trim()) {
-        logger.warn('Invalid URL provided', { url });
-        return {
-          statusCode: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'Invalid URL provided' })
-        };
-      }
-      // Detect if URL is a direct media file
-      const urlLower = url.toLowerCase();
-      const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/.test(urlLower);
-      const isVideoUrl = /\.(mp4|webm|ogg|mov)(\?.*)?$/.test(urlLower);
-      const isAudioUrl = /\.(mp3|wav|ogg|m4a)(\?.*)?$/.test(urlLower);
-      
-      // Override type if URL is a direct media file
-      if (isImageUrl) {
-        type = 'image';
-      } else if (isVideoUrl) {
-        type = 'video';
-      } else if (isAudioUrl) {
-        type = 'audio';
-      }
-    } else if (type === 'text') {
-      if (!content) {
-        logger.warn('Missing content for text type');
-        return {
-          statusCode: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'Content is required for text type' })
-        };
-      }
-    } else if (!file) {
-      logger.warn('Missing file for non-text/url type');
-      return {
-        statusCode: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'File is required for this type' })
-      };
-    }
-
-    logger.info('Connecting to database...');
-    const collection = await connectToDatabase();
-    logger.debug('Connected to memories.memories collection');
-
+    // Initialize memory object
     const memory = {
       type,
       tags: tags || [],
@@ -167,52 +123,82 @@ exports.handler = async (event, context) => {
 
     try {
       if (type === 'url' || type === 'image' || type === 'video' || type === 'audio') {
-        logger.info('Processing URL/media', { url, type });
-        memory.url = url;
-        
-        try {
-          // For direct media URLs, set basic metadata
-          if (url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|mp4|webm|ogg|mov|mp3|wav|m4a)(\?.*)?$/i)) {
-            const urlObj = new URL(url);
-            const fileName = urlObj.pathname.split('/').pop() || url;
-            memory.metadata = {
-              ...memory.metadata,
-              title: fileName,
-              description: `Direct ${type} URL`,
-              mediaType: type,
-              fileName: fileName,
-              contentType: `${type}/${fileName.split('.').pop()}`,
-              siteName: urlObj.hostname
-            };
-          } else {
-            // For regular URLs, try to extract metadata
-            const urlMetadata = await extractUrlMetadata(url);
-            logger.debug('Extracted URL metadata', { metadata: urlMetadata });
-            
-            memory.metadata = {
-              ...memory.metadata,
-              ...urlMetadata,
-              title: urlMetadata.title || new URL(url).hostname,
-              description: urlMetadata.description || 'No description available',
-              mediaType: urlMetadata.mediaType || type,
-              isPlayable: !!urlMetadata.playbackHtml,
-              siteName: urlMetadata.siteName || new URL(url).hostname,
-              favicon: `/.netlify/functions/get-favicon?url=${encodeURIComponent(url)}`
-            };
-          }
-        } catch (metadataError) {
-          logger.error('Metadata extraction error', metadataError, { url });
-          // Don't fail the upload if metadata extraction fails
-          const urlObj = new URL(url);
-          memory.metadata = {
-            ...memory.metadata,
-            title: urlObj.pathname.split('/').pop() || url,
-            description: 'Failed to extract metadata',
-            mediaType: type,
-            siteName: urlObj.hostname
+        if (!url || !url.trim()) {
+          logger.warn('Invalid URL provided', { url });
+          return {
+            statusCode: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Invalid URL provided' })
           };
         }
-      } else if (type === 'text' && content) {
+
+        // Validate URL
+        try {
+          new URL(url);
+        } catch (e) {
+          logger.error('Invalid URL format', { url, error: e });
+          return {
+            statusCode: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Invalid URL format' })
+          };
+        }
+
+        memory.url = url;
+        
+        // Try to fetch the URL first to validate it exists
+        try {
+          const response = await fetch(url, { method: 'HEAD' });
+          if (!response.ok) {
+            throw new Error(`Failed to fetch URL: ${response.statusText}`);
+          }
+          contentType = response.headers.get('content-type');
+        } catch (error) {
+          logger.error('Error fetching URL', { url, error: error.message });
+          return {
+            statusCode: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: `Failed to fetch URL: ${error.message}` })
+          };
+        }
+
+        // Extract metadata
+        try {
+          const urlMetadata = await extractUrlMetadata(url);
+          logger.debug('Extracted URL metadata', { metadata: urlMetadata });
+          
+          memory.metadata = {
+            ...memory.metadata,
+            ...urlMetadata,
+            title: urlMetadata.title || url.split('/').pop(),
+            description: urlMetadata.description || 'No description available',
+            mediaType: urlMetadata.mediaType || type,
+            contentType: urlMetadata.contentType || contentType,
+            isPlayable: !!urlMetadata.playbackHtml,
+            siteName: urlMetadata.siteName || new URL(url).hostname,
+            favicon: `/.netlify/functions/get-favicon?url=${encodeURIComponent(url)}`
+          };
+        } catch (error) {
+          logger.error('Error extracting metadata', { url, error: error.message });
+          // Don't fail the upload, just use basic metadata
+          memory.metadata = {
+            ...memory.metadata,
+            title: url.split('/').pop(),
+            description: 'No description available',
+            mediaType: type,
+            contentType: contentType,
+            siteName: new URL(url).hostname
+          };
+        }
+      } else if (type === 'text') {
+        if (!content) {
+          logger.warn('Missing content for text type');
+          return {
+            statusCode: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Content is required for text type' })
+          };
+        }
         logger.info('Processing text content');
         memory.content = content;
         memory.metadata = {
@@ -268,44 +254,35 @@ exports.handler = async (event, context) => {
           throw new Error('Failed to process file data');
         }
       }
-    } catch (error) {
-      logger.error('Error processing content', error, { type });
-      throw error;
-    }
 
-    try {
       logger.info('Saving memory to database');
+      const collection = await connectToDatabase();
       const result = await collection.insertOne(memory);
+      
       logger.info('Memory saved successfully', { id: result.insertedId });
-
       return {
-        statusCode: 201,
+        statusCode: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: 'Memory created successfully',
+        body: JSON.stringify({
+          success: true,
           memory: { ...memory, _id: result.insertedId }
         })
       };
-    } catch (dbError) {
-      logger.error('Database error', dbError);
-      throw new Error('Failed to save memory to database');
+
+    } catch (error) {
+      logger.error('Error processing memory', error);
+      return {
+        statusCode: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Error processing memory' })
+      };
     }
   } catch (error) {
-    logger.error('Error creating memory', {
-      error: error.message,
-      stack: error.stack,
-      type: error.type
-    });
-    
-    // Send a more detailed error response
+    logger.error('Unexpected error', error);
     return {
       statusCode: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        error: 'Internal server error',
-        message: error.message,
-        type: error.type || 'unknown'
-      })
+      body: JSON.stringify({ error: 'An unexpected error occurred' })
     };
   }
 };

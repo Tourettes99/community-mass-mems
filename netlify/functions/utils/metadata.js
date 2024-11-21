@@ -4,8 +4,33 @@ const { getMetadata } = require('page-metadata-parser');
 const domino = require('domino');
 const fetch = require('node-fetch');
 
+async function isImageUrl(url) {
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+  const urlLower = url.toLowerCase();
+  return imageExtensions.some(ext => urlLower.endsWith(ext));
+}
+
 async function extractUrlMetadata(url) {
   try {
+    // Check if it's a direct image URL
+    if (await isImageUrl(url)) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+      
+      const buffer = await response.buffer();
+      const type = await fileType.fromBuffer(buffer);
+      
+      return {
+        title: url.split('/').pop(),
+        description: 'Direct image link',
+        siteName: new URL(url).hostname,
+        mediaType: 'image',
+        image: url,
+        contentType: type?.mime || 'image/jpeg',
+        url: url
+      };
+    }
+
     const result = await unfurl(url);
     
     // Handle YouTube videos
@@ -56,21 +81,35 @@ async function extractUrlMetadata(url) {
 
     // Default metadata for other URLs
     return {
-      title: result.title,
-      description: result.description,
-      siteName: result.site_name,
+      title: result.title || url,
+      description: result.description || 'No description available',
+      siteName: result.site_name || new URL(url).hostname,
       mediaType: 'url',
       image: result.open_graph?.images?.[0]?.url || result.favicon,
-      url: result.url
+      url: result.url || url
     };
   } catch (error) {
     console.error('Error extracting URL metadata:', error);
-    return {
-      title: url,
-      description: 'No description available',
-      mediaType: 'url',
-      url: url
-    };
+    
+    // Attempt to provide basic metadata even if unfurl fails
+    try {
+      const urlObj = new URL(url);
+      return {
+        title: url.split('/').pop() || url,
+        description: 'No description available',
+        siteName: urlObj.hostname,
+        mediaType: await isImageUrl(url) ? 'image' : 'url',
+        image: await isImageUrl(url) ? url : null,
+        url: url
+      };
+    } catch (e) {
+      return {
+        title: url,
+        description: 'No description available',
+        mediaType: 'url',
+        url: url
+      };
+    }
   }
 }
 
