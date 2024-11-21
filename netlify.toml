@@ -53,7 +53,11 @@ Content-Security-Policy = """
     https://open.spotify.com
     https://player.twitch.tv
     https://drive.google.com
-    https://*.dropbox.com;
+    https://*.dropbox.com
+    https://*.discord.com
+    https://*.r1prompts.com
+    https://*.suno.ai
+    https://*.rabbit.tech;
   style-src 'self' 'unsafe-inline' 
     https://fonts.googleapis.com 
     https://cdnjs.cloudflare.com 
@@ -63,7 +67,11 @@ Content-Security-Policy = """
     https://*.facebook.com 
     https://*.redditmedia.com
     https://w.soundcloud.com
-    https://open.spotify.com;
+    https://open.spotify.com
+    https://*.discord.com
+    https://*.r1prompts.com
+    https://*.suno.ai
+    https://*.rabbit.tech;
   font-src 'self' 
     https://fonts.gstatic.com 
     https://cdnjs.cloudflare.com 
@@ -71,7 +79,8 @@ Content-Security-Policy = """
     https://*.twitter.com 
     https://*.instagram.com 
     https://*.tiktok.com 
-    https://*.facebook.com;
+    https://*.facebook.com
+    https://*.discord.com;
   img-src 'self' data: blob: https: http:;
   media-src 'self' blob: https: http:;
   connect-src 'self' https: http: ws: wss:;
@@ -90,7 +99,11 @@ Content-Security-Policy = """
     https://player.twitch.tv
     https://drive.google.com
     https://*.dropboxusercontent.com
-    https://*.dropbox.com;
+    https://*.dropbox.com
+    https://*.discord.com
+    https://*.r1prompts.com
+    https://*.suno.ai
+    https://*.rabbit.tech;
   child-src 'self' 
     blob: 
     https://*.youtube.com 
@@ -102,7 +115,11 @@ Content-Security-Policy = """
     https://player.vimeo.com
     https://w.soundcloud.com
     https://open.spotify.com
-    https://player.twitch.tv;
+    https://player.twitch.tv
+    https://*.discord.com
+    https://*.r1prompts.com
+    https://*.suno.ai
+    https://*.rabbit.tech;
   worker-src 'self' blob:;
   form-action 'self';
   base-uri 'self';

@@ -152,6 +152,94 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
       const url = memory.url;
       const domain = getUrlDomain(url);
       
+      // Discord messages/channels
+      if (domain.includes('discord.com')) {
+        // Handle Discord message links
+        const messageMatch = url.match(/channels\/(\d+)\/(\d+)\/(\d+)/);
+        if (messageMatch) {
+          return {
+            html: `<iframe 
+              src="https://discord.com/embed?messageId=${messageMatch[3]}&channelId=${messageMatch[2]}&guildId=${messageMatch[1]}"
+              allowtransparency="true"
+              frameborder="0"
+              sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>`,
+            aspectRatio: '400px'
+          };
+        }
+        // Handle Discord server/channel invites
+        const inviteMatch = url.match(/invite\/([a-zA-Z0-9-]+)/);
+        if (inviteMatch) {
+          return {
+            html: `<iframe 
+              src="https://discord.com/widget?id=${inviteMatch[1]}&theme=dark"
+              allowtransparency="true"
+              frameborder="0"
+              sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>`,
+            aspectRatio: '500px'
+          };
+        }
+      }
+
+      // R1 Prompts
+      if (domain.includes('r1prompts.com')) {
+        // Extract prompt ID from URL
+        const promptId = url.split('/').pop();
+        if (promptId) {
+          return {
+            html: `<iframe 
+              src="https://r1prompts.com/embed/${promptId}"
+              style="border: none; border-radius: 8px;"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+              loading="lazy"></iframe>`,
+            aspectRatio: '400px'
+          };
+        }
+      }
+
+      // Suno.ai
+      if (domain.includes('suno.ai')) {
+        // Extract song ID from URL
+        const songId = url.split('/').pop();
+        if (songId) {
+          return {
+            html: `<iframe 
+              src="https://app.suno.ai/embed/${songId}"
+              style="border: none; border-radius: 12px;"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+              allow="autoplay; encrypted-media"></iframe>`,
+            aspectRatio: '160px'
+          };
+        }
+      }
+
+      // Rabbit Community
+      if (domain.includes('community.rabbit.tech')) {
+        // Extract post ID from URL
+        const postId = url.match(/\/posts\/([^\/]+)/)?.[1];
+        if (postId) {
+          return {
+            html: `<iframe 
+              src="https://community.rabbit.tech/embed/posts/${postId}"
+              style="border: none; border-radius: 8px; width: 100%;"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+              loading="lazy"></iframe>`,
+            aspectRatio: '400px'
+          };
+        }
+        // Handle discussion threads
+        const threadId = url.match(/\/discussions\/([^\/]+)/)?.[1];
+        if (threadId) {
+          return {
+            html: `<iframe 
+              src="https://community.rabbit.tech/embed/discussions/${threadId}"
+              style="border: none; border-radius: 8px; width: 100%;"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+              loading="lazy"></iframe>`,
+            aspectRatio: '600px'
+          };
+        }
+      }
+
       // YouTube videos
       if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
         const videoId = url.includes('youtu.be') 
