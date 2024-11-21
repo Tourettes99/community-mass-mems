@@ -60,18 +60,16 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           setIsPlaying(false);
         });
 
+        wavesurferRef.current.on('loading', (progress) => {
+          console.log('Loading progress:', progress);
+        });
+
+        wavesurferRef.current.on('load', () => {
+          console.log('Audio file loaded');
+        });
+
         // Load the audio file
         wavesurferRef.current.load(fullPath);
-
-        // Add error handling for load
-        const audio = wavesurferRef.current.getMediaElement();
-        if (audio) {
-          audio.onerror = () => {
-            console.error('Audio element error:', audio.error);
-            setError('Failed to load audio file. Please try again.');
-            setIsLoading(false);
-          };
-        }
 
         return () => {
           if (wavesurferRef.current) {
