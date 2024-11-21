@@ -52,6 +52,8 @@ const memorySchema = new mongoose.Schema({
     ogImage: String,
     ogType: String,
     ogUrl: String,
+    ogAudio: String,
+    ogVideo: String,
     
     // Twitter Card metadata
     twitterCard: String,
@@ -59,6 +61,7 @@ const memorySchema = new mongoose.Schema({
     twitterDescription: String,
     twitterImage: String,
     twitterCreator: String,
+    twitterPlayer: String,
     
     // Article metadata
     articleSection: String,
@@ -84,7 +87,12 @@ const memorySchema = new mongoose.Schema({
     tags: [String],
     category: String,
     userNotes: String,
-    customFields: mongoose.Schema.Types.Mixed
+    customFields: mongoose.Schema.Types.Mixed,
+    
+    // Additional metadata
+    favicon: String,
+    structuredData: mongoose.Schema.Types.Mixed,
+    raw: mongoose.Schema.Types.Mixed
   }
 }, { timestamps: true });
 
@@ -262,25 +270,52 @@ const getMediaInfo = async (url, metadata) => {
 const generateEmbedHtml = (url, platform, videoId) => {
   switch (platform) {
     case 'youtube':
-      return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width: 100%;"></iframe>`;
     case 'vimeo':
-      return `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+      return `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="max-width: 100%;"></iframe>`;
     case 'twitter':
-      return `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`;
+      return `<blockquote class="twitter-tweet" data-dnt="true" data-theme="light"><a href="${url}"></a></blockquote>`;
     case 'spotify':
-      const spotifyMatch = url.match(/spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+      const spotifyMatch = url.match(/spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
       if (spotifyMatch) {
         const [, type, id] = spotifyMatch;
-        return `<iframe src="https://open.spotify.com/embed/${type}/${id}" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>`;
+        const height = type === 'track' ? 152 : type === 'episode' ? 232 : 380;
+        return `<iframe src="https://open.spotify.com/embed/${type}/${id}" width="100%" height="${height}" frameborder="0" allowtransparency="true" allow="encrypted-media" style="max-width: 100%;"></iframe>`;
       }
       return null;
     case 'soundcloud':
-      return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}"></iframe>`;
+      return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"></iframe>`;
     case 'instagram':
-      const instagramMatch = url.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
+      const instagramMatch = url.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
       if (instagramMatch) {
         const postId = instagramMatch[1];
-        return `<blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/${postId}/" style="max-width:540px; min-width:326px; width:99.375%;"><a href="https://www.instagram.com/p/${postId}/" target="_blank">View on Instagram</a></blockquote><script async src="//www.instagram.com/embed.js"></script>`;
+        return `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="https://www.instagram.com/p/${postId}/" style="max-width:540px; min-width:326px; margin: 0 auto;"><a href="https://www.instagram.com/p/${postId}/" target="_blank">View on Instagram</a></blockquote>`;
+      }
+      return null;
+    case 'facebook':
+      const fbMatch = url.match(/facebook\.com\/([^\/]+)\/(?:posts|videos)\/(\d+)/);
+      if (fbMatch) {
+        return `<div class="fb-post" data-href="${url}" data-width="500" data-show-text="true"></div>`;
+      }
+      return null;
+    case 'tiktok':
+      const tiktokMatch = url.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
+      if (tiktokMatch) {
+        const videoId = tiktokMatch[1];
+        return `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${videoId}" style="max-width: 605px;min-width: 325px;"><section></section></blockquote>`;
+      }
+      return null;
+    case 'reddit':
+      return `<iframe id="reddit-embed" src="https://www.redditmedia.com/r/${encodeURIComponent(url)}?ref_source=embed&amp;ref=share&amp;embed=true" sandbox="allow-scripts allow-same-origin allow-popups" style="border: none;" height="400" width="100%" scrolling="yes"></iframe>`;
+    case 'pinterest':
+      return `<a data-pin-do="embedPin" href="${url}"></a>`;
+    case 'general':
+      // For general HTML5 video/audio files
+      const ext = url.split('.').pop().toLowerCase();
+      if (['mp4', 'webm', 'ogg'].includes(ext)) {
+        return `<video controls playsinline style="max-width: 100%;"><source src="${url}" type="video/${ext}">Your browser does not support the video tag.</video>`;
+      } else if (['mp3', 'wav'].includes(ext)) {
+        return `<audio controls style="width: 100%;"><source src="${url}" type="audio/${ext}">Your browser does not support the audio tag.</audio>`;
       }
       return null;
     default:
@@ -291,7 +326,13 @@ const generateEmbedHtml = (url, platform, videoId) => {
 // Function to fetch URL metadata
 const fetchUrlMetadata = async (url) => {
   try {
-    const result = await unfurl(url);
+    const result = await unfurl(url, {
+      follow: 5, // Follow up to 5 redirects
+      timeout: 10000, // 10 second timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CommunityMassMems/1.0; +https://communitymems.example.com)'
+      }
+    });
     
     // Get media info after we have metadata
     const mediaInfo = await getMediaInfo(url, {
@@ -299,11 +340,18 @@ const fetchUrlMetadata = async (url) => {
       twitterImage: result.twitter_card?.image?.url
     });
 
+    // Determine content type from metadata
+    let contentType = result.open_graph?.type || 'website';
+    if (result.open_graph?.video) contentType = 'video';
+    else if (result.open_graph?.audio) contentType = 'audio';
+    else if (result.twitter_card?.card === 'player') contentType = 'media';
+
     return {
       // Basic metadata
-      title: result.title,
-      description: result.description,
-      siteName: result.site_name || new URL(url).hostname,
+      title: result.title || result.open_graph?.title || result.twitter_card?.title,
+      description: result.description || result.open_graph?.description || result.twitter_card?.description,
+      siteName: result.site_name || result.open_graph?.site_name || new URL(url).hostname,
+      contentType,
       
       // Open Graph metadata
       ogTitle: result.open_graph?.title,
@@ -311,6 +359,8 @@ const fetchUrlMetadata = async (url) => {
       ogImage: result.open_graph?.image?.url,
       ogType: result.open_graph?.type,
       ogUrl: result.open_graph?.url,
+      ogAudio: result.open_graph?.audio?.url,
+      ogVideo: result.open_graph?.video?.url,
       
       // Twitter Card metadata
       twitterCard: result.twitter_card?.card,
@@ -318,10 +368,11 @@ const fetchUrlMetadata = async (url) => {
       twitterDescription: result.twitter_card?.description,
       twitterImage: result.twitter_card?.image?.url,
       twitterCreator: result.twitter_card?.creator,
+      twitterPlayer: result.twitter_card?.player?.url,
       
       // Article metadata
       articleSection: result.open_graph?.article?.section,
-      articleTags: result.open_graph?.article?.tags,
+      articleTags: result.open_graph?.article?.tags || [],
       articlePublisher: result.open_graph?.article?.publisher,
       
       // Media and preview information
@@ -329,9 +380,25 @@ const fetchUrlMetadata = async (url) => {
       
       // Additional metadata
       language: result.language,
-      publishedDate: result.open_graph?.article?.published_time,
-      modifiedDate: result.open_graph?.article?.modified_time,
-      author: result.open_graph?.article?.author
+      publishedDate: result.open_graph?.article?.published_time || result.published,
+      modifiedDate: result.open_graph?.article?.modified_time || result.modified,
+      author: result.open_graph?.article?.author || result.author,
+      favicon: result.favicon,
+      
+      // Structured data
+      structuredData: result.json_ld || [],
+      
+      // Additional media metadata
+      duration: result.open_graph?.video?.duration || result.twitter_card?.player?.duration,
+      width: result.open_graph?.video?.width || result.twitter_card?.player?.width,
+      height: result.open_graph?.video?.height || result.twitter_card?.player?.height,
+      
+      // Raw metadata for debugging
+      raw: {
+        openGraph: result.open_graph,
+        twitterCard: result.twitter_card,
+        jsonLd: result.json_ld
+      }
     };
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
