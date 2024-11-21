@@ -29,7 +29,7 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { styled } from '@mui/material/styles';
 import { Memory } from '../types';
 
-type MemoryFileType = 'image' | 'video' | 'audio' | 'static';
+type MemoryType = 'text' | 'audio' | 'video' | 'image' | 'url' | 'static';
 
 interface FileTypes {
   image: string[];
@@ -54,7 +54,7 @@ interface UploadBarProps {
 }
 
 const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
-  const [type, setType] = useState<Memory['type']>('url');
+  const [type, setType] = useState<MemoryType>('url');
   const [url, setUrl] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -64,8 +64,9 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
   const [success, setSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleTypeChange = (event: SelectChangeEvent<Memory['type']>) => {
-    setType(event.target.value);
+  const handleTypeChange = (event: SelectChangeEvent<MemoryType>) => {
+    const newType = event.target.value as MemoryType;
+    setType(newType);
     setUrl('');
     setContent('');
   };
@@ -118,7 +119,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
       // For now, we'll just use a local URL
       const objectUrl = URL.createObjectURL(file);
       setUrl(objectUrl);
-      setType(fileType);
+      setType(fileType as MemoryType);
 
       // For static text files, read content
       if (fileType === 'static' && file.type.includes('text')) {
@@ -166,7 +167,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     }
   };
 
-  const getTypeIcon = (memoryType: Memory['type']) => {
+  const getTypeIcon = (memoryType: MemoryType) => {
     switch (memoryType) {
       case 'url':
         return <LinkIcon />;
@@ -227,7 +228,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
                   ref={fileInputRef}
                   type="file"
                   onChange={handleFileChange}
-                  accept={type !== 'text' && type !== 'url' ? SUPPORTED_FILE_TYPES[type as MemoryFileType]?.join(',') : undefined}
+                  accept={type !== 'text' && type !== 'url' ? SUPPORTED_FILE_TYPES[type as keyof typeof SUPPORTED_FILE_TYPES]?.join(',') : undefined}
                 />
               </Button>
             </Tooltip>
