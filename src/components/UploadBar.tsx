@@ -101,20 +101,29 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     setCurrentTag(event.target.value);
   };
 
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    const ext = '.' + file.name.split('.').pop().toLowerCase();
-    const fileType = Object.entries(SUPPORTED_FILE_TYPES).find(([_, exts]) => exts.includes(ext))?.[0];
-    
-    if (!fileType) {
-      setError(`Unsupported file type. Supported types: ${Object.values(SUPPORTED_FILE_TYPES).flat().join(', ')}`);
-      return;
-    }
+    setLoading(true);
+    setError('');
 
     try {
+      // Validate file type
+      const fileExtension = file.name.split('.').pop();
+      if (!fileExtension) {
+        setError('Invalid file: no file extension found');
+        return;
+      }
+
+      const ext = '.' + fileExtension.toLowerCase();
+      const fileType = Object.entries(SUPPORTED_FILE_TYPES).find(([_, exts]) => exts.includes(ext))?.[0];
+
+      if (!fileType) {
+        setError(`Unsupported file type. Supported types: ${Object.values(SUPPORTED_FILE_TYPES).flat().join(', ')}`);
+        return;
+      }
+
       // Create a signed URL or handle file upload here
       // For now, we'll just use a local URL
       const objectUrl = URL.createObjectURL(file);
@@ -129,6 +138,8 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     } catch (error) {
       console.error('Error processing file:', error);
       setError('Failed to process file');
+    } finally {
+      setLoading(false);
     }
   };
 
