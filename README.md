@@ -1,74 +1,46 @@
-# R1 Community Memories
+# Getting Started with Create React App
 
-A beautiful web application for Rabbit R1 users to share and relive memorable moments through images, text, GIFs, audio files, and embedded links.
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## Features
+## Available Scripts
 
-- Material UI design with RAL 2005 color scheme
-- Dynamic grid layout with pulsing animation effect
-- Support for multiple media types:
-  - Images (with metadata)
-  - GIFs (with metadata)
-  - Audio files (with metadata)
-  - Text content
-  - Embedded links
-- Drag-and-drop file upload
-- Upload progress indicator
-- Cancellable uploads
-- Responsive design
+In the project directory, you can run:
 
-## Prerequisites
+### `npm start`
 
-- Node.js (v14 or higher)
-- MongoDB (v4.4 or higher)
-- npm or yarn
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
-## Setup
+The page will reload if you make edits.\
+You will also see any lint errors in the console.
 
-1. Install MongoDB and make sure it's running on port 27017
+### `npm test`
 
-2. Install backend dependencies:
-```bash
-npm install
-```
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-3. Install frontend dependencies:
-```bash
-cd client
-npm install
-```
+### `npm run build`
 
-4. Create an `uploads` directory in the root folder:
-```bash
-mkdir uploads
-```
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
-5. Start the backend server:
-```bash
-npm start
-```
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
-6. In a new terminal, start the frontend development server:
-```bash
-cd client
-npm start
-```
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-The application will be available at http://localhost:3000
+### `npm run eject`
 
-## Environment Variables
+**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
 
-Create a `.env` file in the root directory with the following variables:
-```
-MONGODB_URI=mongodb://localhost:27017/r1memories
-PORT=5000
-```
+If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-## File Upload Limits
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
 
-- Maximum file size: 10MB
-- Supported file types:
-  - Images (jpg, png, gif)
-  - Audio (mp3, wav)
-  - Text files
-  - JSON files
+You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+
+## Learn More
+
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+
+To learn React, check out the [React documentation](https://reactjs.org/).
