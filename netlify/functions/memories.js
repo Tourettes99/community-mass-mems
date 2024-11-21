@@ -4,8 +4,10 @@ const { MongoClient } = require('mongodb');
 // MongoDB Connection URI
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
+  console.error('MONGODB_URI environment variable is missing');
   throw new Error('MONGODB_URI environment variable is required');
 }
+
 const DB_NAME = 'memories';
 const COLLECTION_NAME = 'memories';
 
@@ -34,7 +36,7 @@ const memorySchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  collection: COLLECTION_NAME // Explicitly set collection name
+  collection: COLLECTION_NAME
 });
 
 let Memory;
@@ -44,95 +46,77 @@ try {
   Memory = mongoose.model('Memory', memorySchema);
 }
 
-// Cache the database connection
 let cachedDb = null;
 
 async function connectToDatabase() {
   if (cachedDb) {
+    console.log('Using cached database connection');
     return cachedDb;
   }
 
   try {
-    const client = await MongoClient.connect(MONGODB_URI);
-    const db = client.db(DB_NAME);
-    cachedDb = db;
-    return db;
+    // Connect using mongoose
+    await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    console.log('New database connection established');
+    cachedDb = mongoose.connection;
+    return cachedDb;
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('Error connecting to database:', error);
     throw error;
   }
 }
 
 exports.handler = async (event, context) => {
+  context.callbackWaitsForEmptyEventLoop = false;
+
   // Set CORS headers
   const headers = {
-    'Access-Control-Allow-Origin': '*', // Update this to your domain in production
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
   };
 
-  // Handle OPTIONS request (preflight)
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers,
-      body: ''
-    };
-  }
-
-  // Connect to MongoDB
   try {
-    if (!mongoose.connection.readyState) {
-      await mongoose.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        dbName: DB_NAME // Explicitly set database name
-      });
+    // Connect to database
+    await connectToDatabase();
+    console.log('Successfully connected to database');
+
+    if (event.httpMethod === 'OPTIONS') {
+      return {
+        statusCode: 200,
+        headers
+      };
     }
 
-    // Log connection status and database info
-    console.log('MongoDB Connection State:', mongoose.connection.readyState);
-    console.log('Database Name:', mongoose.connection.db.databaseName);
-    console.log('Collections:', await mongoose.connection.db.listCollections().toArray());
-
     if (event.httpMethod === 'GET') {
-      try {
-        const memories = await Memory.find().sort({ createdAt: -1 });
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify(memories)
-        };
-      } catch (error) {
-        console.error('Error fetching memories:', error);
-        console.error('Stack:', error.stack);
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({ 
-            error: 'Failed to fetch memories', 
-            details: error.message,
-            stack: error.stack 
-          })
-        };
-      }
+      const memories = await Memory.find({}).sort({ createdAt: -1 });
+      console.log(`Retrieved ${memories.length} memories`);
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(memories)
+      };
     }
 
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Method not allowed' })
+      body: JSON.stringify({ message: 'Method not allowed' })
     };
+
   } catch (error) {
-    console.error('MongoDB connection error:', error);
-    console.error('Stack:', error.stack);
+    console.error('Error in memories function:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
-        error: 'Database connection failed', 
-        details: error.message,
-        stack: error.stack 
+      body: JSON.stringify({
+        message: 'Internal server error',
+        error: error.message
       })
     };
   }
