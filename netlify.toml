@@ -3,6 +3,9 @@ external_node_modules = ["sharp", "fluent-ffmpeg", "mongodb-client-encryption", 
 included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
 node_bundler = "esbuild"
 
+[functions.memories]
+timeout = 30
+
 [build]
 command = "CI=false GENERATE_SOURCEMAP=false npm run build"
 publish = "build"

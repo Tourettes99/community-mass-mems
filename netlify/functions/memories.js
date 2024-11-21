@@ -33,45 +33,60 @@ const memorySchema = new mongoose.Schema({
   }
 });
 
+// Ensure we don't try to recreate the model if it exists
 let Memory;
 try {
-  Memory = mongoose.model('Memory');
-} catch {
+  Memory = mongoose.models.Memory || mongoose.model('Memory', memorySchema);
+} catch (e) {
   Memory = mongoose.model('Memory', memorySchema);
 }
 
-// Cache mongoose connection
+// Track connection status
 let isConnected = false;
 
 const connectToDatabase = async () => {
-  if (isConnected) {
+  if (isConnected && mongoose.connection.readyState === 1) {
     console.log('Using existing database connection');
     return;
   }
 
   try {
-    console.log('MongoDB URI:', MONGODB_URI.replace(/:[^:]*@/, ':****@')); // Log URI with hidden password
-    await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    // Log connection attempt
+    console.log('Attempting to connect to MongoDB...');
+    console.log('Connection string format:', MONGODB_URI.split('@')[1]); // Log URI without credentials
+
+    const conn = await mongoose.connect(MONGODB_URI);
+    
     isConnected = true;
-    console.log('New database connection established');
+    console.log('MongoDB Connected:', conn.connection.host);
+    
+    // Add connection event listeners
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
+      isConnected = false;
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.log('MongoDB disconnected');
+      isConnected = false;
+    });
+
   } catch (error) {
-    console.error('Error connecting to database:', error.message);
+    console.error('MongoDB connection error:', error.message);
+    isConnected = false;
     throw error;
   }
 };
 
 exports.handler = async (event, context) => {
-  // Set this to false to prevent function timeout
+  // Prevent function timeout from waiting for database
   context.callbackWaitsForEmptyEventLoop = false;
 
-  // CORS Headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Content-Type': 'application/json'
   };
 
   // Handle preflight requests
@@ -83,12 +98,19 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Connect to database
     await connectToDatabase();
-    console.log('Successfully connected to database');
 
     if (event.httpMethod === 'GET') {
-      const memories = await Memory.find({}).sort({ createdAt: -1 });
-      console.log(`Retrieved ${memories.length} memories`);
+      // Log query attempt
+      console.log('Attempting to fetch memories...');
+
+      const memories = await Memory.find({})
+        .sort({ createdAt: -1 })
+        .lean() // Convert to plain JavaScript objects
+        .exec();
+
+      console.log(`Successfully retrieved ${memories.length} memories`);
 
       return {
         statusCode: 200,
@@ -104,13 +126,16 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('Error in memories function:', error);
+    console.error('Function error:', error);
+    console.error('Stack trace:', error.stack);
+
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         message: 'Internal server error',
         error: error.message,
+        type: error.name,
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
