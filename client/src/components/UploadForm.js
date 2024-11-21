@@ -37,15 +37,6 @@ const UploadForm = ({ onUploadComplete }) => {
   };
 
   const validateForm = () => {
-    if (!title.trim()) {
-      setError('Title is required');
-      return false;
-    }
-    if (!description.trim()) {
-      setError('Description is required');
-      return false;
-    }
-
     switch (activeTab) {
       case 0: // Text
         if (!content.trim()) {
@@ -124,8 +115,10 @@ const UploadForm = ({ onUploadComplete }) => {
 
     try {
       const formData = new FormData();
-      formData.append('title', title.trim());
-      formData.append('description', description.trim());
+      
+      // Add optional title and description if provided
+      if (title.trim()) formData.append('title', title.trim());
+      if (description.trim()) formData.append('description', description.trim());
 
       switch (activeTab) {
         case 0: // Text
@@ -202,21 +195,19 @@ const UploadForm = ({ onUploadComplete }) => {
       <Box sx={{ mb: 3 }}>
         <TextField
           fullWidth
-          label="Title"
+          label="Title (optional)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           margin="normal"
-          required
         />
         <TextField
           fullWidth
-          label="Description"
+          label="Description (optional)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           margin="normal"
           multiline
           rows={2}
-          required
         />
       </Box>
 

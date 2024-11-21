@@ -292,8 +292,14 @@ function formatDuration(seconds) {
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, required: true },
+  title: { 
+    type: String,
+    default: '' // Make title optional with empty default
+  },
+  description: { 
+    type: String,
+    default: '' // Make description optional with empty default
+  },
   type: { 
     type: String, 
     required: true,
@@ -324,7 +330,7 @@ router.post('/memories', async (req, res) => {
   try {
     await uploadMiddleware(req, res);
     
-    const { title, description, type } = req.body;
+    const { title = '', description = '', type } = req.body;
     let content, metadata;
 
     switch (type) {
@@ -334,7 +340,7 @@ router.post('/memories', async (req, res) => {
         break;
       
       case MEMORY_TYPES.URL:
-        content = req.body.url;
+        content = req.body.url || req.body.content; // Support both url and content fields
         metadata = await getUrlMetadata(content);
         break;
       
