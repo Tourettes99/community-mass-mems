@@ -221,7 +221,7 @@ exports.handler = async (event, context) => {
     const memory = {
       type,
       tags: tags || [],
-      createdAt: new Date().toISOString(), // Convert to ISO string for frontend
+      createdAt: new Date().toISOString(),
       metadata: {
         title: '',
         description: '',
@@ -230,6 +230,11 @@ exports.handler = async (event, context) => {
       }
     };
 
+    // Only add content field if it has a value
+    if (content) {
+      memory.content = content;
+    }
+
     console.log('Processing content type:', type);
 
     // Handle different types of content
@@ -237,16 +242,34 @@ exports.handler = async (event, context) => {
       if (type === 'url' && url) {
         console.log('Processing URL:', url);
         memory.url = url;
-        const urlMetadata = await extractUrlMetadata(url);
+        
+        // Enhanced URL metadata extraction
+        let urlMetadata;
+        try {
+          urlMetadata = await extractUrlMetadata(url);
+          console.log('Extracted URL metadata:', urlMetadata);
+        } catch (metadataError) {
+          console.error('Metadata extraction error:', metadataError);
+          urlMetadata = {
+            title: url,
+            description: 'Failed to extract metadata',
+            mediaType: 'url'
+          };
+        }
+
+        // Ensure we have meaningful metadata
         memory.metadata = {
           ...memory.metadata,
           ...urlMetadata,
+          title: urlMetadata.title || new URL(url).hostname,
+          description: urlMetadata.description || 'No description available',
           mediaType: urlMetadata.mediaType || 'url',
-          isPlayable: !!urlMetadata.playbackHtml
+          isPlayable: !!urlMetadata.playbackHtml,
+          siteName: urlMetadata.siteName || new URL(url).hostname,
+          favicon: urlMetadata.favicon || `https://www.google.com/s2/favicons?domain=${url}`
         };
       } else if (type === 'text' && content) {
         console.log('Processing text content');
-        memory.content = content;
         memory.metadata = {
           ...memory.metadata,
           title: content.slice(0, 50),
