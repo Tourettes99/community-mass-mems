@@ -64,48 +64,66 @@ const MemoryCard = ({ memory }) => {
     return null;
   };
 
+  // Don't render empty memories
+  if (!content && !url && !metadata?.playbackHtml && !metadata?.previewUrl) {
+    return null;
+  }
+
   return (
     <div className={`memory-card memory-type-${type}`}>
       {/* Title Section */}
       {metadata?.title && type !== 'text' && (
-        <h3 className="memory-title">
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            {metadata.title}
-          </a>
-        </h3>
+        <div className="memory-header">
+          <h3 className="memory-title">
+            {url ? (
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                {metadata.title}
+              </a>
+            ) : (
+              metadata.title
+            )}
+          </h3>
+          {metadata?.siteName && (
+            <span className="memory-site">{metadata.siteName}</span>
+          )}
+        </div>
       )}
 
       {/* Main Content */}
-      {renderContent()}
+      <div className="memory-content">
+        {renderContent()}
+      </div>
 
       {/* Description */}
       {metadata?.description && type !== 'text' && (
-        <p className="memory-description">{metadata.description}</p>
-      )}
-
-      {/* Metadata Display */}
-      <div className="memory-metadata">
-        {metadata?.siteName && (
-          <span className="memory-site">{metadata.siteName}</span>
-        )}
-        {metadata?.author && (
-          <span className="memory-author">By {metadata.author}</span>
-        )}
-        {metadata?.publishedDate && (
-          <span className="memory-date">
-            {new Date(metadata.publishedDate).toLocaleDateString()}
-          </span>
-        )}
-      </div>
-
-      {/* Tags */}
-      {metadata?.tags && metadata.tags.length > 0 && (
-        <div className="memory-tags">
-          {metadata.tags.map((tag, index) => (
-            <span key={index} className="memory-tag">#{tag}</span>
-          ))}
+        <div className="memory-description-container">
+          <p className="memory-description">{metadata.description}</p>
         </div>
       )}
+
+      {/* Footer Metadata */}
+      <div className="memory-footer">
+        {/* Author and Date */}
+        <div className="memory-meta">
+          {metadata?.author && (
+            <span className="memory-author">By {metadata.author}</span>
+          )}
+          {metadata?.publishedDate && (
+            <span className="memory-date">
+              {new Date(metadata.publishedDate).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+
+        {/* Tags */}
+        {metadata?.tags && metadata.tags.length > 0 && (
+          <div className="memory-tags">
+            {metadata.tags.map((tag, index) => (
+              <span key={index} className="memory-tag">#{tag}</span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
