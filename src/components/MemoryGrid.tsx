@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton, CardHeader, Avatar, Link, Stack, Chip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -209,7 +209,20 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   }
 };
 
-const MemoryGrid: React.FC<MemoryGridProps> = ({ memories, loading = false, error = null, onRefresh }) => {
+const MemoryGrid: React.FC<MemoryGridProps> = ({ memories = [], loading = false, error = null, onRefresh }) => {
+  const [sortedMemories, setSortedMemories] = useState<Memory[]>([]);
+
+  useEffect(() => {
+    // Ensure memories is an array and sort by creation date
+    const validMemories = Array.isArray(memories) ? memories : [];
+    const sorted = [...validMemories].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    setSortedMemories(sorted);
+  }, [memories]);
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -220,22 +233,12 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({ memories, loading = false, erro
 
   if (error) {
     return (
-      <Box 
-        sx={{ 
-          p: 4, 
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 2,
-        }}
-      >
-        <Typography color="error">{error}</Typography>
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography color="error" gutterBottom>
+          {error}
+        </Typography>
         {onRefresh && (
-          <IconButton 
-            onClick={onRefresh}
-            color="primary"
-          >
+          <IconButton onClick={onRefresh} color="primary">
             <RefreshIcon />
           </IconButton>
         )}
@@ -243,47 +246,30 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({ memories, loading = false, erro
     );
   }
 
-  if (!memories.length) {
+  if (!sortedMemories.length) {
     return (
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          minHeight: 200
-        }}
-      >
-        <Typography variant="body1" color="text.secondary">
-          No memories yet. Create your first memory above!
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography color="textSecondary">
+          No memories found. Create one by using the upload bar above!
         </Typography>
       </Box>
     );
   }
 
   return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: '1fr',
-          sm: 'repeat(2, 1fr)',
-          md: 'repeat(3, 1fr)',
-          lg: 'repeat(4, 1fr)',
-        },
-        gap: 3,
-        p: 3,
-      }}
-    >
+    <Box sx={{ mt: 4 }}>
       <AnimatePresence>
-        {memories.map((memory) => (
+        {sortedMemories.map((memory, index) => (
           <motion.div
-            key={memory._id}
+            key={memory._id || index}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.3, delay: index * 0.1 }}
           >
-            <MemoryCard memory={memory} />
+            <Box sx={{ mb: 2 }}>
+              <MemoryCard memory={memory} />
+            </Box>
           </motion.div>
         ))}
       </AnimatePresence>
