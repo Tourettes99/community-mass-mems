@@ -22,9 +22,88 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Basic health check route
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'API is running' });
+// Create router for API endpoints
+const router = express.Router();
+
+// Root endpoint (health check)
+router.get('/', (req, res) => {
+  res.json({
+    status: 'success',
+    message: 'API is running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      test: '/.netlify/functions/api/test-connection',
+      memories: '/.netlify/functions/api/memories',
+      upload: '/.netlify/functions/api/memories/upload'
+    }
+  });
+});
+
+// Test connection endpoint
+router.get('/test-connection', async (req, res) => {
+  console.log('🔌 Test connection endpoint hit');
+  try {
+    // Ensure MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      await connectWithRetry();
+    }
+
+    const state = mongoose.connection.readyState;
+    let stateText;
+    switch (state) {
+      case 0: stateText = 'Disconnected'; break;
+      case 1: stateText = 'Connected'; break;
+      case 2: stateText = 'Connecting'; break;
+      case 3: stateText = 'Disconnecting'; break;
+      default: stateText = 'Unknown';
+    }
+
+    // Get database stats if connected
+    let stats = null;
+    if (state === 1) {
+      try {
+        stats = await mongoose.connection.db.stats();
+        console.log('📈 Database Stats Retrieved');
+      } catch (statsError) {
+        console.error('❌ Error getting database stats:', statsError);
+      }
+    }
+
+    const response = {
+      status: 'success',
+      timestamp: new Date().toISOString(),
+      connection: {
+        state: stateText,
+        readyState: state,
+        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
+        database: mongoose.connection.name,
+        host: mongoose.connection.host
+      }
+    };
+
+    if (stats) {
+      response.stats = {
+        collections: stats.collections,
+        documents: stats.objects,
+        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
+        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
+      };
+    }
+
+    console.log('✅ Sending connection test response:', response);
+    res.json(response);
+  } catch (error) {
+    console.error('❌ MongoDB connection test error:', error);
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: {
+        message: error.message,
+        name: error.name,
+        code: error.code
+      }
+    });
+  }
 });
 
 // MongoDB connection
@@ -97,71 +176,6 @@ async function connectWithRetry(retries = MAX_RETRIES) {
     return false;
   }
 }
-
-// Test connection endpoint - Direct route on app
-app.get('/test-connection', async (req, res) => {
-  console.log('🔌 Test connection endpoint hit');
-  try {
-    // Ensure MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
-      await connectWithRetry();
-    }
-
-    const state = mongoose.connection.readyState;
-    let stateText;
-    switch (state) {
-      case 0: stateText = 'Disconnected'; break;
-      case 1: stateText = 'Connected'; break;
-      case 2: stateText = 'Connecting'; break;
-      case 3: stateText = 'Disconnecting'; break;
-      default: stateText = 'Unknown';
-    }
-
-    // Get database stats if connected
-    let stats = null;
-    if (state === 1) {
-      try {
-        stats = await mongoose.connection.db.stats();
-        console.log('📈 Database Stats Retrieved');
-      } catch (statsError) {
-        console.error('❌ Error getting database stats:', statsError);
-      }
-    }
-
-    const response = {
-      status: 'success',
-      connection: {
-        state: stateText,
-        readyState: state,
-        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
-        database: mongoose.connection.name,
-        host: mongoose.connection.host
-      }
-    };
-
-    if (stats) {
-      response.stats = {
-        collections: stats.collections,
-        documents: stats.objects,
-        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
-        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
-      };
-    }
-
-    console.log('✅ Sending connection test response:', response);
-    res.json(response);
-  } catch (error) {
-    console.error('❌ MongoDB connection test error:', error);
-    res.status(500).json({
-      status: 'error',
-      error: {
-        message: error.message,
-        name: error.name,
-        code: error.code
-      }
-    });
-  }
-});
 
 // Memory types enum
 const MEMORY_TYPES = {
@@ -305,9 +319,6 @@ const memorySchema = new mongoose.Schema({
 
 const Memory = mongoose.model('Memory', memorySchema);
 
-// Routes
-const router = express.Router();
-
 // Memory routes
 router.post('/memories', async (req, res) => {
   try {
@@ -361,6 +372,7 @@ router.post('/memories', async (req, res) => {
     
     res.status(201).json({
       status: 'success',
+      timestamp: new Date().toISOString(),
       data: {
         memory: {
           id: memory._id,
@@ -376,6 +388,7 @@ router.post('/memories', async (req, res) => {
     console.error('Error creating memory:', error);
     res.status(400).json({
       status: 'error',
+      timestamp: new Date().toISOString(),
       message: error.message
     });
   }
@@ -389,6 +402,7 @@ router.get('/memories', async (req, res) => {
     
     res.json({
       status: 'success',
+      timestamp: new Date().toISOString(),
       data: {
         memories
       }
@@ -397,6 +411,7 @@ router.get('/memories', async (req, res) => {
     console.error('Error fetching memories:', error);
     res.status(500).json({
       status: 'error',
+      timestamp: new Date().toISOString(),
       message: error.message
     });
   }
@@ -409,12 +424,14 @@ router.get('/memories/:id', async (req, res) => {
     if (!memory) {
       return res.status(404).json({
         status: 'error',
+        timestamp: new Date().toISOString(),
         message: 'Memory not found'
       });
     }
     
     res.json({
       status: 'success',
+      timestamp: new Date().toISOString(),
       data: {
         memory
       }
@@ -423,21 +440,23 @@ router.get('/memories/:id', async (req, res) => {
     console.error('Error fetching memory:', error);
     res.status(500).json({
       status: 'error',
+      timestamp: new Date().toISOString(),
       message: error.message
     });
   }
 });
 
-// Mount all routes
+// Mount all routes with consistent prefix
 app.use('/.netlify/functions/api', router);
-app.use('/api', router);  // For local development
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err);
   res.status(err.status || 500).json({
     status: 'error',
+    timestamp: new Date().toISOString(),
     message: err.message || 'Internal server error',
+    path: req.path,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
@@ -477,6 +496,7 @@ exports.handler = async (event, context) => {
       statusCode: 500,
       body: JSON.stringify({
         status: 'error',
+        timestamp: new Date().toISOString(),
         message: 'Internal server error',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
