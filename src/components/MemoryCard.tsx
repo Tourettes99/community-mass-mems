@@ -83,12 +83,12 @@ const getMemoryPreview = (memory: Memory, expanded: boolean) => {
           </Box>
         );
       }
-      return metadata?.image ? (
+      return metadata?.previewUrl ? (
         <Link href={url} target="_blank" rel="noopener noreferrer">
           <CardMedia
             component="img"
             height="140"
-            image={metadata.image}
+            image={metadata.previewUrl}
             alt={metadata.title || 'URL preview'}
           />
         </Link>
