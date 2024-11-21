@@ -30,23 +30,83 @@ status = 200
 [[headers]]
 for = "/*"
 [headers.values]
-X-Frame-Options = "DENY"
+X-Frame-Options = "SAMEORIGIN"
 X-XSS-Protection = "1; mode=block"
 X-Content-Type-Options = "nosniff"
 Referrer-Policy = "strict-origin-when-cross-origin"
 Content-Security-Policy = """
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://platform.twitter.com https://www.instagram.com https://www.tiktok.com https://www.facebook.com https://connect.facebook.net https://www.redditmedia.com;
-  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
-  font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
-  img-src 'self' data: blob: https:;
-  media-src 'self' blob: https: http://localhost:*;
-  connect-src 'self' https: http://localhost:* ws://localhost:*;
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' 
+    https://*.twitter.com 
+    https://*.instagram.com 
+    https://*.tiktok.com 
+    https://*.facebook.com 
+    https://*.facebook.net 
+    https://*.redditmedia.com 
+    https://*.reddit.com
+    https://w.soundcloud.com
+    https://connect.facebook.net
+    https://platform.twitter.com
+    https://www.youtube.com
+    https://player.vimeo.com
+    https://w.soundcloud.com
+    https://open.spotify.com
+    https://player.twitch.tv
+    https://drive.google.com
+    https://*.dropbox.com;
+  style-src 'self' 'unsafe-inline' 
+    https://fonts.googleapis.com 
+    https://cdnjs.cloudflare.com 
+    https://*.twitter.com 
+    https://*.instagram.com 
+    https://*.tiktok.com 
+    https://*.facebook.com 
+    https://*.redditmedia.com
+    https://w.soundcloud.com
+    https://open.spotify.com;
+  font-src 'self' 
+    https://fonts.gstatic.com 
+    https://cdnjs.cloudflare.com 
+    data:
+    https://*.twitter.com 
+    https://*.instagram.com 
+    https://*.tiktok.com 
+    https://*.facebook.com;
+  img-src 'self' data: blob: https: http:;
+  media-src 'self' blob: https: http:;
+  connect-src 'self' https: http: ws: wss:;
   object-src 'none';
-  frame-src 'self' https://www.youtube.com https://platform.twitter.com https://www.instagram.com https://www.tiktok.com https://www.facebook.com https://www.redditmedia.com;
-  frame-ancestors 'none';
+  frame-src 'self' 
+    https://*.youtube.com 
+    https://*.twitter.com 
+    https://*.instagram.com 
+    https://*.tiktok.com 
+    https://*.facebook.com 
+    https://*.redditmedia.com 
+    https://*.reddit.com
+    https://player.vimeo.com
+    https://w.soundcloud.com
+    https://open.spotify.com
+    https://player.twitch.tv
+    https://drive.google.com
+    https://*.dropboxusercontent.com
+    https://*.dropbox.com;
+  child-src 'self' 
+    blob: 
+    https://*.youtube.com 
+    https://*.twitter.com 
+    https://*.instagram.com 
+    https://*.tiktok.com 
+    https://*.facebook.com 
+    https://*.redditmedia.com
+    https://player.vimeo.com
+    https://w.soundcloud.com
+    https://open.spotify.com
+    https://player.twitch.tv;
+  worker-src 'self' blob:;
   form-action 'self';
   base-uri 'self';
+  frame-ancestors 'self';
 """
 
 [[headers]]
