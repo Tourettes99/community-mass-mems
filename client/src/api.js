@@ -2,11 +2,11 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? '/api'  // This will be redirected to /.netlify/functions/api by Netlify
+  ? '/api'  // This will be proxied to the backend in production
   : 'http://localhost:5000/api';
 
 // Create axios instance with base URL
-export const api = axios.create({
+const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -23,24 +23,13 @@ api.interceptors.response.use(
 );
 
 // API endpoints
-export const ENDPOINTS = {
+const ENDPOINTS = {
   MEMORIES: '/memories',
-  UPLOAD: '/upload',
-  TEST: '/test'
+  UPLOAD: '/upload'
 };
 
 // API functions
-export const testAPI = async () => {
-  try {
-    const response = await api.get(ENDPOINTS.TEST);
-    return response.data;
-  } catch (error) {
-    console.error('Error testing API:', error);
-    throw error;
-  }
-};
-
-export const getMemories = async () => {
+const getMemories = async () => {
   try {
     const response = await api.get(ENDPOINTS.MEMORIES);
     return response.data;
@@ -50,7 +39,7 @@ export const getMemories = async () => {
   }
 };
 
-export const uploadMemory = async (formData) => {
+const uploadMemory = async (formData) => {
   try {
     // For text memories, convert FormData to JSON
     if (formData.get('type') === 'text') {
@@ -64,11 +53,13 @@ export const uploadMemory = async (formData) => {
     }
     
     // For file uploads, use multipart/form-data
-    const response = await api.post(ENDPOINTS.UPLOAD, formData, {
+    const config = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    };
+
+    const response = await api.post(ENDPOINTS.UPLOAD, formData, config);
     return response.data;
   } catch (error) {
     console.error('Error uploading memory:', error);
@@ -76,14 +67,14 @@ export const uploadMemory = async (formData) => {
   }
 };
 
-export const getMemoryFile = async (memoryId) => {
+const getMemoryFile = async (memoryId) => {
   try {
-    const response = await api.get(`${ENDPOINTS.MEMORIES}/${memoryId}/file`, {
-      responseType: 'blob',
-    });
+    const response = await api.get(`${ENDPOINTS.MEMORIES}/${memoryId}/file`);
     return response.data;
   } catch (error) {
     console.error('Error fetching memory file:', error);
     throw error;
   }
 };
+
+export { api, ENDPOINTS, getMemories, uploadMemory, getMemoryFile };

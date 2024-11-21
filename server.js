@@ -32,7 +32,18 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve uploads directory
 app.use('/uploads', express.static(uploadsDir));
+
+// Serve static files from the React app
+const clientBuildPath = path.join(__dirname, 'client', 'build');
+if (fs.existsSync(clientBuildPath)) {
+  app.use(express.static(clientBuildPath));
+}
+
+// API Routes prefix
+const apiRouter = express.Router();
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/memories', {
@@ -133,7 +144,7 @@ async function getUrlMetadata(url) {
 }
 
 // Routes
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+apiRouter.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const { type } = req.body;
     let memoryData = { type };
@@ -185,7 +196,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-app.get('/api/memories', async (req, res) => {
+apiRouter.get('/memories', async (req, res) => {
   try {
     const memories = await Memory.find().sort({ createdAt: -1 });
     res.json(memories);
@@ -194,6 +205,16 @@ app.get('/api/memories', async (req, res) => {
     res.status(500).json({ error: 'Error fetching memories' });
   }
 });
+
+// Use API router with /api prefix
+app.use('/api', apiRouter);
+
+// Serve React app for all other routes in production
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

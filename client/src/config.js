@@ -1,7 +1,12 @@
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://your-production-server.com'  // Replace with your production server URL
-  : 'http://localhost:5000';
+  ? '/.netlify/functions/api'  // Use Netlify Functions path in production
+  : 'http://localhost:5000/api';
 
-export const getFileUrl = (filename) => `${API_BASE_URL}/uploads/${filename}`;
+export const getFileUrl = (filename) => {
+  if (process.env.NODE_ENV === 'production') {
+    return `/.netlify/functions/api/files/${filename}`;
+  }
+  return `${API_BASE_URL}/files/${filename}`;
+};
 
 export default API_BASE_URL;
