@@ -48,60 +48,17 @@ router.get('/test-connection', async (req, res) => {
       await connectWithRetry();
     }
 
-    const state = mongoose.connection.readyState;
-    let stateText;
-    switch (state) {
-      case 0: stateText = 'Disconnected'; break;
-      case 1: stateText = 'Connected'; break;
-      case 2: stateText = 'Connecting'; break;
-      case 3: stateText = 'Disconnecting'; break;
-      default: stateText = 'Unknown';
-    }
-
-    // Get database stats if connected
-    let stats = null;
-    if (state === 1) {
-      try {
-        stats = await mongoose.connection.db.stats();
-        console.log('📈 Database Stats Retrieved');
-      } catch (statsError) {
-        console.error('❌ Error getting database stats:', statsError);
-      }
-    }
-
-    const response = {
+    res.json({
       status: 'success',
-      timestamp: new Date().toISOString(),
-      connection: {
-        state: stateText,
-        readyState: state,
-        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
-        database: mongoose.connection.name,
-        host: mongoose.connection.host
-      }
-    };
-
-    if (stats) {
-      response.stats = {
-        collections: stats.collections,
-        documents: stats.objects,
-        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
-        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
-      };
-    }
-
-    console.log('✅ Sending connection test response:', response);
-    res.json(response);
+      message: 'Connected to database',
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     console.error('❌ MongoDB connection test error:', error);
     res.status(500).json({
       status: 'error',
-      timestamp: new Date().toISOString(),
-      error: {
-        message: error.message,
-        name: error.name,
-        code: error.code
-      }
+      message: 'Failed to connect to database',
+      timestamp: new Date().toISOString()
     });
   }
 });

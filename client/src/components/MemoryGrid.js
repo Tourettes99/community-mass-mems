@@ -1,54 +1,128 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Fade } from '@mui/material';
+import { Box, Fade } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Memory from './Memory';
+import Masonry from '@mui/lab/Masonry';
 
-const StyledGrid = styled(Grid)(({ theme }) => ({
+const StyledMasonry = styled(Masonry)(({ theme }) => ({
+  margin: 0,
   padding: theme.spacing(3),
-  '& .MuiGrid-item': {
-    display: 'flex',
-  }
 }));
 
-// Fisher-Yates shuffle algorithm
+const StyledMemoryWrapper = styled(Box)(({ theme, delay }) => ({
+  width: '100%',
+  height: '100%',
+  animation: `$pulse 3s infinite ${delay}ms ease-in-out`,
+  '@keyframes pulse': {
+    '0%': {
+      transform: 'scale(1)',
+    },
+    '50%': {
+      transform: 'scale(1.02)',
+    },
+    '100%': {
+      transform: 'scale(1)',
+    },
+  },
+}));
+
+// Fisher-Yates shuffle algorithm with weighted randomization
 const shuffleArray = (array) => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    // Add some weighted randomness based on memory type
+    const weight = Math.random() + getMemoryTypeWeight(shuffled[i].type);
+    const j = Math.floor(weight * (i + 1)) % shuffled.length;
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
 };
 
+// Weight different memory types to influence their positioning
+const getMemoryTypeWeight = (type) => {
+  switch (type) {
+    case 'image':
+    case 'gif':
+      return 0.3; // Higher chance to be at the top
+    case 'text':
+      return 0.2;
+    case 'audio':
+      return 0.1;
+    default:
+      return 0;
+  }
+};
+
+// Get random column span for variety
+const getRandomSpan = (type) => {
+  switch (type) {
+    case 'image':
+    case 'gif':
+      return Math.random() > 0.7 ? 2 : 1; // 30% chance for double width
+    case 'text':
+      return Math.random() > 0.8 ? 2 : 1; // 20% chance for double width
+    default:
+      return 1;
+  }
+};
+
 const MemoryGrid = ({ memories }) => {
   const [displayedMemories, setDisplayedMemories] = useState([]);
+  const [spans, setSpans] = useState({});
 
-  // Shuffle memories whenever the memories prop changes
+  // Initialize spans and shuffle memories
   useEffect(() => {
+    const newSpans = {};
+    memories.forEach(memory => {
+      newSpans[memory._id] = getRandomSpan(memory.type);
+    });
+    setSpans(newSpans);
     setDisplayedMemories(shuffleArray(memories));
   }, [memories]);
 
-  // Periodically reshuffle memories every 5 minutes
+  // Periodically reshuffle memories and update spans
   useEffect(() => {
     const shuffleInterval = setInterval(() => {
-      setDisplayedMemories(prevMemories => shuffleArray(prevMemories));
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+      setDisplayedMemories(prevMemories => {
+        const newMemories = shuffleArray(prevMemories);
+        const newSpans = {};
+        newMemories.forEach(memory => {
+          newSpans[memory._id] = getRandomSpan(memory.type);
+        });
+        setSpans(newSpans);
+        return newMemories;
+      });
+    }, 3 * 60 * 1000); // 3 minutes
 
     return () => clearInterval(shuffleInterval);
   }, []);
 
   return (
-    <StyledGrid container spacing={3}>
-      {displayedMemories.map((memory, index) => (
-        <Grid item xs={12} sm={6} md={4} key={memory._id}>
-          <Fade in timeout={300} style={{ transitionDelay: `${index * 100}ms` }}>
-            <div style={{ width: '100%', height: '100%' }}>
-              <Memory memory={memory} />
-            </div>
-          </Fade>
-        </Grid>
-      ))}
-    </StyledGrid>
+    <Box sx={{ width: '100%', minHeight: '100vh' }}>
+      <StyledMasonry
+        columns={{ xs: 1, sm: 2, md: 3, lg: 4 }}
+        spacing={3}
+        defaultHeight={450}
+        defaultColumns={4}
+        defaultSpacing={3}
+      >
+        {displayedMemories.map((memory, index) => (
+          <Box
+            key={memory._id}
+            sx={{
+              gridColumn: `span ${spans[memory._id] || 1}`,
+              width: '100%',
+            }}
+          >
+            <Fade in timeout={300} style={{ transitionDelay: `${index * 100}ms` }}>
+              <StyledMemoryWrapper delay={index * 500 % 2000}>
+                <Memory memory={memory} />
+              </StyledMemoryWrapper>
+            </Fade>
+          </Box>
+        ))}
+      </StyledMasonry>
+    </Box>
   );
 };
 
