@@ -218,9 +218,13 @@ exports.handler = async (event, context) => {
     const memory = {
       type,
       tags: tags || [],
-      createdAt: new Date(),
-      metadata: {},
-      userId: data.userId || 'anonymous'
+      createdAt: new Date().toISOString(), // Convert to ISO string for frontend
+      metadata: {
+        title: '',
+        description: '',
+        mediaType: type,
+        contentType: contentType || 'text/plain'
+      }
     };
 
     console.log('Processing content type:', type);
@@ -230,28 +234,44 @@ exports.handler = async (event, context) => {
       if (type === 'url' && url) {
         console.log('Processing URL:', url);
         memory.url = url;
-        memory.metadata = await extractUrlMetadata(url);
+        const urlMetadata = await extractUrlMetadata(url);
+        memory.metadata = {
+          ...memory.metadata,
+          ...urlMetadata,
+          mediaType: urlMetadata.mediaType || 'url',
+          isPlayable: !!urlMetadata.playbackHtml
+        };
       } else if (type === 'text' && content) {
         console.log('Processing text content');
         memory.content = content;
         memory.metadata = {
+          ...memory.metadata,
           title: content.slice(0, 50),
           description: content,
-          mediaType: 'text'
+          mediaType: 'text',
+          rawContent: content
         };
       } else if (file) {
         console.log('Processing file:', fileName);
         const buffer = Buffer.from(file, 'base64');
         memory.fileName = fileName;
-        memory.contentType = contentType;
-        memory.file = file;
-        memory.metadata = await extractFileMetadata(buffer, fileName);
+        const fileMetadata = await extractFileMetadata(buffer, fileName);
+        memory.metadata = {
+          ...memory.metadata,
+          ...fileMetadata,
+          mediaType: type,
+          isPlayable: ['video', 'audio'].includes(type),
+          fileSize: buffer.length,
+          contentType: fileMetadata.contentType || contentType
+        };
+        memory.file = file; // Store base64 file data
       }
     } catch (error) {
       console.error('Error processing content:', error);
       memory.metadata = {
+        ...memory.metadata,
         error: 'Failed to process content',
-        message: error.message
+        description: error.message
       };
     }
 
@@ -266,7 +286,15 @@ exports.handler = async (event, context) => {
     console.log('Memory created successfully:', result.insertedId);
 
     // Remove the file content from the response to reduce payload size
-    const responseMemory = { ...memory, _id: result.insertedId };
+    const responseMemory = { 
+      ...memory,
+      _id: result.insertedId.toString(), // Convert ObjectId to string
+      metadata: {
+        ...memory.metadata,
+        lastModified: new Date().toISOString() // Add lastModified date
+      }
+    };
+    
     if (responseMemory.file) {
       delete responseMemory.file;
     }
