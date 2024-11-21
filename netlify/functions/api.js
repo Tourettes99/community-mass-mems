@@ -11,6 +11,7 @@ const router = express.Router();
 
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
+console.log('MongoDB URI present:', !!MONGODB_URI);
 
 if (!MONGODB_URI) {
   console.error('MONGODB_URI environment variable is not defined!');
@@ -61,21 +62,40 @@ const handleUpload = (req, res, next) => {
 const mongooseOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
-  family: 4, // Use IPv4, skip trying IPv6
+  family: 4,
   maxPoolSize: 10,
-  connectTimeoutMS: 10000,
-  retryWrites: true,
+  keepAlive: true,
+  keepAliveInitialDelay: 300000,
+  autoIndex: true,
+  authSource: 'admin'
 };
 
 // Connect to MongoDB with retry logic
+let isConnecting = false;
 const connectWithRetry = async (retries = 5, delay = 5000) => {
+  if (isConnecting) {
+    console.log('Already attempting to connect to MongoDB...');
+    return;
+  }
+
+  isConnecting = true;
+
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`MongoDB connection attempt ${i + 1} of ${retries}`);
+      console.log('Connecting to:', MONGODB_URI.replace(/:([^:@]{8})[^:@]*@/, ':***@'));
+      
+      if (mongoose.connection.readyState === 1) {
+        console.log('Already connected to MongoDB');
+        isConnecting = false;
+        return;
+      }
+
       await mongoose.connect(MONGODB_URI, mongooseOptions);
       console.log('Successfully connected to MongoDB Atlas');
+      isConnecting = false;
       return;
     } catch (err) {
       console.error('MongoDB connection error:', {
@@ -86,6 +106,7 @@ const connectWithRetry = async (retries = 5, delay = 5000) => {
       });
       
       if (i === retries - 1) {
+        isConnecting = false;
         throw err;
       }
       
@@ -102,17 +123,24 @@ connectWithRetry().catch(err => {
 // Add connection monitoring
 mongoose.connection.on('error', err => {
   console.error('MongoDB connection error:', err);
+  if (!isConnecting) {
+    setTimeout(() => connectWithRetry(), 5000);
+  }
 });
 
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected, attempting to reconnect...');
-  connectWithRetry().catch(err => {
-    console.error('Failed to reconnect to MongoDB:', err);
-  });
+  if (!isConnecting) {
+    setTimeout(() => connectWithRetry(), 5000);
+  }
 });
 
 mongoose.connection.on('connected', () => {
   console.log('MongoDB connected successfully');
+});
+
+mongoose.connection.on('connecting', () => {
+  console.log('Connecting to MongoDB...');
 });
 
 // Memory Schema
@@ -134,14 +162,31 @@ const memorySchema = new mongoose.Schema({
 const Memory = mongoose.model('Memory', memorySchema);
 
 // Middleware to check MongoDB connection
-const checkMongoConnection = (req, res, next) => {
+const checkMongoConnection = async (req, res, next) => {
+  console.log('Checking MongoDB connection state:', mongoose.connection.readyState);
+  
+  if (mongoose.connection.readyState === 0) {
+    try {
+      console.log('MongoDB disconnected, attempting to reconnect...');
+      await connectWithRetry(3, 2000);
+    } catch (error) {
+      console.error('Failed to reconnect to MongoDB:', error);
+      return res.status(503).json({
+        error: 'Database connection unavailable',
+        details: error.message,
+        state: mongoose.connection.readyState
+      });
+    }
+  }
+  
   if (mongoose.connection.readyState !== 1) {
-    console.error('MongoDB not connected. Current state:', mongoose.connection.readyState);
     return res.status(503).json({
       error: 'Database connection unavailable',
-      state: mongoose.connection.readyState
+      state: mongoose.connection.readyState,
+      stateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState]
     });
   }
+  
   next();
 };
 
@@ -245,14 +290,33 @@ router.get('/memories/:id/file', async (req, res) => {
 });
 
 // Test route with detailed status
-router.get('/test', (req, res) => {
-  res.json({ 
-    message: 'API is working!',
-    mongoState: mongoose.connection.readyState,
-    mongoStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
-    environment: process.env.NODE_ENV,
-    timestamp: new Date().toISOString()
-  });
+router.get('/test', async (req, res) => {
+  console.log('Test route called');
+  console.log('Current MongoDB state:', mongoose.connection.readyState);
+  
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      console.log('MongoDB not connected, attempting to connect...');
+      await connectWithRetry(3, 2000);
+    }
+    
+    res.json({ 
+      message: 'API is working!',
+      mongoState: mongoose.connection.readyState,
+      mongoStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      dbName: mongoose.connection.name,
+      dbHost: mongoose.connection.host
+    });
+  } catch (error) {
+    console.error('Test route error:', error);
+    res.status(500).json({
+      error: 'Failed to connect to database',
+      details: error.message,
+      state: mongoose.connection.readyState
+    });
+  }
 });
 
 // Mount routes
