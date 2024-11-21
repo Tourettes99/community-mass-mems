@@ -118,9 +118,8 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         addDebugInfo(`Full URL will be: ${window.location.origin}${fullPath}`);
 
         // Set up event handlers
-        wavesurferRef.current.on('error', (err) => {
-          const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-          addDebugInfo(`WaveSurfer error: ${errorMsg}`);
+        wavesurferRef.current.on('error', () => {
+          addDebugInfo('WaveSurfer error occurred');
           setError('Failed to load audio file. Please try again.');
           setIsLoading(false);
         });
@@ -131,8 +130,8 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           setError(null);
         });
 
-        wavesurferRef.current.on('loading', (progress) => {
-          addDebugInfo(`Loading progress: ${progress}%`);
+        wavesurferRef.current.on('loading', () => {
+          addDebugInfo('Loading audio file...');
         });
 
         wavesurferRef.current.on('finish', () => {
