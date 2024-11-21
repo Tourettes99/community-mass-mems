@@ -133,12 +133,6 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
         wavesurfer.on('ready', () => {
           addDebugInfo('WaveSurfer ready - Audio loaded successfully');
-          try {
-            const duration = wavesurfer.getDuration();
-            addDebugInfo(`Audio duration: ${duration} seconds`);
-          } catch (err) {
-            addDebugInfo('Could not get duration');
-          }
           setIsLoading(false);
           setError(null);
         });
@@ -155,10 +149,12 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         // Add more event handlers for debugging
         wavesurfer.on('play', () => {
           addDebugInfo('Playback started');
+          setIsPlaying(true);
         });
 
         wavesurfer.on('pause', () => {
           addDebugInfo('Playback paused');
+          setIsPlaying(false);
         });
 
         wavesurfer.on('decode', () => {
@@ -199,24 +195,9 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         wavesurfer.pause();
         addDebugInfo('Pause command sent');
       } else {
-        try {
-          const duration = wavesurfer.getDuration();
-          addDebugInfo(`Current duration: ${duration} seconds`);
-          
-          if (duration === 0) {
-            addDebugInfo('Warning: Audio duration is 0, attempting to reload');
-            await wavesurfer.load(`/${audioPath}`);
-          }
-        } catch (err) {
-          addDebugInfo('Could not get duration, attempting to play anyway');
-        }
-        
         await wavesurfer.play();
         addDebugInfo('Play command sent');
       }
-      
-      setIsPlaying(!isPlaying);
-      addDebugInfo(`Successfully ${isPlaying ? 'paused' : 'started'} playback`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       addDebugInfo(`Error in playback control: ${errorMsg}`);
