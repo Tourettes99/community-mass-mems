@@ -42,8 +42,9 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         const fullPath = `${process.env.PUBLIC_URL}/${audioPath}`;
         console.log('Loading audio from:', fullPath);
 
-        wavesurferRef.current.on('error', (err) => {
-          console.error('WaveSurfer error:', err);
+        // Type-safe event handlers
+        wavesurferRef.current.on('error', () => {
+          console.error('WaveSurfer error occurred');
           setError('Failed to load audio file. Please try again.');
           setIsLoading(false);
         });
@@ -62,6 +63,16 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         // Load the audio file
         wavesurferRef.current.load(fullPath);
 
+        // Add error handling for load
+        const audio = wavesurferRef.current.getMediaElement();
+        if (audio) {
+          audio.onerror = () => {
+            console.error('Audio element error:', audio.error);
+            setError('Failed to load audio file. Please try again.');
+            setIsLoading(false);
+          };
+        }
+
         return () => {
           if (wavesurferRef.current) {
             wavesurferRef.current.destroy();
@@ -79,7 +90,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
     if (wavesurferRef.current) {
       try {
         if (isPlaying) {
-          await wavesurferRef.current.pause();
+          wavesurferRef.current.pause();
         } else {
           await wavesurferRef.current.play();
         }
@@ -106,6 +117,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const contentType = response.headers.get('content-type');
+      console.log('Audio file content type:', contentType);
       if (!contentType?.includes('audio')) {
         console.warn('Content-Type is not audio:', contentType);
       }
