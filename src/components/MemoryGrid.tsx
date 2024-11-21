@@ -135,7 +135,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     if (!metadata) return null;
 
     // Extract domain from URL
-    const getUrlDomain = (url: string) => {
+    const getUrlDomain = (url: string | undefined) => {
+      if (!url) return '';
       try {
         const domain = new URL(url).hostname.toLowerCase();
         return domain;
@@ -146,6 +147,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 
     // Handle social media embeds
     const getSocialMediaEmbed = () => {
+      if (!memory.url) return null;
+      
       const domain = getUrlDomain(memory.url);
       
       // Twitter/X embed
