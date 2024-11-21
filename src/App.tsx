@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline, Box, Container } from '@mui/material';
+import { CssBaseline, Box, Container, Snackbar, Alert } from '@mui/material';
 import { theme } from './theme';
 import MemoryGrid from './components/MemoryGrid';
 import UploadBar from './components/UploadBar';
@@ -10,17 +10,10 @@ import PatreonBar from './components/PatreonBar';
 import { Memory } from './types';
 
 function App() {
-  // Initialize state with persisted data or empty array
-  const [memories, setMemories] = useState<Memory[]>(() => {
-    try {
-      const savedMemories = localStorage.getItem('memories');
-      return savedMemories ? JSON.parse(savedMemories) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
   
   // Initialize intro dialog state
   const [showIntro, setShowIntro] = useState(() => {
@@ -31,7 +24,7 @@ function App() {
     }
   });
 
-  const fetchMemories = async () => {
+  const fetchMemories = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -48,52 +41,32 @@ function App() {
         throw new Error('Invalid response format from server');
       }
 
-      setMemories(data);
-      // Only persist valid data
-      localStorage.setItem('memories', JSON.stringify(data));
-      
+      // Sort memories by creation date (newest first)
+      const sortedData = data.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+
+      setMemories(sortedData);
       console.log(`Loaded ${data.length} memories from database`);
     } catch (error) {
       console.error('Error fetching memories:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch memories');
-      
-      // On error, try to load from localStorage as fallback
-      try {
-        const savedMemories = localStorage.getItem('memories');
-        if (savedMemories) {
-          const parsedMemories = JSON.parse(savedMemories);
-          if (Array.isArray(parsedMemories)) {
-            setMemories(parsedMemories);
-            console.log(`Loaded ${parsedMemories.length} memories from localStorage as fallback`);
-          }
-        }
-      } catch (localError) {
-        console.error('Error loading from localStorage:', localError);
-        setMemories([]);
-      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Fetch memories on mount and set up refresh interval
+  // Initial fetch and set up polling
   useEffect(() => {
     fetchMemories();
 
-    // Refresh memories every 30 seconds
-    const intervalId = setInterval(fetchMemories, 30000);
+    // Poll for updates every 5 seconds
+    const intervalId = setInterval(fetchMemories, 5000);
 
     return () => clearInterval(intervalId);
-  }, []);
-
-  // Persist memories whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem('memories', JSON.stringify(memories));
-    } catch (error) {
-      console.error('Failed to save memories:', error);
-    }
-  }, [memories]);
+  }, [fetchMemories]);
 
   useEffect(() => {
     if (!showIntro) {
@@ -105,20 +78,19 @@ function App() {
     }
   }, [showIntro]);
 
-  const handleMemoryCreated = (newMemory: Memory) => {
-    setMemories(prev => {
-      const newMemories = Array.isArray(prev) ? [newMemory, ...prev] : [newMemory];
-      // Persist immediately on memory creation
-      try {
-        localStorage.setItem('memories', JSON.stringify(newMemories));
-      } catch (error) {
-        console.error('Failed to save new memory:', error);
-      }
-      return newMemories;
-    });
+  const handleMemoryCreated = async (newMemory: Memory) => {
+    // Optimistically add the new memory to the list
+    setMemories(prev => [newMemory, ...prev]);
+    
+    // Show notification
+    setNotification('Memory added successfully! Refreshing...');
+    
+    // Fetch latest memories to ensure consistency
+    await fetchMemories();
   };
 
   const handleRefresh = () => {
+    setNotification('Refreshing memories...');
     fetchMemories();
   };
 
@@ -147,6 +119,20 @@ function App() {
           onClose={() => setShowIntro(false)} 
           audioPath="episode-1-introduktion.mp3"
         />
+        <Snackbar 
+          open={!!notification} 
+          autoHideDuration={3000} 
+          onClose={() => setNotification(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert 
+            onClose={() => setNotification(null)} 
+            severity="success" 
+            sx={{ width: '100%' }}
+          >
+            {notification}
+          </Alert>
+        </Snackbar>
       </Box>
     </ThemeProvider>
   );
