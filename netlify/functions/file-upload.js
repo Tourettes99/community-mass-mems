@@ -14,35 +14,29 @@ if (!MONGODB_URI) {
   throw new Error('MONGODB_URI environment variable is required');
 }
 
-// Initialize MongoDB connection
 let cachedDb = null;
+let cachedClient = null;
+
 async function connectToDatabase() {
-  console.log('Attempting to connect to MongoDB...');
-  
-  if (cachedDb && mongoose.connection.readyState === 1) {
-    console.log('Using cached database connection');
-    return cachedDb;
+  if (cachedDb && cachedClient) {
+    return { db: cachedDb, client: cachedClient };
   }
 
   try {
     console.log('Connecting to MongoDB...');
-    const connection = await mongoose.connect(MONGODB_URI, {
+    const client = await MongoClient.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000,
-      bufferCommands: false,
-      dbName: 'memories'
+      serverSelectionTimeoutMS: 10000
     });
 
+    const db = client.db('community-memories');
+    cachedDb = db;
+    cachedClient = client;
     console.log('MongoDB connected successfully');
-    cachedDb = connection;
-    return connection;
+    return { db, client };
   } catch (error) {
-    console.error('MongoDB connection error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
+    console.error('MongoDB connection error:', error);
     throw error;
   }
 }
