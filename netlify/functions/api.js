@@ -30,33 +30,149 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configure multer for memory storage
+// Memory types enum
+const MEMORY_TYPES = {
+  TEXT: 'text',
+  IMAGE: 'image',
+  GIF: 'gif',
+  AUDIO: 'audio',
+  URL: 'url'
+};
+
+// Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  }
-}).single('file'); // Configure for single file upload
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = {
+      'image/jpeg': MEMORY_TYPES.IMAGE,
+      'image/png': MEMORY_TYPES.IMAGE,
+      'image/gif': MEMORY_TYPES.GIF,
+      'audio/mpeg': MEMORY_TYPES.AUDIO,
+      'audio/wav': MEMORY_TYPES.AUDIO,
+      'audio/ogg': MEMORY_TYPES.AUDIO
+    };
 
-// Custom error handling middleware
-const handleUpload = (req, res, next) => {
-  upload(req, res, function(err) {
-    if (err instanceof multer.MulterError) {
-      console.error('Multer error:', err);
-      return res.status(400).json({
-        error: 'File upload error',
-        details: err.message
-      });
-    } else if (err) {
-      console.error('Unknown upload error:', err);
-      return res.status(500).json({
-        error: 'Unknown upload error',
-        details: err.message
-      });
+    if (allowedTypes[file.mimetype]) {
+      file.memoryType = allowedTypes[file.mimetype];
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images (JPEG, PNG), GIFs, and audio files (MP3, WAV, OGG) are allowed.'));
     }
-    next();
-  });
-};
+  }
+}).single('file');
+
+// Utility function to get image metadata
+async function getImageMetadata(buffer, filename) {
+  const sharp = require('sharp');
+  const image = sharp(buffer);
+  const metadata = await image.metadata();
+
+  return {
+    filename,
+    format: metadata.format,
+    width: metadata.width,
+    height: metadata.height,
+    fileSize: buffer.length
+  };
+}
+
+// Utility function to get GIF metadata
+async function getGifMetadata(buffer, filename) {
+  const gifInfo = require('gif-info');
+  const info = gifInfo(buffer);
+
+  return {
+    filename,
+    format: 'gif',
+    width: info.width,
+    height: info.height,
+    frameCount: info.images,
+    fps: Math.round(100 / info.duration * info.images) / 100,
+    fileSize: buffer.length
+  };
+}
+
+// Utility function to get audio metadata
+async function getAudioMetadata(buffer, filename) {
+  const musicMetadata = require('music-metadata');
+  const metadata = await musicMetadata.parseBuffer(buffer);
+
+  return {
+    filename,
+    format: metadata.format.container,
+    duration: formatDuration(metadata.format.duration),
+    bitrate: metadata.format.bitrate,
+    sampleRate: metadata.format.sampleRate,
+    fileSize: buffer.length
+  };
+}
+
+// Utility function to get URL metadata
+async function getUrlMetadata(url) {
+  const urlMetadata = require('url-metadata');
+  const metadata = await urlMetadata(url);
+
+  return {
+    siteName: metadata.siteName || new URL(url).hostname,
+    siteIcon: metadata.favicon,
+    previewImage: metadata.image,
+    urlDescription: metadata.description
+  };
+}
+
+// Utility function to format duration
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+// Memory Schema
+const memorySchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  type: { 
+    type: String, 
+    required: true,
+    enum: Object.values(MEMORY_TYPES),
+    default: MEMORY_TYPES.TEXT
+  },
+  content: {
+    text: String,
+    fileUrl: String,
+    originalFilename: String
+  },
+  metadata: {
+    // Common metadata
+    filename: String,
+    format: String,
+    fileSize: Number,
+
+    // Image/GIF metadata
+    width: Number,
+    height: Number,
+    frameCount: Number,
+    fps: Number,
+
+    // Audio metadata
+    duration: String,
+    bitrate: Number,
+    sampleRate: Number,
+
+    // URL metadata
+    siteName: String,
+    siteIcon: String,
+    previewImage: String,
+    urlDescription: String
+  }
+}, {
+  timestamps: true
+});
+
+const Memory = mongoose.model('Memory', memorySchema);
 
 // MongoDB connection options
 const mongooseOptions = {
@@ -200,24 +316,6 @@ async function checkMongoConnection(req, res, next) {
   next();
 }
 
-// Memory Schema
-const memorySchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, required: true },
-  mediaUrl: String,
-  mediaType: String,
-  timestamp: { type: Date, default: Date.now },
-  tags: [String],
-  content: String, // For text content
-  fileData: Buffer, // For file storage
-  fileName: String,
-  fileType: String
-}, {
-  timestamps: true
-});
-
-const Memory = mongoose.model('Memory', memorySchema);
-
 // Routes
 router.use(checkMongoConnection);
 
@@ -238,91 +336,97 @@ router.get('/memories', async (req, res) => {
   }
 });
 
-router.post('/memories', handleUpload, async (req, res) => {
-  console.log('POST /memories request received');
-  console.log('Request body:', req.body);
-  console.log('File:', req.file ? {
-    filename: req.file.originalname,
-    mimetype: req.file.mimetype,
-    size: req.file.size
-  } : 'No file');
-  
+router.post('/memories', upload, async (req, res) => {
   try {
-    const { title, description, url } = req.body;
-    
+    const { title, description, text, url } = req.body;
+
     if (!title || !description) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['title', 'description'],
-        received: { title: !!title, description: !!description }
+        required: ['title', 'description']
       });
     }
 
-    const memoryData = {
+    let memoryData = {
       title: title.trim(),
-      description: description.trim(),
-      url: url || null,
-      fileUrl: null // We'll handle file uploads separately
+      description: description.trim()
     };
 
-    // Handle file upload
+    // Handle different content types
     if (req.file) {
-      console.log('Processing file upload:', req.file.originalname);
-      memoryData.fileData = req.file.buffer;
-      memoryData.fileName = req.file.originalname;
-      memoryData.fileType = req.file.mimetype;
-    }
+      const file = req.file;
+      let metadata;
 
-    // Handle media URL
-    if (req.body.mediaUrl) {
-      console.log('Processing media URL:', req.body.mediaUrl);
-      memoryData.mediaUrl = req.body.mediaUrl.trim();
-      memoryData.mediaType = req.body.mediaType || 'url';
-    }
+      if (file.memoryType === MEMORY_TYPES.GIF) {
+        metadata = await getGifMetadata(file.buffer, file.originalname);
+      } else if (file.memoryType === MEMORY_TYPES.IMAGE) {
+        metadata = await getImageMetadata(file.buffer, file.originalname);
+      } else if (file.memoryType === MEMORY_TYPES.AUDIO) {
+        metadata = await getAudioMetadata(file.buffer, file.originalname);
+      }
 
-    console.log('Creating new memory with data:', {
-      ...memoryData,
-      fileData: req.file ? `${req.file.size} bytes` : undefined
-    });
+      memoryData.type = file.memoryType;
+      memoryData.content = {
+        fileUrl: `/api/files/${file.originalname}`,
+        originalFilename: file.originalname
+      };
+      memoryData.metadata = metadata;
+
+      // Store file in MongoDB (in production, you'd want to use S3 or similar)
+      memoryData.fileData = file.buffer;
+
+    } else if (url) {
+      const metadata = await getUrlMetadata(url);
+      memoryData.type = MEMORY_TYPES.URL;
+      memoryData.content = { text: url };
+      memoryData.metadata = metadata;
+
+    } else if (text) {
+      memoryData.type = MEMORY_TYPES.TEXT;
+      memoryData.content = { text };
+    } else {
+      return res.status(400).json({
+        error: 'No content provided',
+        message: 'Please provide either a file, URL, or text content'
+      });
+    }
 
     const memory = new Memory(memoryData);
     const savedMemory = await memory.save();
-    
-    // Create a safe response object without the file buffer
-    const response = savedMemory.toObject();
-    if (response.fileData) {
-      response.fileData = 'File data present';
-    }
 
-    console.log('Memory saved successfully');
+    // Remove binary data from response
+    const response = savedMemory.toObject();
+    delete response.fileData;
+
     res.status(201).json({
       message: 'Memory created successfully',
       memory: response
     });
-    
+
   } catch (error) {
-    console.error('Error saving memory:', error);
+    console.error('Error creating memory:', error);
     res.status(500).json({
       error: 'Failed to create memory',
-      details: error.message,
-      code: error.code
+      details: error.message
     });
   }
 });
 
 // Route to serve files
-router.get('/memories/:id/file', async (req, res) => {
+router.get('/files/:filename', async (req, res) => {
   try {
-    const memory = await Memory.findById(req.params.id);
+    const memory = await Memory.findOne({ 'content.originalFilename': req.params.filename });
+    
     if (!memory || !memory.fileData) {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    res.set('Content-Type', memory.fileType);
+    res.set('Content-Type', memory.metadata.format);
     res.send(memory.fileData);
+
   } catch (error) {
     console.error('Error serving file:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to serve file' });
   }
 });
 
