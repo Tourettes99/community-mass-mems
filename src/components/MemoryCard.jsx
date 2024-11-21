@@ -1,130 +1,201 @@
-import React, { useEffect } from 'react';
-import './MemoryCard.css';
+import React from 'react';
+import {
+  Card,
+  CardContent,
+  CardMedia,
+  Typography,
+  Box,
+  Link,
+  Skeleton,
+  CardActionArea,
+  IconButton,
+  Chip,
+  Stack,
+} from '@mui/material';
+import {
+  OpenInNew as OpenInNewIcon,
+  Image as ImageIcon,
+  VideoLibrary as VideoIcon,
+  Article as ArticleIcon,
+  Link as LinkIcon,
+} from '@mui/icons-material';
 
 const MemoryCard = ({ memory }) => {
-  const { type, url, content, metadata } = memory;
+  if (!memory) return null;
 
-  useEffect(() => {
-    // Load Instagram embeds
-    if (window.instgrm && metadata?.playbackHtml?.includes('instagram-media')) {
-      window.instgrm.Embeds.process();
-    }
-    // Load Twitter embeds
-    if (window.twttr && metadata?.playbackHtml?.includes('twitter-tweet')) {
-      window.twttr.widgets.load();
-    }
-  }, [metadata?.playbackHtml]);
+  const {
+    title,
+    description,
+    url,
+    imageUrl,
+    type,
+    siteName,
+    authorName,
+    publishedTime,
+    embedHtml,
+  } = memory;
 
-  const renderContent = () => {
-    // For text memories
-    if (type === 'text' && content) {
+  const getMediaIcon = () => {
+    switch (type) {
+      case 'image':
+        return <ImageIcon />;
+      case 'video':
+        return <VideoIcon />;
+      case 'article':
+        return <ArticleIcon />;
+      default:
+        return <LinkIcon />;
+    }
+  };
+
+  const renderMedia = () => {
+    if (embedHtml) {
       return (
-        <div className="memory-text-content">
-          <p>{content}</p>
-        </div>
-      );
-    }
-
-    // For URLs with playback HTML
-    if (metadata?.playbackHtml) {
-      return (
-        <div 
-          className={`memory-embed memory-type-${type}`}
-          dangerouslySetInnerHTML={{ __html: metadata.playbackHtml }}
+        <Box
+          sx={{
+            position: 'relative',
+            paddingTop: '56.25%', // 16:9 aspect ratio
+            bgcolor: 'background.default',
+            overflow: 'hidden',
+          }}
+          dangerouslySetInnerHTML={{ __html: embedHtml }}
         />
       );
     }
 
-    // For URLs with preview images but no playback
-    if (metadata?.previewUrl) {
+    if (imageUrl) {
       return (
-        <div className="memory-preview">
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <img 
-              src={metadata.previewUrl} 
-              alt={metadata.title || 'Memory preview'} 
-              className="preview-image"
-            />
-          </a>
-        </div>
+        <CardMedia
+          component="img"
+          image={imageUrl}
+          alt={title || 'Memory image'}
+          sx={{
+            height: 0,
+            paddingTop: '56.25%', // 16:9 aspect ratio
+            objectFit: 'cover',
+          }}
+        />
       );
     }
 
-    // Fallback for URLs without preview
-    if (url) {
-      return (
-        <div className="memory-link">
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            {metadata?.title || url}
-          </a>
-        </div>
-      );
-    }
-
-    return null;
+    return (
+      <Box
+        sx={{
+          height: 0,
+          paddingTop: '56.25%',
+          bgcolor: 'background.default',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          {getMediaIcon()}
+        </Box>
+      </Box>
+    );
   };
 
-  // Don't render empty memories
-  if (!content && !url && !metadata?.playbackHtml && !metadata?.previewUrl) {
-    return null;
-  }
-
   return (
-    <div className={`memory-card memory-type-${type}`}>
-      {/* Title Section */}
-      {metadata?.title && type !== 'text' && (
-        <div className="memory-header">
-          <h3 className="memory-title">
-            {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer">
-                {metadata.title}
-              </a>
-            ) : (
-              metadata.title
+    <Card
+      elevation={1}
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+        '&:hover': {
+          transform: 'translateY(-4px)',
+          boxShadow: 4,
+        },
+      }}
+    >
+      <CardActionArea
+        component={Link}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        sx={{ flexGrow: 1 }}
+      >
+        {renderMedia()}
+        
+        <CardContent>
+          <Stack spacing={1}>
+            {siteName && (
+              <Chip
+                label={siteName}
+                size="small"
+                icon={getMediaIcon()}
+                sx={{ alignSelf: 'flex-start' }}
+              />
             )}
-          </h3>
-          {metadata?.siteName && (
-            <span className="memory-site">{metadata.siteName}</span>
-          )}
-        </div>
-      )}
+            
+            <Typography
+              gutterBottom
+              variant="h6"
+              component="h2"
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                lineHeight: 1.2,
+                minHeight: '2.4em',
+              }}
+            >
+              {title || 'Untitled Memory'}
+            </Typography>
 
-      {/* Main Content */}
-      <div className="memory-content">
-        {renderContent()}
-      </div>
+            {description && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
+                {description}
+              </Typography>
+            )}
 
-      {/* Description */}
-      {metadata?.description && type !== 'text' && (
-        <div className="memory-description-container">
-          <p className="memory-description">{metadata.description}</p>
-        </div>
-      )}
-
-      {/* Footer Metadata */}
-      <div className="memory-footer">
-        {/* Author and Date */}
-        <div className="memory-meta">
-          {metadata?.author && (
-            <span className="memory-author">By {metadata.author}</span>
-          )}
-          {metadata?.publishedDate && (
-            <span className="memory-date">
-              {new Date(metadata.publishedDate).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-
-        {/* Tags */}
-        {metadata?.tags && metadata.tags.length > 0 && (
-          <div className="memory-tags">
-            {metadata.tags.map((tag, index) => (
-              <span key={index} className="memory-tag">#{tag}</span>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+            <Box
+              sx={{
+                mt: 'auto',
+                pt: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              {authorName && (
+                <Typography variant="caption" color="text.secondary">
+                  By {authorName}
+                </Typography>
+              )}
+              
+              {publishedTime && (
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(publishedTime).toLocaleDateString()}
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+        </CardContent>
+      </CardActionArea>
+    </Card>
   );
 };
 
