@@ -3,7 +3,7 @@ external_node_modules = ["sharp", "fluent-ffmpeg", "mongodb-client-encryption", 
 included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
 node_bundler = "esbuild"
 
-[functions.memories]
+[functions."*"]
 timeout = 30
 
 [build]
@@ -32,3 +32,6 @@ X-Frame-Options = "DENY"
 X-XSS-Protection = "1; mode=block"
 X-Content-Type-Options = "nosniff"
 Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[plugins]]
+package = "@netlify/plugin-functions-install-core"
