@@ -134,6 +134,52 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     const metadata = memory.metadata;
     if (!metadata) return null;
 
+    // Extract domain from URL
+    const getUrlDomain = (url: string) => {
+      try {
+        const domain = new URL(url).hostname.toLowerCase();
+        return domain;
+      } catch {
+        return '';
+      }
+    };
+
+    // Handle social media embeds
+    const getSocialMediaEmbed = () => {
+      const domain = getUrlDomain(memory.url);
+      
+      // Twitter/X embed
+      if (domain.includes('twitter.com') || domain.includes('x.com')) {
+        return {
+          html: `<blockquote class="twitter-tweet"><a href="${memory.url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js"></script>`,
+          aspectRatio: '100%'
+        };
+      }
+      
+      // TikTok embed
+      if (domain.includes('tiktok.com')) {
+        return {
+          html: `<blockquote class="tiktok-embed"><a href="${memory.url}"></a></blockquote><script async src="https://www.tiktok.com/embed.js"></script>`,
+          aspectRatio: '100%'
+        };
+      }
+      
+      // Facebook video embed
+      if (domain.includes('facebook.com') && memory.url.includes('/videos/')) {
+        const videoId = memory.url.match(/\/videos\/(\d+)/)?.[1];
+        if (videoId) {
+          return {
+            html: `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(memory.url)}&show_text=false" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>`,
+            aspectRatio: '56.25%' // 16:9 aspect ratio
+          };
+        }
+      }
+
+      return null;
+    };
+
+    const socialEmbed = getSocialMediaEmbed();
+
     return (
       <Card 
         sx={{ 
@@ -181,43 +227,64 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         {/* File Metadata */}
         {renderMetadataDetails(metadata)}
 
-        {/* Media Content */}
-        {metadata.isPlayable && metadata.playbackHtml ? (
+        {/* Social Media Embed */}
+        {socialEmbed ? (
           <Box 
             sx={{ 
               width: '100%',
               position: 'relative',
-              paddingTop: metadata.mediaType === 'video' ? '56.25%' : 'auto',
+              paddingTop: socialEmbed.aspectRatio,
               '& iframe': {
-                position: metadata.mediaType === 'video' ? 'absolute' : 'relative',
+                position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: metadata.mediaType === 'video' ? '100%' : 'auto',
+                height: '100%',
                 border: 'none',
                 borderRadius: 1,
               },
-              '& video, & audio': {
+            }}
+            dangerouslySetInnerHTML={{ __html: socialEmbed.html }}
+          />
+        ) : (
+          // Regular Media Content
+          metadata.isPlayable && metadata.playbackHtml ? (
+            <Box 
+              sx={{ 
                 width: '100%',
-                borderRadius: 1,
-              },
-            }}
-            dangerouslySetInnerHTML={{ __html: metadata.playbackHtml }}
-          />
-        ) : metadata.previewUrl ? (
-          <CardMedia
-            component="img"
-            image={metadata.previewUrl}
-            alt={metadata.title || "Preview"}
-            sx={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: '300px',
-              objectFit: 'cover',
-            }}
-          />
-        ) : null}
-
+                position: 'relative',
+                paddingTop: metadata.mediaType === 'video' ? '56.25%' : 'auto',
+                '& iframe': {
+                  position: metadata.mediaType === 'video' ? 'absolute' : 'relative',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: metadata.mediaType === 'video' ? '100%' : 'auto',
+                  border: 'none',
+                  borderRadius: 1,
+                },
+                '& video, & audio': {
+                  width: '100%',
+                  borderRadius: 1,
+                },
+              }}
+              dangerouslySetInnerHTML={{ __html: metadata.playbackHtml }}
+            />
+          ) : metadata.previewUrl ? (
+            <CardMedia
+              component="img"
+              image={metadata.previewUrl}
+              alt={metadata.title || "Preview"}
+              sx={{
+                width: '100%',
+                height: 'auto',
+                maxHeight: '300px',
+                objectFit: 'cover',
+              }}
+            />
+          ) : null
+        )}
+        
         {/* Description or Raw Content */}
         {(metadata.description || metadata.rawContent) && (
           <CardContent>
