@@ -3,22 +3,22 @@ import { Box, CardMedia, Typography, Link } from '@mui/material';
 import { Launch } from '@mui/icons-material';
 
 const UrlMemory = ({ memory }) => {
-  const { metadata } = memory;
+  const { urlMetadata } = memory;
 
   return (
     <Box sx={{ position: 'relative' }}>
-      {metadata.previewImage && (
+      {urlMetadata.image && (
         <CardMedia
           component="img"
           height="200"
-          image={metadata.previewImage}
-          alt={metadata.siteName}
+          image={urlMetadata.image}
+          alt={urlMetadata.title}
           sx={{ objectFit: 'cover' }}
         />
       )}
       <Box sx={{ p: 2, bgcolor: 'background.paper' }}>
         <Link 
-          href={memory.content.text} 
+          href={memory.content} 
           target="_blank" 
           rel="noopener noreferrer"
           sx={{ 
@@ -30,15 +30,18 @@ const UrlMemory = ({ memory }) => {
           }}
         >
           <Typography variant="subtitle1" component="span">
-            {metadata.siteName}
+            {urlMetadata.title || urlMetadata.siteName}
           </Typography>
           <Launch sx={{ ml: 0.5, fontSize: 16 }} />
         </Link>
-        {metadata.urlDescription && (
+        {urlMetadata.description && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {metadata.urlDescription}
+            {urlMetadata.description}
           </Typography>
         )}
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          {urlMetadata.siteName}
+        </Typography>
       </Box>
     </Box>
   );

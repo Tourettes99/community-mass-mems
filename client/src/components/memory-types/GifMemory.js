@@ -2,20 +2,20 @@ import React from 'react';
 import { CardMedia, Box, Typography } from '@mui/material';
 
 const GifMemory = ({ memory }) => {
-  const { metadata, content } = memory;
+  const gifUrl = `/uploads/${memory.content}`;
 
   return (
     <>
       <CardMedia
         component="img"
         height="200"
-        image={content.fileUrl}
-        alt={content.originalFilename}
+        image={gifUrl}
+        alt={memory.fileName}
         sx={{ objectFit: 'cover' }}
       />
       <Box sx={{ p: 1, bgcolor: 'rgba(0, 0, 0, 0.03)' }}>
         <Typography variant="caption" component="div" color="text.secondary">
-          {metadata.filename} • {metadata.width}x{metadata.height} • {metadata.fps}fps • GIF
+          {memory.fileName} • {memory.dimensions} • {memory.fps}fps • GIF
         </Typography>
       </Box>
     </>
