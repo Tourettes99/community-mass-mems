@@ -232,7 +232,7 @@ exports.handler = async (event, context) => {
               mediaType: urlMetadata.mediaType || type,
               isPlayable: !!urlMetadata.playbackHtml,
               siteName: urlMetadata.siteName || new URL(url).hostname,
-              favicon: urlMetadata.favicon || `https://www.google.com/s2/favicons?domain=${url}`
+              favicon: `/.netlify/functions/get-favicon?url=${encodeURIComponent(url)}`
             };
           }
         } catch (metadataError) {
@@ -326,15 +326,20 @@ exports.handler = async (event, context) => {
       throw new Error('Failed to save memory to database');
     }
   } catch (error) {
-    logger.error('Error creating memory', error);
+    logger.error('Error creating memory', {
+      error: error.message,
+      stack: error.stack,
+      type: error.type
+    });
     
+    // Send a more detailed error response
     return {
       statusCode: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'Internal server error',
         message: error.message,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        type: error.type || 'unknown'
       })
     };
   }
