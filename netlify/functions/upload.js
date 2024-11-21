@@ -130,31 +130,47 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
 };
 
 exports.handler = async (event, context) => {
+  // CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json'
+  };
+
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
+    return { 
+      statusCode: 204, 
+      headers, 
+      body: '' 
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { 
+      statusCode: 405, 
+      headers,
+      body: JSON.stringify({ error: 'Method Not Allowed' })
+    };
   }
 
   try {
     // Parse the incoming request
     const data = JSON.parse(event.body);
-    const { type, url, content, tags } = data;
+    const { type, url, content, tags, file } = data;
 
-    // Validate required fields
+    // Validate memory type
     if (!type || !['url', 'image', 'video', 'audio', 'text'].includes(type)) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ error: 'Invalid memory type' })
       };
     }
 
     // Connect to MongoDB
-    if (!mongoose.connection.readyState) {
-      await mongoose.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        dbName: DB_NAME
-      });
-    }
+    await mongoose.connect(process.env.MONGODB_URI);
     
     let memoryData = {
       type,
@@ -162,30 +178,82 @@ exports.handler = async (event, context) => {
       content
     };
 
-    // Handle URL type memories
-    if (type === 'url') {
-      if (!url) {
-        return {
-          statusCode: 400,
-          body: JSON.stringify({ error: 'URL is required for url type memories' })
-        };
-      }
-
-      const urlMetadata = await fetchUrlMetadata(url);
-      memoryData = {
-        ...memoryData,
-        url,
-        metadata: {
-          title: urlMetadata.title,
-          description: urlMetadata.description,
-          siteName: urlMetadata.siteName,
-          favicon: urlMetadata.favicon,
-          mediaType: urlMetadata.mediaType,
-          previewUrl: urlMetadata.previewUrl,
-          playbackHtml: urlMetadata.playbackHtml,
-          isPlayable: urlMetadata.isPlayable
+    // Handle different memory types
+    switch (type) {
+      case 'url':
+        if (!url) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'URL is required for url type memories' })
+          };
         }
-      };
+
+        // Validate URL format
+        try {
+          new URL(url);
+        } catch {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Invalid URL format' })
+          };
+        }
+
+        const urlMetadata = await fetchUrlMetadata(url);
+        memoryData = {
+          ...memoryData,
+          url,
+          metadata: {
+            title: urlMetadata.title,
+            description: urlMetadata.description,
+            siteName: urlMetadata.siteName,
+            favicon: urlMetadata.favicon,
+            mediaType: urlMetadata.mediaType,
+            previewUrl: urlMetadata.previewUrl,
+            playbackHtml: urlMetadata.playbackHtml,
+            isPlayable: urlMetadata.isPlayable
+          }
+        };
+        break;
+
+      case 'text':
+        if (!content || typeof content !== 'string' || content.trim().length === 0) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Text content is required' })
+          };
+        }
+        memoryData.content = content.trim();
+        break;
+
+      case 'image':
+      case 'video':
+      case 'audio':
+        if (!file) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: `File is required for ${type} type memories` })
+          };
+        }
+        
+        // Add file metadata
+        memoryData = {
+          ...memoryData,
+          url: file.url, // URL from file upload
+          metadata: {
+            title: file.originalname || file.name,
+            mediaType: type,
+            previewUrl: type === 'image' ? file.url : null,
+            isPlayable: type !== 'image',
+            playbackHtml: type !== 'image' ? 
+              `<${type} controls style="width: 100%"><source src="${file.url}" type="${file.contentType}">Your browser does not support ${type} playback.</${type}>` : 
+              null
+          }
+        };
+        break;
     }
 
     // Create and save the memory
@@ -194,14 +262,22 @@ exports.handler = async (event, context) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify(memory)
+      headers,
+      body: JSON.stringify({
+        message: 'Memory created successfully',
+        memory
+      })
     };
 
   } catch (error) {
     console.error('Error creating memory:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to create memory' })
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to create memory',
+        message: error.message 
+      })
     };
   }
 };
