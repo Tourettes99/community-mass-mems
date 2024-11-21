@@ -10,6 +10,8 @@ const fetch = require('node-fetch');
 const sizeOf = require('image-size');
 
 const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+const DB_NAME = 'memories';
+const COLLECTION_NAME = 'memories';
 
 let cachedDb = null;
 let cachedClient = null;
@@ -31,10 +33,10 @@ async function connectToDatabase() {
       connectTimeoutMS: 30000 // Added connect timeout
     });
 
-    const db = client.db('memories');
+    const db = client.db(DB_NAME);
     cachedDb = db;
     cachedClient = client;
-    console.log('MongoDB connected successfully to memories database');
+    console.log(`MongoDB connected successfully to ${DB_NAME} database`);
     return { db, client };
   } catch (error) {
     console.error('MongoDB connection error:', {
@@ -212,7 +214,8 @@ exports.handler = async (event, context) => {
     // Connect to database
     console.log('Connecting to database...');
     const { db } = await connectToDatabase();
-    const memories = db.collection('memories');
+    const memories = db.collection(COLLECTION_NAME);
+    console.log(`Using collection: ${COLLECTION_NAME}`);
 
     // Prepare memory document
     const memory = {
