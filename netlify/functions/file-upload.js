@@ -12,223 +12,72 @@ if (!MONGODB_URI) {
 
 const DB_NAME = 'memories';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const COMPRESSION_QUALITY = 80; // 0-100, higher means better quality
-const MAX_IMAGE_DIMENSION = 2048; // Max width/height in pixels
-const MAX_VIDEO_DIMENSION = 1280; // 720p
-const MAX_AUDIO_BITRATE = '128k'; // 128kbps for audio
 
-// Memory Schema (same as in upload.js)
+// Memory Schema
 const memorySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['image', 'gif', 'video', 'audio', 'document', 'url'],
+    enum: ['url', 'image', 'video', 'audio', 'text', 'static'],
     required: true
   },
-  url: {
-    type: String,
-    required: true
-  },
+  url: String,
+  content: String,
+  tags: [String],
   metadata: {
-    fileName: String,
-    resolution: String,
-    format: String,
-    fps: Number,
-    duration: String,
-    bitrate: String,
-    codec: String,
-    siteName: String,
+    title: String,
     description: String,
-    size: {
-      original: Number,
-      compressed: Number
-    },
+    siteName: String,
+    favicon: String,
+    mediaType: String,
+    previewUrl: String,
+    playbackHtml: String,
+    isPlayable: Boolean,
+    fileSize: Number,
     contentType: String,
-    dimensions: {
-      width: Number,
-      height: Number
-    }
+    resolution: String,
+    duration: String,
+    format: String,
+    encoding: String,
+    lastModified: Date,
+    rawContent: String
   }
 }, { timestamps: true });
 
-// Create the Memory model
-const Memory = mongoose.models.Memory || mongoose.model('Memory', memorySchema);
-
-// File processing functions
-const getFileType = (contentType) => {
-  if (contentType.startsWith('image/gif')) return 'gif';
-  if (contentType.startsWith('image/')) return 'image';
-  if (contentType.startsWith('video/')) return 'video';
-  if (contentType.startsWith('audio/')) return 'audio';
-  return 'document';
-};
-
-const compressImage = async (buffer, contentType, originalName) => {
-  const image = Sharp(buffer);
-  const metadata = await image.metadata();
-  
-  let resizeOptions = {};
-  if (metadata.width > MAX_IMAGE_DIMENSION || metadata.height > MAX_IMAGE_DIMENSION) {
-    resizeOptions = {
-      width: Math.min(metadata.width, MAX_IMAGE_DIMENSION),
-      height: Math.min(metadata.height, MAX_IMAGE_DIMENSION),
-      fit: 'inside',
-      withoutEnlargement: true
-    };
+// Initialize MongoDB connection
+let cachedDb = null;
+async function connectToDatabase() {
+  if (cachedDb) {
+    return cachedDb;
   }
 
-  let processedImage;
-  if (contentType === 'image/jpeg' || contentType === 'image/jpg') {
-    processedImage = await image
-      .resize(resizeOptions)
-      .jpeg({ quality: COMPRESSION_QUALITY })
-      .toBuffer();
-  } else if (contentType === 'image/png') {
-    processedImage = await image
-      .resize(resizeOptions)
-      .png({ compressionLevel: 9 })
-      .toBuffer();
-  } else if (contentType === 'image/gif') {
-    processedImage = buffer; // Don't compress GIFs to preserve animation
-  } else {
-    processedImage = await image
-      .resize(resizeOptions)
-      .toBuffer();
-  }
-
-  const dimensions = {
-    width: metadata.width,
-    height: metadata.height
-  };
-
-  return {
-    buffer: processedImage,
-    contentType,
-    dimensions
-  };
-};
-
-const compressVideo = async (buffer, contentType) => {
-  return new Promise((resolve, reject) => {
-    const inputStream = new PassThrough();
-    const outputStream = new PassThrough();
-    let outputBuffer = Buffer.alloc(0);
-
-    ffmpeg(inputStream)
-      .size(`${MAX_VIDEO_DIMENSION}x?`)
-      .videoBitrate('1000k')
-      .audioBitrate('128k')
-      .format('mp4')
-      .on('error', reject)
-      .on('end', () => {
-        resolve({
-          buffer: outputBuffer,
-          contentType: 'video/mp4',
-          dimensions: {
-            width: MAX_VIDEO_DIMENSION,
-            height: null // Maintained aspect ratio
-          }
-        });
-      })
-      .pipe(outputStream);
-
-    outputStream.on('data', chunk => {
-      outputBuffer = Buffer.concat([outputBuffer, chunk]);
+  try {
+    const connection = await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      dbName: DB_NAME,
+      serverSelectionTimeoutMS: 5000
     });
 
-    inputStream.end(buffer);
-  });
-};
-
-const compressAudio = async (buffer, contentType) => {
-  return new Promise((resolve, reject) => {
-    const inputStream = new PassThrough();
-    const outputStream = new PassThrough();
-    let outputBuffer = Buffer.alloc(0);
-
-    ffmpeg(inputStream)
-      .audioBitrate(MAX_AUDIO_BITRATE)
-      .format('mp3')
-      .on('error', reject)
-      .on('end', () => {
-        resolve({
-          buffer: outputBuffer,
-          contentType: 'audio/mp3'
-        });
-      })
-      .pipe(outputStream);
-
-    outputStream.on('data', chunk => {
-      outputBuffer = Buffer.concat([outputBuffer, chunk]);
-    });
-
-    inputStream.end(buffer);
-  });
-};
-
-const compressDocument = async (buffer, contentType) => {
-  return new Promise((resolve, reject) => {
-    zlib.gzip(buffer, (error, compressedBuffer) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve({
-          buffer: compressedBuffer,
-          contentType
-        });
-      }
-    });
-  });
-};
-
-const compressFile = async (buffer, contentType, fileName) => {
-  const type = getFileType(contentType);
-  
-  switch (type) {
-    case 'image':
-    case 'gif':
-      return compressImage(buffer, contentType, fileName);
-    case 'video':
-      return compressVideo(buffer, contentType);
-    case 'audio':
-      return compressAudio(buffer, contentType);
-    default:
-      return compressDocument(buffer, contentType);
+    cachedDb = connection;
+    return cachedDb;
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
   }
-};
+}
 
-const parseMultipartForm = async (event) => {
-  const boundary = event.headers['content-type'].split('boundary=')[1];
-  const parts = event.body.split(`--${boundary}`);
-  
-  const files = {};
-  const fields = {};
-
-  for (let part of parts) {
-    if (part.includes('Content-Disposition: form-data;')) {
-      const contentType = part.match(/Content-Type: (.*?)\r\n/)?.[1];
-      const name = part.match(/name="([^"]+)"/)?.[1];
-      const filename = part.match(/filename="([^"]+)"/)?.[1];
-      
-      if (filename && contentType) {
-        // This is a file
-        const content = Buffer.from(part.split('\r\n\r\n')[1].split('\r\n--')[0], 'base64');
-        files[name] = {
-          name: filename,
-          type: contentType,
-          content,
-          size: content.length
-        };
-      } else if (name) {
-        // This is a field
-        fields[name] = part.split('\r\n\r\n')[1].split('\r\n--')[0].trim();
-      }
-    }
-  }
-
-  return { files, fields };
-};
+// Initialize Memory model
+let Memory;
+try {
+  Memory = mongoose.model('Memory');
+} catch {
+  Memory = mongoose.model('Memory', memorySchema);
+}
 
 exports.handler = async (event, context) => {
+  // Make sure to close the DB connection when the function exits
+  context.callbackWaitsForEmptyEventLoop = false;
+
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -249,71 +98,55 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    if (!mongoose.connection.readyState) {
-      console.log('Connecting to MongoDB...');
-      await mongoose.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        dbName: DB_NAME
-      });
-      console.log('Connected to MongoDB successfully');
-    }
+    // Connect to MongoDB
+    await connectToDatabase();
 
-    const contentType = event.headers['content-type'] || '';
-    if (!contentType.includes('multipart/form-data')) {
+    // Parse request body
+    let body;
+    try {
+      body = JSON.parse(event.body);
+    } catch (error) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Content-Type must be multipart/form-data' })
+        body: JSON.stringify({ error: 'Invalid request body' })
       };
     }
 
-    const formData = await parseMultipartForm(event);
-    if (!formData.files.file) {
+    // Validate required fields
+    if (!body.type || !['url', 'image', 'video', 'audio', 'text', 'static'].includes(body.type)) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'No file uploaded' })
+        body: JSON.stringify({ error: 'Invalid memory type' })
       };
     }
 
-    const file = formData.files.file;
-    if (file.size > MAX_FILE_SIZE) {
-      return {
-        statusCode: 413,
-        headers,
-        body: JSON.stringify({ error: 'File too large. Maximum size is 10MB.' })
-      };
-    }
-
-    console.log('Processing file:', file.name);
-    const { buffer: compressedBuffer, contentType: outputContentType, dimensions } = 
-      await compressFile(file.content, file.type, file.name);
-
-    const base64Content = compressedBuffer.toString('base64');
-    const dataUrl = `data:${outputContentType};base64,${base64Content}`;
-
+    // Create memory object
     const memoryData = {
-      type: getFileType(outputContentType),
-      url: dataUrl,
-      metadata: {
-        fileName: file.name,
-        format: outputContentType.split('/')[1],
-        size: {
-          original: file.size,
-          compressed: compressedBuffer.length
-        },
-        contentType: outputContentType,
-        dimensions
-      }
+      type: body.type,
+      url: body.url,
+      content: body.content,
+      tags: body.tags || []
     };
 
-    console.log('Compression results:', {
-      originalSize: Math.round(file.size / 1024) + 'KB',
-      compressedSize: Math.round(compressedBuffer.length / 1024) + 'KB',
-      compressionRatio: Math.round((1 - compressedBuffer.length / file.size) * 100) + '%',
-      type: getFileType(outputContentType)
-    });
+    // Add metadata based on type
+    if (body.type === 'url' && body.url) {
+      try {
+        memoryData.metadata = {
+          title: body.url,
+          mediaType: 'url'
+        };
+      } catch (error) {
+        console.error('Error fetching URL metadata:', error);
+      }
+    } else if (body.type === 'text' && body.content) {
+      memoryData.metadata = {
+        title: body.content.slice(0, 50) + (body.content.length > 50 ? '...' : ''),
+        mediaType: 'text',
+        description: body.content
+      };
+    }
 
     console.log('Creating new memory:', JSON.stringify(memoryData, null, 2));
     const memory = new Memory(memoryData);
@@ -324,18 +157,12 @@ exports.handler = async (event, context) => {
       statusCode: 201,
       headers,
       body: JSON.stringify({
-        message: 'Upload successful',
-        memory: {
-          _id: savedMemory._id,
-          type: savedMemory.type,
-          url: savedMemory.url,
-          metadata: savedMemory.metadata,
-          createdAt: savedMemory.createdAt
-        }
+        message: 'Memory created successfully',
+        memory: savedMemory
       })
     };
   } catch (error) {
-    console.error('Error processing file upload:', error);
+    console.error('Error processing request:', error);
     
     return {
       statusCode: 500,
