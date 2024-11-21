@@ -29,7 +29,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           <CardMedia
             component="img"
             image={memory.url}
-            alt={memory.metadata.fileName}
+            alt={memory.metadata?.fileName || 'Memory image'}
             sx={{ height: 200, objectFit: 'cover' }}
           />
         );
@@ -37,15 +37,15 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         return (
           <Box sx={{ p: 2 }}>
             <audio controls style={{ width: '100%' }}>
-              <source src={memory.url} type={`audio/${memory.metadata.format}`} />
+              <source src={memory.url} type={memory.metadata?.format ? `audio/${memory.metadata.format}` : 'audio/mpeg'} />
             </audio>
           </Box>
         );
       case 'url':
         return (
           <Box sx={{ p: 2 }}>
-            <Typography variant="h6">{memory.metadata.siteName}</Typography>
-            <Typography variant="body2">{memory.metadata.description}</Typography>
+            <Typography variant="h6">{memory.metadata?.siteName || 'Website'}</Typography>
+            <Typography variant="body2">{memory.metadata?.description || 'No description available'}</Typography>
           </Box>
         );
       default:
@@ -55,6 +55,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 
   const renderMetadata = () => {
     const { metadata } = memory;
+    if (!metadata) return null;
+    
     return (
       <Box sx={{ mt: 1 }}>
         {metadata.fileName && (
