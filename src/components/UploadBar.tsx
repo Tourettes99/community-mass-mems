@@ -1,4 +1,4 @@
-import React, { useState, useRef, ChangeEvent, React.KeyboardEvent, FormEvent } from 'react';
+import React, { useState, useRef, ChangeEvent, KeyboardEvent, FormEvent } from 'react';
 import {
   Box,
   Button,
@@ -15,7 +15,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  TextFieldProps
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -28,7 +29,9 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { styled } from '@mui/material/styles';
 import { Memory } from '../types';
 
-const SUPPORTED_FILE_TYPES = {
+type MemoryFileType = 'image' | 'video' | 'audio' | 'static';
+
+const SUPPORTED_FILE_TYPES: Record<MemoryFileType, string[]> = {
   image: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
   video: ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'],
   audio: ['.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'],
@@ -71,11 +74,23 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     setTags(tags.filter(tag => tag !== tagToDelete));
   };
 
-  const handleKeyPress = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyPress = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' && currentTag) {
       event.preventDefault();
       handleTagAdd();
     }
+  };
+
+  const handleUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setUrl(event.target.value);
+  };
+
+  const handleContentChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setContent(event.target.value);
+  };
+
+  const handleTagChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setCurrentTag(event.target.value);
   };
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -189,7 +204,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
               fullWidth
               label={`${type.charAt(0).toUpperCase() + type.slice(1)} URL`}
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={handleUrlChange}
               InputProps={{
                 startAdornment: getTypeIcon(type)
               }}
@@ -205,7 +220,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
                   ref={fileInputRef}
                   type="file"
                   onChange={handleFileChange}
-                  accept={SUPPORTED_FILE_TYPES[type]?.join(',')}
+                  accept={type !== 'text' && type !== 'url' ? SUPPORTED_FILE_TYPES[type as MemoryFileType]?.join(',') : undefined}
                 />
               </Button>
             </Tooltip>
@@ -220,7 +235,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
             rows={4}
             label="Text Content"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
           />
         )}
 
@@ -230,7 +245,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
             <TextField
               label="Add Tags"
               value={currentTag}
-              onChange={(e) => setCurrentTag(e.target.value)}
+              onChange={handleTagChange}
               onKeyPress={handleKeyPress}
               size="small"
             />
