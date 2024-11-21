@@ -9,6 +9,13 @@ const path = require('path');
 const app = express();
 const router = express.Router();
 
+// Debug logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
 console.log('MongoDB URI present:', !!MONGODB_URI);
@@ -492,8 +499,9 @@ router.get('/test', async (req, res) => {
   }
 });
 
-// Add test endpoint for MongoDB connection
+// Test endpoint for MongoDB connection
 router.get('/test-connection', async (req, res) => {
+  console.log('Test connection endpoint hit');
   try {
     const state = mongoose.connection.readyState;
     let stateText;
@@ -505,24 +513,38 @@ router.get('/test-connection', async (req, res) => {
       default: stateText = 'Unknown';
     }
 
-    // Get database stats
-    const stats = await mongoose.connection.db.stats();
-    
-    res.json({
+    // Get database stats if connected
+    let stats = null;
+    if (state === 1) {
+      try {
+        stats = await mongoose.connection.db.stats();
+      } catch (statsError) {
+        console.error('Error getting database stats:', statsError);
+      }
+    }
+
+    const response = {
       status: 'success',
       connection: {
         state: stateText,
+        readyState: state,
         url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
         database: mongoose.connection.name,
         host: mongoose.connection.host
-      },
-      stats: {
+      }
+    };
+
+    if (stats) {
+      response.stats = {
         collections: stats.collections,
         documents: stats.objects,
         dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
         storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
-      }
-    });
+      };
+    }
+
+    console.log('Sending connection test response:', response);
+    res.json(response);
   } catch (error) {
     console.error('MongoDB connection test error:', error);
     res.status(500).json({
@@ -530,7 +552,7 @@ router.get('/test-connection', async (req, res) => {
       error: {
         message: error.message,
         name: error.name,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        code: error.code
       }
     });
   }
@@ -604,8 +626,25 @@ router.get('/test-db', async (req, res) => {
   }
 });
 
-// Mount routes
+// Mount routes at the root level for Netlify Functions
 app.use('/', router);
 
 // Export handler
-module.exports.handler = serverless(app);
+module.exports.handler = serverless(app, {
+  binary: ['image/*', 'audio/*'],
+  request: function(request, event, context) {
+    // Log incoming requests
+    console.log('Request:', {
+      method: request.method,
+      path: request.path,
+      headers: request.headers
+    });
+  },
+  response: function(response, event, context) {
+    // Log outgoing responses
+    console.log('Response:', {
+      statusCode: response.statusCode,
+      headers: response.headers
+    });
+  }
+});
