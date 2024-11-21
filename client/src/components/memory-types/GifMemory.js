@@ -1,8 +1,9 @@
 import React from 'react';
 import { CardMedia, Box, Typography } from '@mui/material';
+import { getFileUrl } from '../../config';
 
 const GifMemory = ({ memory }) => {
-  const gifUrl = `/uploads/${memory.content}`;
+  const gifUrl = getFileUrl(memory.content);
 
   return (
     <>

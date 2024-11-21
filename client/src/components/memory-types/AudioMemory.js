@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Box, IconButton, Typography, LinearProgress } from '@mui/material';
 import { PlayArrow, Pause } from '@mui/icons-material';
+import { getFileUrl } from '../../config';
 
 const AudioMemory = ({ memory }) => {
   const audioRef = useRef(null);
@@ -98,11 +99,13 @@ const AudioMemory = ({ memory }) => {
     setIsPlaying(!isPlaying);
   };
 
+  const audioUrl = getFileUrl(memory.content);
+
   return (
     <Box sx={{ p: 2 }}>
       <audio
         ref={audioRef}
-        src={`/uploads/${memory.content}`}
+        src={audioUrl}
         preload="metadata"
       />
       
