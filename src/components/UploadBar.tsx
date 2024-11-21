@@ -155,10 +155,10 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
 
       // Add URL or content based on type
       if (type === 'url') {
-        if (!url) {
+        if (!url.trim()) {
           throw new Error('URL is required for URL type memories');
         }
-        requestBody.url = url;
+        requestBody.url = url.trim();
       } else if (type === 'text') {
         if (!content) {
           throw new Error('Content is required for text type memories');

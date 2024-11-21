@@ -139,6 +139,16 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Additional validation for URL type
+    if (type === 'url' && (!url || !url.trim())) {
+      logger.warn('Invalid URL provided', { url });
+      return {
+        statusCode: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Invalid URL provided' })
+      };
+    }
+
     logger.info('Connecting to database...');
     const { db } = await connectToDatabase();
     const memories = db.collection(COLLECTION_NAME);
