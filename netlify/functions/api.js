@@ -39,7 +39,7 @@ const MEMORY_TYPES = {
   URL: 'url'
 };
 
-// Configure multer for file uploads
+// Configure multer for serverless environment
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -55,14 +55,27 @@ const upload = multer({
       'audio/ogg': MEMORY_TYPES.AUDIO
     };
 
-    if (allowedTypes[file.mimetype]) {
-      file.memoryType = allowedTypes[file.mimetype];
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only images (JPEG, PNG), GIFs, and audio files (MP3, WAV, OGG) are allowed.'));
+    if (!allowedTypes[file.mimetype]) {
+      return cb(new Error('File type not allowed'), false);
     }
+
+    file.memoryType = allowedTypes[file.mimetype];
+    cb(null, true);
   }
 }).single('file');
+
+// Promisify multer middleware
+const uploadMiddleware = (req, res) => {
+  return new Promise((resolve, reject) => {
+    upload(req, res, (err) => {
+      if (err) {
+        console.error('Upload error:', err);
+        reject(err);
+      }
+      resolve();
+    });
+  });
+};
 
 // Utility function to get image metadata
 async function getImageMetadata(buffer, filename) {
@@ -319,69 +332,70 @@ async function checkMongoConnection(req, res, next) {
 // Routes
 router.use(checkMongoConnection);
 
-router.get('/memories', async (req, res) => {
-  console.log('GET /memories request received');
+// Handle file uploads
+router.post('/memories', async (req, res) => {
   try {
-    const memories = await Memory.find()
-      .select('-fileData') // Exclude file data from response
-      .sort({ timestamp: -1 });
-    console.log('Found memories:', memories.length);
-    res.json(memories);
-  } catch (error) {
-    console.error('Error fetching memories:', error);
-    res.status(500).json({ 
-      error: error.message,
-      stack: error.stack
-    });
-  }
-});
+    // Handle file upload if present
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
+      await uploadMiddleware(req, res);
+    }
 
-router.post('/memories', upload, async (req, res) => {
-  try {
     const { title, description, text, url } = req.body;
+    console.log('Received memory request:', { title, description, hasFile: !!req.file });
 
     if (!title || !description) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['title', 'description']
+        required: ['title', 'description'],
+        received: { title: !!title, description: !!description }
       });
     }
 
     let memoryData = {
       title: title.trim(),
-      description: description.trim()
+      description: description.trim(),
+      timestamp: new Date()
     };
 
     // Handle different content types
     if (req.file) {
       const file = req.file;
-      let metadata;
+      console.log('Processing file:', { 
+        name: file.originalname, 
+        type: file.memoryType, 
+        size: file.size 
+      });
 
-      if (file.memoryType === MEMORY_TYPES.GIF) {
-        metadata = await getGifMetadata(file.buffer, file.originalname);
-      } else if (file.memoryType === MEMORY_TYPES.IMAGE) {
-        metadata = await getImageMetadata(file.buffer, file.originalname);
-      } else if (file.memoryType === MEMORY_TYPES.AUDIO) {
-        metadata = await getAudioMetadata(file.buffer, file.originalname);
+      let metadata;
+      try {
+        if (file.memoryType === MEMORY_TYPES.GIF) {
+          metadata = await getGifMetadata(file.buffer, file.originalname);
+        } else if (file.memoryType === MEMORY_TYPES.IMAGE) {
+          metadata = await getImageMetadata(file.buffer, file.originalname);
+        } else if (file.memoryType === MEMORY_TYPES.AUDIO) {
+          metadata = await getAudioMetadata(file.buffer, file.originalname);
+        }
+      } catch (metadataError) {
+        console.error('Metadata extraction error:', metadataError);
       }
 
       memoryData.type = file.memoryType;
-      memoryData.content = {
-        fileUrl: `/api/files/${file.originalname}`,
-        originalFilename: file.originalname
-      };
-      memoryData.metadata = metadata;
-
-      // Store file in MongoDB (in production, you'd want to use S3 or similar)
       memoryData.fileData = file.buffer;
+      memoryData.metadata = metadata || {
+        fileName: file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype
+      };
 
     } else if (url) {
+      console.log('Processing URL memory:', url);
       const metadata = await getUrlMetadata(url);
       memoryData.type = MEMORY_TYPES.URL;
-      memoryData.content = { text: url };
+      memoryData.content = { url };
       memoryData.metadata = metadata;
 
     } else if (text) {
+      console.log('Processing text memory');
       memoryData.type = MEMORY_TYPES.TEXT;
       memoryData.content = { text };
     } else {
@@ -393,21 +407,19 @@ router.post('/memories', upload, async (req, res) => {
 
     const memory = new Memory(memoryData);
     const savedMemory = await memory.save();
+    console.log('Memory saved successfully:', savedMemory._id);
 
     // Remove binary data from response
     const response = savedMemory.toObject();
     delete response.fileData;
 
-    res.status(201).json({
-      message: 'Memory created successfully',
-      memory: response
-    });
-
+    res.status(201).json(response);
   } catch (error) {
-    console.error('Error creating memory:', error);
+    console.error('Memory creation error:', error);
     res.status(500).json({
       error: 'Failed to create memory',
-      details: error.message
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

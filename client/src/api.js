@@ -18,6 +18,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+    }
     return Promise.reject(error);
   }
 );
@@ -25,7 +29,6 @@ api.interceptors.response.use(
 // API endpoints
 const ENDPOINTS = {
   MEMORIES: '/memories',
-  UPLOAD: '/upload',
   TEST_CONNECTION: '/test-connection'
 };
 
@@ -56,10 +59,12 @@ const uploadMemory = async (formData) => {
     if (formData.get('type') === 'text') {
       const data = {
         type: 'text',
-        content: formData.get('content')
+        title: formData.get('title'),
+        description: formData.get('description'),
+        text: formData.get('content')
       };
       
-      const response = await api.post(ENDPOINTS.UPLOAD, data);
+      const response = await api.post(ENDPOINTS.MEMORIES, data);
       return response.data;
     }
     
@@ -70,7 +75,7 @@ const uploadMemory = async (formData) => {
       },
     };
 
-    const response = await api.post(ENDPOINTS.UPLOAD, formData, config);
+    const response = await api.post(ENDPOINTS.MEMORIES, formData, config);
     return response.data;
   } catch (error) {
     console.error('Error uploading memory:', error);
