@@ -1,7 +1,7 @@
 [build]
   base = "."
   publish = "client/build"
-  command = "cd client && npm install && CI=false npm run build && copy /Y public\\manifest.json build\\manifest.json"
+  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
   functions = "netlify/functions"
 
 [build.environment]
@@ -10,15 +10,15 @@
   GENERATE_SOURCEMAP = "false"
 
 [context.production]
-  command = "cd client && npm install && CI=false npm run build && copy /Y public\\manifest.json build\\manifest.json"
+  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
   publish = "client/build"
 
 [context.deploy-preview]
-  command = "cd client && npm install && CI=false npm run build && copy /Y public\\manifest.json build\\manifest.json"
+  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
   publish = "client/build"
 
 [context.branch-deploy]
-  command = "cd client && npm install && CI=false npm run build && copy /Y public\\manifest.json build\\manifest.json"
+  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
   publish = "client/build"
 
 [dev]
