@@ -37,25 +37,53 @@ function App() {
     
     try {
       const response = await fetch('/.netlify/functions/get-memories');
-      if (!response.ok) throw new Error('Failed to fetch memories');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
-      const newMemories = Array.isArray(data) ? data : [];
-      setMemories(newMemories);
-      // Persist to localStorage
-      localStorage.setItem('memories', JSON.stringify(newMemories));
+      
+      // Validate the response data
+      if (!Array.isArray(data)) {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response format from server');
+      }
+
+      setMemories(data);
+      // Only persist valid data
+      localStorage.setItem('memories', JSON.stringify(data));
+      
+      console.log(`Loaded ${data.length} memories from database`);
     } catch (error) {
       console.error('Error fetching memories:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch memories');
-      setMemories([]);
-      // Clear localStorage on error
-      localStorage.removeItem('memories');
+      
+      // On error, try to load from localStorage as fallback
+      try {
+        const savedMemories = localStorage.getItem('memories');
+        if (savedMemories) {
+          const parsedMemories = JSON.parse(savedMemories);
+          if (Array.isArray(parsedMemories)) {
+            setMemories(parsedMemories);
+            console.log(`Loaded ${parsedMemories.length} memories from localStorage as fallback`);
+          }
+        }
+      } catch (localError) {
+        console.error('Error loading from localStorage:', localError);
+        setMemories([]);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch memories on mount and set up refresh interval
   useEffect(() => {
     fetchMemories();
+
+    // Refresh memories every 30 seconds
+    const intervalId = setInterval(fetchMemories, 30000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // Persist memories whenever they change

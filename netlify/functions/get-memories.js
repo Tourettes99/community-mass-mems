@@ -125,10 +125,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        message: 'Memories retrieved successfully',
-        memories
-      })
+      body: JSON.stringify(memories)
     };
   } catch (error) {
     console.error('Error fetching memories:', error);
