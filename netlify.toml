@@ -1,7 +1,7 @@
 [build]
   base = "."
   publish = "client/build"
-  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
+  command = "cd client && npm install && CI=false npm run build"
   functions = "netlify/functions"
 
 [build.environment]
@@ -10,15 +10,15 @@
   GENERATE_SOURCEMAP = "false"
 
 [context.production]
-  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
+  command = "cd client && npm install && CI=false npm run build"
   publish = "client/build"
 
 [context.deploy-preview]
-  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
+  command = "cd client && npm install && CI=false npm run build"
   publish = "client/build"
 
 [context.branch-deploy]
-  command = "cd client && npm install && CI=false npm run build && cp -f public/manifest.json build/manifest.json"
+  command = "cd client && npm install && CI=false npm run build"
   publish = "client/build"
 
 [dev]
@@ -31,10 +31,9 @@
     Access-Control-Allow-Origin = "*"
 
 [[headers]]
-  for = "/manifest.json"
+  for = "/static/*"
     [headers.values]
-    Content-Type = "application/manifest+json"
-    Cache-Control = "public, max-age=0, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
   for = "/*.js"
@@ -48,9 +47,16 @@
     Content-Type = "text/css"
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Handle SPA routing
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/static/*"
+  to = "/static/:splat"
   status = 200
   force = true
 

@@ -1,10 +1,25 @@
 // API configuration
-const isDevelopment = process.env.NODE_ENV === 'development';
+import axios from 'axios';
 
-// Base URL for API calls
-export const API_BASE_URL = isDevelopment 
-  ? 'http://localhost:5000/api'
-  : '/.netlify/functions/api';
+const isDevelopment = process.env.NODE_ENV === 'development';
+const API_BASE_URL = isDevelopment ? 'http://localhost:5000/api' : '/.netlify/functions/api';
+
+// Create axios instance with base URL
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error);
+    return Promise.reject(error);
+  }
+);
 
 // API endpoints
 export const ENDPOINTS = {
@@ -16,11 +31,8 @@ export const ENDPOINTS = {
 // API functions
 export const testAPI = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}${ENDPOINTS.TEST}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
+    const response = await api.get(ENDPOINTS.TEST);
+    return response.data;
   } catch (error) {
     console.error('Error testing API:', error);
     throw error;
@@ -29,19 +41,8 @@ export const testAPI = async () => {
 
 export const fetchMemories = async () => {
   try {
-    console.log('Fetching memories from:', `${API_BASE_URL}${ENDPOINTS.MEMORIES}`);
-    const response = await fetch(`${API_BASE_URL}${ENDPOINTS.MEMORIES}`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    console.log('Received memories:', data);
-    return data;
+    const response = await api.get(ENDPOINTS.MEMORIES);
+    return response.data;
   } catch (error) {
     console.error('Error fetching memories:', error);
     throw error;
@@ -50,17 +51,12 @@ export const fetchMemories = async () => {
 
 export const uploadMemory = async (formData) => {
   try {
-    console.log('Uploading memory to:', `${API_BASE_URL}${ENDPOINTS.UPLOAD}`);
-    const response = await fetch(`${API_BASE_URL}${ENDPOINTS.UPLOAD}`, {
-      method: 'POST',
-      body: formData
+    const response = await api.post(ENDPOINTS.UPLOAD, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    console.log('Upload response:', data);
-    return data;
+    return response.data;
   } catch (error) {
     console.error('Error uploading memory:', error);
     throw error;
