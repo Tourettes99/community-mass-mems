@@ -6,6 +6,16 @@
 [build.environment]
   NODE_VERSION = "18.16.0"
   NODE_ENV = "production"
+  MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["mongodb-client-encryption", "bson", "aws4"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 [[redirects]]
   from = "/*"
@@ -19,3 +29,4 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Access-Control-Allow-Origin = "*"
