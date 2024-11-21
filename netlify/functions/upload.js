@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 
-const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 const DB_NAME = 'memories';
 const COLLECTION_NAME = 'memories';
 
@@ -48,37 +48,59 @@ const getFileType = (contentType) => {
 };
 
 const parseMultipartForm = event => {
-  const boundary = event.headers['content-type'].split('=')[1];
-  const body = Buffer.from(event.body, 'base64').toString();
-  
-  const parts = body.split(`--${boundary}`);
-  const result = {
-    fields: {},
-    files: {}
-  };
+  try {
+    const boundary = event.headers['content-type'].split('boundary=')[1];
+    const rawBody = Buffer.from(event.body, 'base64');
+    
+    // Split the body into parts using the boundary
+    const parts = rawBody.toString().split(`--${boundary}`);
+    const result = {
+      fields: {},
+      files: {}
+    };
 
-  parts.forEach(part => {
-    if (part.includes('Content-Disposition: form-data;')) {
-      const [headers, ...contentParts] = part.split('\r\n\r\n');
-      const content = contentParts.join('\r\n\r\n').trim();
-      
-      const nameMatch = headers.match(/name="([^"]+)"/);
-      const filenameMatch = headers.match(/filename="([^"]+)"/);
-      
-      if (filenameMatch) {
-        const contentTypeMatch = headers.match(/Content-Type: (.+)/);
+    for (const part of parts) {
+      if (!part.includes('Content-Disposition: form-data;')) continue;
+
+      // Split headers and content
+      const [headerSection, ...contentSections] = part.split('\r\n\r\n');
+      if (!headerSection || contentSections.length === 0) continue;
+
+      // Get content without the trailing boundary and \r\n
+      let content = contentSections.join('\r\n\r\n');
+      if (content.endsWith('\r\n')) {
+        content = content.slice(0, -2);
+      }
+
+      // Parse headers
+      const nameMatch = headerSection.match(/name="([^"]+)"/);
+      const filenameMatch = headerSection.match(/filename="([^"]+)"/);
+      const contentTypeMatch = headerSection.match(/Content-Type: (.+)/);
+
+      if (filenameMatch && contentTypeMatch) {
+        // This is a file
+        const startPos = part.indexOf('\r\n\r\n') + 4;
+        const fileContent = rawBody.slice(
+          rawBody.indexOf(Buffer.from(part.slice(startPos))),
+          rawBody.indexOf(Buffer.from(`--${boundary}`, startPos))
+        );
+
         result.files.file = {
           name: filenameMatch[1],
-          type: contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream',
-          content: content
+          type: contentTypeMatch[1].trim(),
+          content: fileContent
         };
       } else if (nameMatch) {
-        result.fields[nameMatch[1]] = content;
+        // This is a regular field
+        result.fields[nameMatch[1]] = content.trim();
       }
     }
-  });
 
-  return result;
+    return result;
+  } catch (error) {
+    console.error('Error parsing multipart form:', error);
+    throw error;
+  }
 };
 
 exports.handler = async (event, context) => {
@@ -123,7 +145,14 @@ exports.handler = async (event, context) => {
     if (contentType.includes('multipart/form-data')) {
       // Handle file upload
       const formData = parseMultipartForm(event);
-      console.log('Parsed form data:', formData);
+      console.log('Parsed form data:', { 
+        fields: formData.fields,
+        fileInfo: formData.files.file ? {
+          name: formData.files.file.name,
+          type: formData.files.file.type,
+          size: formData.files.file.content.length
+        } : null
+      });
 
       if (!formData.files.file) {
         return {
@@ -135,9 +164,8 @@ exports.handler = async (event, context) => {
 
       const file = formData.files.file;
       
-      // For now, we'll store the file content as a data URL
-      // In production, you'd want to upload this to S3 or another storage service
-      const base64Content = Buffer.from(file.content).toString('base64');
+      // Convert binary content to base64 and create proper data URL
+      const base64Content = file.content.toString('base64');
       const dataUrl = `data:${file.type};base64,${base64Content}`;
 
       memoryData = {
@@ -146,7 +174,7 @@ exports.handler = async (event, context) => {
         metadata: {
           fileName: file.name,
           format: file.type.split('/')[1],
-          // Add more metadata as needed
+          size: file.content.length,
         }
       };
     } else {
@@ -172,15 +200,21 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log('Memory data to save:', memoryData);
+    console.log('Memory data to save:', {
+      ...memoryData,
+      url: memoryData.url.substring(0, 50) + '...' // Truncate URL for logging
+    });
+
     const memory = new Memory(memoryData);
     const savedMemory = await memory.save();
-    console.log('Saved memory:', savedMemory);
 
     return {
       statusCode: 201,
       headers,
-      body: JSON.stringify(savedMemory)
+      body: JSON.stringify({
+        ...savedMemory.toObject(),
+        url: memoryData.url // Include the full URL in the response
+      })
     };
   } catch (error) {
     console.error('Error processing upload:', error);

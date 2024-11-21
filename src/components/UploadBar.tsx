@@ -6,7 +6,8 @@ import {
   TextField, 
   CircularProgress,
   Typography,
-  IconButton
+  IconButton,
+  Container
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -29,7 +30,7 @@ const UploadBar: React.FC = () => {
       errorMessage = 'File is too large. Please try a smaller file.';
     }
     setError(errorMessage);
-    setTimeout(() => setError(null), 5000); // Clear error after 5 seconds
+    setTimeout(() => setError(null), 5000);
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,94 +92,126 @@ const UploadBar: React.FC = () => {
   };
 
   return (
-    <Paper 
-      elevation={3}
-      sx={{
-        p: 2,
-        mb: 3,
-        bgcolor: 'background.paper',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2,
-      }}
-    >
-      {error && (
-        <Typography 
-          variant="body2" 
-          color="error" 
-          sx={{ 
-            textAlign: 'center',
-            bgcolor: 'error.light',
-            color: 'error.contrastText',
-            p: 1,
-            borderRadius: 1
-          }}
-        >
-          {error}
-        </Typography>
-      )}
-      
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: { xs: 'column', md: 'row' },
-        gap: 2,
-        alignItems: 'center'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*,audio/*,.gif"
-            onChange={handleFileUpload}
-            style={{ display: 'none' }}
-            id="file-upload"
-          />
-          <label htmlFor="file-upload">
-            <Button
-              component="span"
-              variant="contained"
-              startIcon={<CloudUploadIcon />}
-              disabled={uploading}
+    <Container maxWidth="lg">
+      <Paper 
+        elevation={3}
+        sx={{
+          p: 3,
+          mb: 3,
+          bgcolor: 'background.paper',
+        }}
+      >
+        {error && (
+          <Box sx={{ mb: 2 }}>
+            <Typography 
+              variant="body2"
+              sx={{ 
+                textAlign: 'center',
+                bgcolor: 'error.light',
+                color: 'error.contrastText',
+                p: 1,
+                borderRadius: 1
+              }}
             >
-              Upload File
-            </Button>
-          </label>
-          <Typography variant="body2" color="text.secondary">
-            or
-          </Typography>
-          <TextField
-            fullWidth
-            placeholder="Paste URL here"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            disabled={uploading}
-          />
-        </Box>
+              {error}
+            </Typography>
+          </Box>
+        )}
+        
+        <Box sx={{ 
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: 2,
+          alignItems: { xs: 'stretch', sm: 'center' },
+        }}>
+          <Box sx={{ 
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: 'center',
+            gap: 2,
+            flex: 1,
+          }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*,audio/*,.gif"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+              id="file-upload"
+            />
+            <label htmlFor="file-upload">
+              <Button
+                component="span"
+                variant="contained"
+                startIcon={<CloudUploadIcon />}
+                disabled={uploading}
+                sx={{ width: { xs: '100%', sm: 'auto' } }}
+              >
+                Upload File
+              </Button>
+            </label>
+            
+            <Typography 
+              variant="body2" 
+              color="text.secondary"
+              sx={{
+                display: { xs: 'none', sm: 'block' }
+              }}
+            >
+              or
+            </Typography>
+            
+            <TextField
+              fullWidth
+              placeholder="Paste URL here"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={uploading}
+              size="small"
+              sx={{
+                flexGrow: 1,
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2
+                }
+              }}
+            />
+          </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {uploading && (
-            <>
-              <CircularProgress 
-                variant="determinate" 
-                value={uploadProgress} 
-                size={24} 
-              />
-              <IconButton onClick={handleCancel} color="secondary">
-                <CancelIcon />
-              </IconButton>
-            </>
-          )}
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleUrlSubmit}
-            disabled={uploading || !url}
-          >
-            Submit URL
-          </Button>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: 1,
+            justifyContent: { xs: 'flex-end', sm: 'flex-start' }
+          }}>
+            {uploading && (
+              <>
+                <CircularProgress 
+                  variant="determinate" 
+                  value={uploadProgress} 
+                  size={24} 
+                />
+                <IconButton 
+                  onClick={handleCancel} 
+                  color="secondary"
+                  size="small"
+                >
+                  <CancelIcon />
+                </IconButton>
+              </>
+            )}
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleUrlSubmit}
+              disabled={uploading || !url}
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
+            >
+              Submit URL
+            </Button>
+          </Box>
         </Box>
-      </Box>
-    </Paper>
+      </Paper>
+    </Container>
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Card, CardContent, Typography, CardMedia } from '@mui/material';
+import { Box, Card, CardContent, Typography, CardMedia, CircularProgress } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
@@ -15,29 +15,86 @@ interface Memory {
     duration?: string;
     siteName?: string;
     description?: string;
+    size?: number;
   };
 }
 
 const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleImageError = () => {
+    setIsLoading(false);
+    setError('Failed to load image');
+  };
 
   const renderContent = () => {
     switch (memory.type) {
       case 'image':
       case 'gif':
         return (
-          <CardMedia
-            component="img"
-            image={memory.url}
-            alt={memory.metadata?.fileName || 'Memory image'}
-            sx={{ height: 200, objectFit: 'cover' }}
-          />
+          <Box sx={{ position: 'relative', height: 200 }}>
+            {isLoading && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'background.default',
+                }}
+              >
+                <CircularProgress size={24} />
+              </Box>
+            )}
+            {error ? (
+              <Box
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'error.light',
+                  color: 'error.contrastText',
+                }}
+              >
+                <Typography variant="body2">{error}</Typography>
+              </Box>
+            ) : (
+              <CardMedia
+                component="img"
+                image={memory.url}
+                alt={memory.metadata?.fileName || 'Memory image'}
+                sx={{
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: isLoading ? 0 : 1,
+                  transition: 'opacity 0.3s ease-in-out',
+                }}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+              />
+            )}
+          </Box>
         );
       case 'audio':
         return (
           <Box sx={{ p: 2 }}>
             <audio controls style={{ width: '100%' }}>
-              <source src={memory.url} type={memory.metadata?.format ? `audio/${memory.metadata.format}` : 'audio/mpeg'} />
+              <source 
+                src={memory.url} 
+                type={memory.metadata?.format ? `audio/${memory.metadata.format}` : 'audio/mpeg'} 
+              />
+              Your browser does not support the audio element.
             </audio>
           </Box>
         );
@@ -46,6 +103,24 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           <Box sx={{ p: 2 }}>
             <Typography variant="h6">{memory.metadata?.siteName || 'Website'}</Typography>
             <Typography variant="body2">{memory.metadata?.description || 'No description available'}</Typography>
+            <Typography 
+              variant="body2" 
+              component="a" 
+              href={memory.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ 
+                display: 'block',
+                mt: 1,
+                color: 'primary.main',
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline'
+                }
+              }}
+            >
+              Visit Website
+            </Typography>
           </Box>
         );
       default:
@@ -60,19 +135,34 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     return (
       <Box sx={{ mt: 1 }}>
         {metadata.fileName && (
-          <Typography variant="body2">Name: {metadata.fileName}</Typography>
-        )}
-        {metadata.resolution && (
-          <Typography variant="body2">Resolution: {metadata.resolution}</Typography>
+          <Typography variant="body2" noWrap>
+            Name: {metadata.fileName}
+          </Typography>
         )}
         {metadata.format && (
-          <Typography variant="body2">Format: {metadata.format}</Typography>
+          <Typography variant="body2">
+            Format: {metadata.format}
+          </Typography>
+        )}
+        {metadata.size && (
+          <Typography variant="body2">
+            Size: {(metadata.size / 1024).toFixed(1)} KB
+          </Typography>
+        )}
+        {metadata.resolution && (
+          <Typography variant="body2">
+            Resolution: {metadata.resolution}
+          </Typography>
         )}
         {metadata.fps && (
-          <Typography variant="body2">FPS: {metadata.fps}</Typography>
+          <Typography variant="body2">
+            FPS: {metadata.fps}
+          </Typography>
         )}
         {metadata.duration && (
-          <Typography variant="body2">Duration: {metadata.duration}</Typography>
+          <Typography variant="body2">
+            Duration: {metadata.duration}
+          </Typography>
         )}
       </Box>
     );
@@ -91,10 +181,11 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           display: 'flex',
           flexDirection: 'column',
           bgcolor: 'background.paper',
+          overflow: 'hidden',
         }}
       >
         {renderContent()}
-        <CardContent>
+        <CardContent sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
           <AnimatePresence>
             {isHovered && (
               <motion.div
@@ -114,61 +205,37 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 
 const MemoryGrid: React.FC = () => {
   const [memories, setMemories] = useState<Memory[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMemories = async () => {
       try {
-        setError(null);
         const response = await axios.get('/api/memories');
         setMemories(response.data);
-      } catch (error: any) {
-        let errorMessage = 'Failed to load memories. Please try again later.';
-        if (error.code === 'ERR_NETWORK') {
-          errorMessage = 'Unable to connect to the server. Please check your internet connection.';
-        } else if (error.response?.status === 404) {
-          errorMessage = 'The memories endpoint is currently unavailable. Our team has been notified.';
-        }
-        setError(errorMessage);
-        console.error('Failed to fetch memories:', error);
+      } catch (err) {
+        setError('Failed to load memories');
+        console.error('Error fetching memories:', err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchMemories();
-    const interval = setInterval(fetchMemories, 10000); // Refresh every 10 seconds
-
-    return () => clearInterval(interval);
   }, []);
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <Typography variant="h6">Loading memories...</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '50vh',
-        gap: 2,
-        p: 3,
-        textAlign: 'center'
-      }}>
-        <Typography variant="h6" color="error">
-          {error}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          We're working on fixing this issue. Please check back in a few minutes.
-        </Typography>
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography color="error">{error}</Typography>
       </Box>
     );
   }
@@ -184,21 +251,12 @@ const MemoryGrid: React.FC = () => {
           lg: 'repeat(4, 1fr)',
         },
         gap: 3,
+        p: 3,
       }}
     >
-      <AnimatePresence>
-        {memories.map((memory) => (
-          <motion.div
-            key={memory._id}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            layout
-          >
-            <MemoryCard memory={memory} />
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      {memories.map((memory) => (
+        <MemoryCard key={memory._id} memory={memory} />
+      ))}
     </Box>
   );
 };
