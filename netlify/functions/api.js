@@ -62,31 +62,40 @@ const handleUpload = (req, res, next) => {
 const mongooseOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
+  serverSelectionTimeoutMS: 5000, // Reduced timeout
+  socketTimeoutMS: 30000,
+  connectTimeoutMS: 10000,
   family: 4,
-  keepAlive: true,
-  keepAliveInitialDelay: 300000,
   retryWrites: true,
   w: 'majority',
-  maxPoolSize: 10,
+  maxPoolSize: 1,
   minPoolSize: 1
 };
 
 // Connection state tracking
 let isConnecting = false;
 let connectionAttempts = 0;
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
 
 async function connectWithRetry(retries = MAX_RETRIES) {
   if (mongoose.connection.readyState === 1) {
     console.log('MongoDB is already connected');
-    return;
+    return true;
+  }
+
+  // If we're stuck in connecting state for too long, force a disconnect
+  if (mongoose.connection.readyState === 2 && isConnecting) {
+    console.log('Stuck in connecting state, forcing disconnect...');
+    try {
+      await mongoose.disconnect();
+    } catch (err) {
+      console.error('Error during forced disconnect:', err);
+    }
   }
 
   if (isConnecting) {
     console.log('Connection attempt already in progress...');
-    return;
+    return false;
   }
 
   try {
@@ -94,50 +103,59 @@ async function connectWithRetry(retries = MAX_RETRIES) {
     connectionAttempts++;
     
     console.log(`MongoDB Connection Attempt ${connectionAttempts}/${MAX_RETRIES}`);
-    console.log('MongoDB URI format check:', MONGODB_URI.startsWith('mongodb+srv://'));
+    console.log('Connection Options:', {
+      uri: MONGODB_URI ? 'URI Present' : 'URI Missing',
+      format: MONGODB_URI?.startsWith('mongodb+srv://') ? 'Valid Format' : 'Invalid Format'
+    });
     
+    // Close existing connection if any
+    if (mongoose.connection.readyState !== 0) {
+      console.log('Closing existing connection...');
+      await mongoose.disconnect();
+    }
+
     const conn = await mongoose.connect(MONGODB_URI, mongooseOptions);
     
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     console.log('Connection State:', mongoose.connection.readyState);
     console.log('Database Name:', conn.connection.name);
     
-    // Reset connection tracking on successful connection
     isConnecting = false;
     connectionAttempts = 0;
 
-    // Set up connection event handlers
     mongoose.connection.on('connected', () => {
       console.log('MongoDB connected event fired');
+      isConnecting = false;
     });
 
     mongoose.connection.on('error', (err) => {
       console.error('MongoDB connection error:', err);
+      isConnecting = false;
     });
 
     mongoose.connection.on('disconnected', () => {
       console.log('MongoDB disconnected event fired');
-      if (connectionAttempts < MAX_RETRIES) {
-        console.log('Attempting to reconnect...');
-        setTimeout(() => connectWithRetry(MAX_RETRIES), 5000);
-      }
+      isConnecting = false;
     });
+
+    return true;
 
   } catch (error) {
-    isConnecting = false;
-    console.error('MongoDB connection error:', error);
-    console.error('Error details:', {
+    console.error('MongoDB connection error:', {
       name: error.name,
       message: error.message,
-      code: error.code,
-      stack: error.stack
+      code: error.code
     });
 
+    isConnecting = false;
+
     if (retries > 0) {
-      console.log(`Retrying connection in 5 seconds... (${retries} attempts remaining)`);
-      setTimeout(() => connectWithRetry(retries - 1), 5000);
+      console.log(`Retrying connection in 3 seconds... (${retries} attempts remaining)`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return connectWithRetry(retries - 1);
     } else {
       console.error('Max retries reached. Could not connect to MongoDB');
+      return false;
     }
   }
 }
@@ -152,14 +170,21 @@ async function checkMongoConnection(req, res, next) {
   const state = mongoose.connection.readyState;
   const stateText = ['disconnected', 'connected', 'connecting', 'disconnecting'][state];
   
-  console.log(`MongoDB Connection State: ${stateText} (${state})`);
+  console.log(`MongoDB Connection Check - State: ${stateText} (${state})`);
   
-  if (state === 0) {
-    // If disconnected, try to reconnect
-    try {
-      await connectWithRetry();
-    } catch (error) {
-      console.error('Failed to reconnect:', error);
+  // If stuck in connecting state for too long or disconnected, try to reconnect
+  if (state === 2 || state === 0) {
+    console.log('Attempting to establish connection...');
+    const connected = await connectWithRetry();
+    
+    if (!connected) {
+      return res.status(503).json({
+        error: 'Database connection unavailable',
+        state: mongoose.connection.readyState,
+        stateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
+        attempts: connectionAttempts,
+        message: 'Failed to establish database connection after multiple attempts'
+      });
     }
   }
   
@@ -167,7 +192,7 @@ async function checkMongoConnection(req, res, next) {
     return res.status(503).json({
       error: 'Database connection unavailable',
       state: mongoose.connection.readyState,
-      stateText,
+      stateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
       attempts: connectionAttempts
     });
   }
