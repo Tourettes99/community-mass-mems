@@ -242,8 +242,77 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         };
       }
 
-      // Social media embeds
-      return getSocialMediaEmbed();
+      // Twitter/X embed
+      if (domain.includes('twitter.com') || domain.includes('x.com')) {
+        const tweetId = url.match(/status\/(\d+)/)?.[1];
+        if (tweetId) {
+          return {
+            html: `<blockquote class="twitter-tweet" data-dnt="true"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js"></script>`,
+            aspectRatio: '100%'
+          };
+        }
+      }
+      
+      // TikTok embed
+      if (domain.includes('tiktok.com') || domain.includes('vm.tiktok.com')) {
+        return {
+          html: `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${url.split('/').pop()?.split('?')[0]}">
+            <section><a target="_blank" href="${url}"></a></section>
+          </blockquote>
+          <script async src="https://www.tiktok.com/embed.js"></script>`,
+          aspectRatio: '100%'
+        };
+      }
+      
+      // Facebook video embed
+      if ((domain.includes('facebook.com') && url.includes('/videos/')) || domain.includes('fb.watch')) {
+        return {
+          html: `<div class="fb-video" data-href="${url}" data-width="auto" data-show-text="false">
+            <blockquote cite="${url}" class="fb-xfbml-parse-ignore"></blockquote>
+          </div>
+          <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0"></script>`,
+          aspectRatio: '56.25%'
+        };
+      }
+
+      // Instagram embed
+      if (domain.includes('instagram.com')) {
+        const instagramId = url.match(/\/(p|reel|tv)\/([^\/\?]+)/)?.[2];
+        if (instagramId) {
+          return {
+            html: `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${url}">
+              <a href="${url}" target="_blank"></a>
+            </blockquote>
+            <script async src="//www.instagram.com/embed.js"></script>`,
+            aspectRatio: '100%'
+          };
+        }
+      }
+
+      // Reddit embed
+      if (domain.includes('reddit.com')) {
+        const redditUrl = url
+          .replace('old.reddit.com', 'reddit.com')
+          .replace('www.reddit.com', 'reddit.com')
+          .replace('reddit.com', 'redditmedia.com');
+          
+        const embedUrl = redditUrl.includes('/comments/') 
+          ? `https://www.redditmedia.com${new URL(url).pathname}?ref_source=embed&ref=share&embed=true`
+          : `${redditUrl}?ref_source=embed&ref=share&embed=true`;
+
+        return {
+          html: `<iframe id="reddit-embed" 
+            src="${embedUrl}"
+            sandbox="allow-scripts allow-same-origin allow-popups"
+            style="border: none;" 
+            scrolling="no"
+            width="100%"
+            height="400"></iframe>`,
+          aspectRatio: '56.25%'
+        };
+      }
+
+      return null;
     };
 
     const embedContent = getUrlEmbed();
