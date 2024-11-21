@@ -1,8 +1,9 @@
 // API configuration
 import axios from 'axios';
 
-const isDevelopment = process.env.NODE_ENV === 'development';
-const API_BASE_URL = isDevelopment ? 'http://localhost:5000/api' : '/.netlify/functions/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? '/.netlify/functions/api'
+  : 'http://localhost:5000/api';
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -24,7 +25,7 @@ api.interceptors.response.use(
 // API endpoints
 export const ENDPOINTS = {
   MEMORIES: '/memories',
-  UPLOAD: '/upload',
+  UPLOAD: '/memories',
   TEST: '/test'
 };
 
@@ -39,7 +40,7 @@ export const testAPI = async () => {
   }
 };
 
-export const fetchMemories = async () => {
+export const getMemories = async () => {
   try {
     const response = await api.get(ENDPOINTS.MEMORIES);
     return response.data;
@@ -59,6 +60,18 @@ export const uploadMemory = async (formData) => {
     return response.data;
   } catch (error) {
     console.error('Error uploading memory:', error);
+    throw error;
+  }
+};
+
+export const getMemoryFile = async (memoryId) => {
+  try {
+    const response = await api.get(`/memories/${memoryId}/file`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching memory file:', error);
     throw error;
   }
 };

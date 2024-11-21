@@ -1,12 +1,11 @@
 // API function for R1 Memories
-// Updated with MongoDB Atlas connection
+// Updated with MongoDB Atlas connection and file upload handling
 const express = require('express');
 const serverless = require('serverless-http');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const router = express.Router();
@@ -29,6 +28,14 @@ app.use(cors({
 
 app.use(express.json());
 
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
+
 // Connect to MongoDB
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('Connected to MongoDB'))
@@ -41,7 +48,11 @@ const memorySchema = new mongoose.Schema({
   mediaUrl: String,
   mediaType: String,
   timestamp: { type: Date, default: Date.now },
-  tags: [String]
+  tags: [String],
+  content: String, // For text content
+  fileData: Buffer, // For file storage
+  fileName: String,
+  fileType: String
 });
 
 const Memory = mongoose.model('Memory', memorySchema);
@@ -59,15 +70,57 @@ router.get('/memories', async (req, res) => {
   }
 });
 
-router.post('/memories', async (req, res) => {
-  console.log('POST /memories request received', req.body);
+router.post('/memories', upload.single('file'), async (req, res) => {
+  console.log('POST /memories request received');
   try {
-    const memory = new Memory(req.body);
+    const memoryData = {
+      title: req.body.title,
+      description: req.body.description,
+      tags: req.body.tags ? JSON.parse(req.body.tags) : [],
+      content: req.body.content || '',
+      timestamp: new Date()
+    };
+
+    // If there's a file uploaded
+    if (req.file) {
+      memoryData.fileData = req.file.buffer;
+      memoryData.fileName = req.file.originalname;
+      memoryData.fileType = req.file.mimetype;
+    }
+
+    // If there's a mediaUrl
+    if (req.body.mediaUrl) {
+      memoryData.mediaUrl = req.body.mediaUrl;
+      memoryData.mediaType = req.body.mediaType || 'url';
+    }
+
+    const memory = new Memory(memoryData);
     await memory.save();
-    console.log('Memory saved:', memory);
-    res.status(201).json(memory);
+    
+    // Don't send the file buffer in the response
+    const response = memory.toObject();
+    delete response.fileData;
+    
+    console.log('Memory saved:', response);
+    res.status(201).json(response);
   } catch (error) {
     console.error('Error saving memory:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Route to serve files
+router.get('/memories/:id/file', async (req, res) => {
+  try {
+    const memory = await Memory.findById(req.params.id);
+    if (!memory || !memory.fileData) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    res.set('Content-Type', memory.fileType);
+    res.send(memory.fileData);
+  } catch (error) {
+    console.error('Error serving file:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -77,8 +130,6 @@ router.get('/test', (req, res) => {
   res.json({ message: 'API is working!' });
 });
 
-// Use the router without the full path prefix
 app.use('/', router);
 
-// Export the handler
 module.exports.handler = serverless(app);
