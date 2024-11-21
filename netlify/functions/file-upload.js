@@ -198,44 +198,58 @@ exports.handler = async (event, context) => {
       }
     };
 
-    if (content) {
-      memory.content = content;
-    }
-
     logger.info('Processing content type:', { type });
 
     try {
-      if (type === 'url' && url) {
-        logger.info('Processing URL', { url });
+      if (type === 'url' || type === 'image' || type === 'video' || type === 'audio') {
+        logger.info('Processing URL/media', { url, type });
         memory.url = url;
         
         try {
-          const urlMetadata = await extractUrlMetadata(url);
-          logger.debug('Extracted URL metadata', { metadata: urlMetadata });
-          
-          memory.metadata = {
-            ...memory.metadata,
-            ...urlMetadata,
-            title: urlMetadata.title || new URL(url).hostname,
-            description: urlMetadata.description || 'No description available',
-            mediaType: urlMetadata.mediaType || 'url',
-            isPlayable: !!urlMetadata.playbackHtml,
-            siteName: urlMetadata.siteName || new URL(url).hostname,
-            favicon: urlMetadata.favicon || `https://www.google.com/s2/favicons?domain=${url}`
-          };
+          // For direct media URLs, set basic metadata
+          if (url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|mp4|webm|ogg|mov|mp3|wav|m4a)(\?.*)?$/i)) {
+            const urlObj = new URL(url);
+            const fileName = urlObj.pathname.split('/').pop() || url;
+            memory.metadata = {
+              ...memory.metadata,
+              title: fileName,
+              description: `Direct ${type} URL`,
+              mediaType: type,
+              fileName: fileName,
+              contentType: `${type}/${fileName.split('.').pop()}`,
+              siteName: urlObj.hostname
+            };
+          } else {
+            // For regular URLs, try to extract metadata
+            const urlMetadata = await extractUrlMetadata(url);
+            logger.debug('Extracted URL metadata', { metadata: urlMetadata });
+            
+            memory.metadata = {
+              ...memory.metadata,
+              ...urlMetadata,
+              title: urlMetadata.title || new URL(url).hostname,
+              description: urlMetadata.description || 'No description available',
+              mediaType: urlMetadata.mediaType || type,
+              isPlayable: !!urlMetadata.playbackHtml,
+              siteName: urlMetadata.siteName || new URL(url).hostname,
+              favicon: urlMetadata.favicon || `https://www.google.com/s2/favicons?domain=${url}`
+            };
+          }
         } catch (metadataError) {
           logger.error('Metadata extraction error', metadataError, { url });
+          // Don't fail the upload if metadata extraction fails
+          const urlObj = new URL(url);
           memory.metadata = {
             ...memory.metadata,
-            title: new URL(url).hostname,
+            title: urlObj.pathname.split('/').pop() || url,
             description: 'Failed to extract metadata',
-            mediaType: 'url',
-            siteName: new URL(url).hostname,
-            favicon: `https://www.google.com/s2/favicons?domain=${url}`
+            mediaType: type,
+            siteName: urlObj.hostname
           };
         }
       } else if (type === 'text' && content) {
         logger.info('Processing text content');
+        memory.content = content;
         memory.metadata = {
           ...memory.metadata,
           title: content.slice(0, 50),
@@ -245,72 +259,72 @@ exports.handler = async (event, context) => {
         };
       } else if (file) {
         logger.info('Processing file', { fileName });
-        const buffer = Buffer.from(file, 'base64');
-        memory.fileName = fileName;
         try {
-          const fileMetadata = await extractFileMetadata(buffer, fileName);
-          logger.debug('Extracted file metadata', { metadata: fileMetadata });
-          memory.metadata = {
-            ...memory.metadata,
-            ...fileMetadata,
-            mediaType: type,
-            isPlayable: ['video', 'audio'].includes(type),
-            fileSize: buffer.length,
-            contentType: fileMetadata.contentType || contentType
-          };
+          const buffer = Buffer.from(file, 'base64');
+          
+          // Ensure we have a fileName
+          if (!fileName) {
+            fileName = 'uploaded-file';
+            const ext = contentType ? `.${contentType.split('/')[1]}` : '';
+            fileName += ext;
+          }
+          
+          // Store the file content
           memory.file = file;
-        } catch (fileError) {
-          logger.error('File metadata extraction error', fileError, { fileName });
-          memory.metadata = {
-            ...memory.metadata,
-            title: fileName,
-            description: 'Failed to extract file metadata',
-            mediaType: type,
-            fileSize: buffer.length,
-            contentType: contentType || 'application/octet-stream'
-          };
-          memory.file = file;
+          memory.fileName = fileName;
+          
+          try {
+            const fileMetadata = await extractFileMetadata(buffer, fileName);
+            logger.debug('Extracted file metadata', { metadata: fileMetadata });
+            
+            memory.metadata = {
+              ...memory.metadata,
+              ...fileMetadata,
+              title: fileName,
+              mediaType: type,
+              isPlayable: ['video', 'audio'].includes(type),
+              fileSize: buffer.length,
+              contentType: fileMetadata.contentType || contentType || 'application/octet-stream'
+            };
+          } catch (fileError) {
+            logger.error('File metadata extraction error', fileError, { fileName });
+            // Don't fail the upload if metadata extraction fails
+            memory.metadata = {
+              ...memory.metadata,
+              title: fileName,
+              description: 'File upload',
+              mediaType: type,
+              fileSize: buffer.length,
+              contentType: contentType || 'application/octet-stream'
+            };
+          }
+        } catch (bufferError) {
+          logger.error('Error processing file buffer', bufferError);
+          throw new Error('Failed to process file data');
         }
       }
     } catch (error) {
       logger.error('Error processing content', error, { type });
-      memory.metadata = {
-        ...memory.metadata,
-        error: 'Failed to process content',
-        description: error.message
+      throw error;
+    }
+
+    try {
+      logger.info('Saving memory to database');
+      const result = await memories.insertOne(memory);
+      logger.info('Memory saved successfully', { id: result.insertedId });
+
+      return {
+        statusCode: 201,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: 'Memory created successfully',
+          memory: { ...memory, _id: result.insertedId }
+        })
       };
+    } catch (dbError) {
+      logger.error('Database error', dbError);
+      throw new Error('Failed to save memory to database');
     }
-
-    logger.info('Inserting memory into database...');
-    const result = await memories.insertOne(memory);
-    
-    if (!result.acknowledged) {
-      throw new Error('Failed to insert memory');
-    }
-
-    logger.info('Memory created successfully', { id: result.insertedId });
-
-    const responseMemory = { 
-      ...memory,
-      _id: result.insertedId.toString(),
-      metadata: {
-        ...memory.metadata,
-        lastModified: new Date().toISOString()
-      }
-    };
-    
-    if (responseMemory.file) {
-      delete responseMemory.file;
-    }
-
-    return {
-      statusCode: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: 'Memory created successfully',
-        memory: responseMemory
-      })
-    };
   } catch (error) {
     logger.error('Error creating memory', error);
     
