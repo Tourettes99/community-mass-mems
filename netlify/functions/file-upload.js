@@ -5,10 +5,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const { PassThrough } = require('stream');
 const zlib = require('zlib');
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error('MONGODB_URI environment variable is required');
-}
+const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 
 const DB_NAME = 'memories';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -50,7 +47,6 @@ const memorySchema = new mongoose.Schema({
 let cachedDb = null;
 async function connectToDatabase() {
   console.log('Attempting to connect to MongoDB...');
-  console.log('MongoDB URI exists:', !!process.env.MONGODB_URI);
   
   if (cachedDb && mongoose.connection.readyState === 1) {
     console.log('Using cached database connection');
@@ -59,11 +55,12 @@ async function connectToDatabase() {
 
   try {
     console.log('Connecting to MongoDB...');
-    const connection = await mongoose.connect(process.env.MONGODB_URI, {
+    const connection = await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 5000,
-      bufferCommands: false
+      bufferCommands: false,
+      dbName: 'memories' // Explicitly set the database name
     });
 
     console.log('MongoDB connected successfully');
