@@ -228,29 +228,14 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   }
 };
 
-const MemoryGrid: React.FC = () => {
-  const [memories, setMemories] = useState<Memory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface MemoryGridProps {
+  memories: Memory[];
+  loading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void;
+}
 
-  const fetchMemories = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get('/api/memories');
-      setMemories(response.data);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load memories');
-      console.error('Error fetching memories:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchMemories();
-  }, [fetchMemories]);
-
+const MemoryGrid: React.FC<MemoryGridProps> = ({ memories, loading = false, error = null, onRefresh }) => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -272,12 +257,31 @@ const MemoryGrid: React.FC = () => {
         }}
       >
         <Typography color="error">{error}</Typography>
-        <IconButton 
-          onClick={fetchMemories}
-          color="primary"
-        >
-          <RefreshIcon />
-        </IconButton>
+        {onRefresh && (
+          <IconButton 
+            onClick={onRefresh}
+            color="primary"
+          >
+            <RefreshIcon />
+          </IconButton>
+        )}
+      </Box>
+    );
+  }
+
+  if (!memories.length) {
+    return (
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          minHeight: 200
+        }}
+      >
+        <Typography variant="body1" color="text.secondary">
+          No memories yet. Create your first memory above!
+        </Typography>
       </Box>
     );
   }
@@ -296,9 +300,19 @@ const MemoryGrid: React.FC = () => {
         p: 3,
       }}
     >
-      {memories.map((memory) => (
-        <MemoryCard key={memory._id} memory={memory} />
-      ))}
+      <AnimatePresence>
+        {memories.map((memory) => (
+          <motion.div
+            key={memory._id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <MemoryCard memory={memory} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </Box>
   );
 };
