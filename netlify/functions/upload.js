@@ -102,21 +102,9 @@ const getFileMetadata = async (url) => {
 
 // Function to get media duration (for audio/video)
 const getMediaDuration = async (url) => {
-  try {
-    const audio = new Audio();
-    audio.src = url;
-    return new Promise((resolve) => {
-      audio.addEventListener('loadedmetadata', () => {
-        const duration = audio.duration;
-        const minutes = Math.floor(duration / 60);
-        const seconds = Math.floor(duration % 60);
-        resolve(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-      });
-      audio.addEventListener('error', () => resolve(null));
-    });
-  } catch {
-    return null;
-  }
+  // For now, we'll skip duration detection since it requires ffmpeg
+  // TODO: Implement duration detection using ffmpeg
+  return null;
 };
 
 // Function to fetch URL metadata with enhanced file handling
@@ -140,8 +128,6 @@ const fetchUrlMetadata = async (url) => {
             <source src="${url}" type="${fileMetadata.contentType || 'video/mp4'}">
             Your browser does not support video playback.
           </video>`;
-          // Try to get video duration
-          metadata.duration = await getMediaDuration(url);
           break;
 
         case 'audio':
@@ -150,13 +136,10 @@ const fetchUrlMetadata = async (url) => {
             <source src="${url}" type="${fileMetadata.contentType || 'audio/mpeg'}">
             Your browser does not support audio playback.
           </audio>`;
-          // Try to get audio duration
-          metadata.duration = await getMediaDuration(url);
           break;
 
         case 'image':
           metadata.previewUrl = url;
-          // Try to get image dimensions
           try {
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
@@ -174,20 +157,16 @@ const fetchUrlMetadata = async (url) => {
           try {
             const response = await fetch(url);
             const text = await response.text();
-            // For text files, store first 2000 chars as preview
             metadata.rawContent = text.slice(0, 2000);
+            metadata.description = `Content preview (first ${metadata.rawContent.length} characters)`;
             
-            // Try to detect encoding
             const encoding = response.headers.get('content-type')?.match(/charset=([^;]+)/)?.[1];
             if (encoding) {
               metadata.encoding = encoding;
             }
             
-            // Set format based on extension
             const ext = path.extname(url).toLowerCase();
-            metadata.format = ext.slice(1); // Remove the dot
-            
-            metadata.description = `Content preview (first ${metadata.rawContent.length} characters)`;
+            metadata.format = ext.slice(1);
           } catch (error) {
             console.error('Error processing static file:', error);
           }
@@ -197,94 +176,21 @@ const fetchUrlMetadata = async (url) => {
       return metadata;
     }
 
-    // Regular URL metadata extraction with enhanced error handling
-    const result = await unfurl(url, {
-      follow: 5,
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CommunityMassMems/1.0)'
-      }
-    });
-
-    const metadata = {
-      mediaType: 'url',
-      title: result.open_graph?.title || result.twitter_card?.title || result.title || url,
-      description: result.open_graph?.description || result.twitter_card?.description || result.description,
-      siteName: result.open_graph?.site_name || result.twitter_card?.site || new URL(url).hostname,
-      favicon: result.favicon
-    };
-
-    // Enhanced media handling
-    if (result.twitter_card?.player?.url || result.open_graph?.video?.url) {
-      metadata.mediaType = 'video';
-      metadata.isPlayable = true;
-      const playerUrl = result.twitter_card?.player?.url || result.open_graph?.video?.url;
-      const playerWidth = result.twitter_card?.player?.width || result.open_graph?.video?.width || '100%';
-      const playerHeight = result.twitter_card?.player?.height || result.open_graph?.video?.height;
-      const aspectRatio = playerHeight && playerWidth ? (playerHeight / playerWidth) * 100 : 56.25;
-      
-      metadata.playbackHtml = `<iframe 
-        width="100%" 
-        style="aspect-ratio: ${playerWidth}/${playerHeight || '9'};" 
-        src="${playerUrl}"
-        frameborder="0" 
-        allowfullscreen
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
-      </iframe>`;
-
-      // Try to get duration if available
-      if (result.open_graph?.video?.duration) {
-        metadata.duration = result.open_graph.video.duration;
-      }
-    } else if (result.oEmbed?.html) {
-      metadata.mediaType = result.oEmbed.type || 'url';
-      metadata.isPlayable = true;
-      metadata.playbackHtml = result.oEmbed.html;
-      
-      if (result.oEmbed.title && !metadata.title) {
-        metadata.title = result.oEmbed.title;
-      }
-      
-      // Get additional oEmbed metadata
-      if (result.oEmbed.width && result.oEmbed.height) {
-        metadata.resolution = `${result.oEmbed.width}x${result.oEmbed.height}`;
-      }
-      if (result.oEmbed.duration) {
-        metadata.duration = result.oEmbed.duration;
-      }
-    }
-
-    // Enhanced preview image handling
-    if (result.open_graph?.image?.url || result.twitter_card?.image?.url) {
-      metadata.previewUrl = result.open_graph?.image?.url || result.twitter_card?.image?.url;
-      
-      // Try to get image dimensions
-      const imageDimensions = result.open_graph?.image || result.twitter_card?.image;
-      if (imageDimensions?.width && imageDimensions?.height) {
-        metadata.resolution = `${imageDimensions.width}x${imageDimensions.height}`;
-      }
-    } else if (result.oEmbed?.thumbnail_url) {
-      metadata.previewUrl = result.oEmbed.thumbnail_url;
-      
-      if (result.oEmbed.thumbnail_width && result.oEmbed.thumbnail_height) {
-        metadata.resolution = `${result.oEmbed.thumbnail_width}x${result.oEmbed.thumbnail_height}`;
-      }
-    }
-
-    // Clean up null/undefined values and validate
-    Object.keys(metadata).forEach(key => {
-      if (metadata[key] === null || metadata[key] === undefined) {
-        delete metadata[key];
-      }
-    });
-
-    return metadata;
-  } catch (error) {
-    console.error('Error fetching URL metadata:', error);
-    // Return minimal metadata on error
+    // Regular URL metadata extraction
+    const result = await unfurl(url);
     return {
+      title: result.title,
+      description: result.description,
+      siteName: result.site_name,
+      favicon: result.favicon,
       mediaType: 'url',
+      previewUrl: result.open_graph?.images?.[0]?.url || result.twitter_card?.images?.[0]?.url
+    };
+  } catch (error) {
+    console.error('Error fetching metadata:', error);
+    return {
       title: url,
+      mediaType: 'url',
       description: 'Failed to fetch metadata'
     };
   }
