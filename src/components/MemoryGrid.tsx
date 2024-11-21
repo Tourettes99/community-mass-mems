@@ -53,8 +53,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   }, []);
 
   const handleCardClick = (event: React.MouseEvent) => {
-    // Don't trigger card expansion when clicking on media controls
-    if ((event.target as HTMLElement).closest('video, audio, iframe')) {
+    if ((event.target as HTMLElement).closest('video, audio, iframe, a')) {
       return;
     }
     setExpanded(!expanded);
@@ -122,7 +121,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           flexDirection: 'column',
           cursor: 'pointer',
           '&:hover': {
-            boxShadow: 6,
+            boxShadow: 3,
           },
         }}
         onClick={handleCardClick}
@@ -142,7 +141,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
               href={memory.url}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={handleLinkClick}
+              onClick={(e) => e.stopPropagation()}
               sx={{
                 color: 'inherit',
                 textDecoration: 'none',
@@ -151,19 +150,39 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 },
               }}
             >
-              {metadata.title || metadata.siteName || memory.url}
+              {metadata.title}
             </Link>
           }
           subheader={metadata.siteName}
-          sx={{
-            pb: metadata.isPlayable || metadata.previewUrl ? 1 : 2,
-          }}
         />
 
-        {renderMediaContent()}
+        {metadata.isPlayable && metadata.playbackHtml ? (
+          <Box 
+            sx={{ 
+              width: '100%',
+              '& iframe': {
+                border: 'none',
+                borderRadius: 1,
+              },
+            }}
+            dangerouslySetInnerHTML={{ __html: metadata.playbackHtml }}
+          />
+        ) : metadata.previewUrl ? (
+          <CardMedia
+            component="img"
+            image={metadata.previewUrl}
+            alt={metadata.title || "Preview"}
+            sx={{
+              width: '100%',
+              height: 'auto',
+              maxHeight: '300px',
+              objectFit: 'cover',
+            }}
+          />
+        ) : null}
 
-        <CardContent sx={{ flexGrow: 1, pt: 2 }}>
-          {metadata.description && (
+        {metadata.description && (
+          <CardContent sx={{ flexGrow: 1, pt: 2 }}>
             <Typography
               variant="body2"
               color="text.secondary"
@@ -177,8 +196,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
             >
               {metadata.description}
             </Typography>
-          )}
-        </CardContent>
+          </CardContent>
+        )}
 
         {memory.tags && memory.tags.length > 0 && (
           <CardContent sx={{ pt: 0 }}>
