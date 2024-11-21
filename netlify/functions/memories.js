@@ -3,6 +3,8 @@ const { MongoClient } = require('mongodb');
 
 // MongoDB Connection URI
 const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+const DB_NAME = 'memories';
+const COLLECTION_NAME = 'memories';
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
@@ -28,6 +30,8 @@ const memorySchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  collection: COLLECTION_NAME // Explicitly set collection name
 });
 
 let Memory;
@@ -47,7 +51,7 @@ async function connectToDatabase() {
 
   try {
     const client = await MongoClient.connect(MONGODB_URI);
-    const db = client.db('memories');
+    const db = client.db(DB_NAME);
     cachedDb = db;
     return db;
   } catch (error) {
@@ -78,39 +82,55 @@ exports.handler = async (event, context) => {
     if (!mongoose.connection.readyState) {
       await mongoose.connect(MONGODB_URI, {
         useNewUrlParser: true,
-        useUnifiedTopology: true
+        useUnifiedTopology: true,
+        dbName: DB_NAME // Explicitly set database name
       });
     }
+
+    // Log connection status and database info
+    console.log('MongoDB Connection State:', mongoose.connection.readyState);
+    console.log('Database Name:', mongoose.connection.db.databaseName);
+    console.log('Collections:', await mongoose.connection.db.listCollections().toArray());
+
+    if (event.httpMethod === 'GET') {
+      try {
+        const memories = await Memory.find().sort({ createdAt: -1 });
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(memories)
+        };
+      } catch (error) {
+        console.error('Error fetching memories:', error);
+        console.error('Stack:', error.stack);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Failed to fetch memories', 
+            details: error.message,
+            stack: error.stack 
+          })
+        };
+      }
+    }
+
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
   } catch (error) {
     console.error('MongoDB connection error:', error);
+    console.error('Stack:', error.stack);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Database connection failed' })
+      body: JSON.stringify({ 
+        error: 'Database connection failed', 
+        details: error.message,
+        stack: error.stack 
+      })
     };
   }
-
-  if (event.httpMethod === 'GET') {
-    try {
-      const memories = await Memory.find().sort({ createdAt: -1 });
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify(memories)
-      };
-    } catch (error) {
-      console.error('Error fetching memories:', error);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'Failed to fetch memories' })
-      };
-    }
-  }
-
-  return {
-    statusCode: 405,
-    headers,
-    body: JSON.stringify({ error: 'Method not allowed' })
-  };
 };
