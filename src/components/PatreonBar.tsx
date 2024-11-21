@@ -1,47 +1,40 @@
 import React from 'react';
-import { Box, Link, Typography } from '@mui/material';
+import { Box, IconButton, Tooltip } from '@mui/material';
 
-const PatreonBar: React.FC = () => {
+const PatreonBar = () => {
   return (
     <Box
       sx={{
-        mt: 4,
-        p: 2,
-        bgcolor: '#FF424D', // Patreon red color
-        borderRadius: '12px', // Rounded corners
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: 3,
-        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-        '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: 6,
-        },
+        position: 'fixed',
+        bottom: 20,
+        right: 20,
+        zIndex: 1000,
       }}
     >
-      <Link
-        href="https://www.patreon.com/communitymass"
-        target="_blank"
-        rel="noopener noreferrer"
-        sx={{
-          textDecoration: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-        }}
-      >
-        <Typography
-          variant="h6"
+      <Tooltip title="Support on Patreon" arrow placement="left">
+        <IconButton
+          component="a"
+          href="https://patreon.com/Foxplaid19773"
+          target="_blank"
+          rel="noopener noreferrer"
           sx={{
+            bgcolor: '#FF424D',
+            width: 56,
+            height: 56,
+            borderRadius: '12px',
             color: 'white',
-            fontWeight: 'bold',
-            textAlign: 'center',
+            boxShadow: 3,
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              bgcolor: '#FF424D',
+              transform: 'translateY(-2px)',
+              boxShadow: 6,
+            },
           }}
         >
-          Support Community Mass on Patreon
-        </Typography>
-      </Link>
+          <i className="fa-brands fa-patreon" style={{ fontSize: '28px' }} />
+        </IconButton>
+      </Tooltip>
     </Box>
   );
 };
