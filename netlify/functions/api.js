@@ -8,19 +8,47 @@ const path = require('path');
 // Initialize express app
 const app = express();
 
+// CORS Configuration
+const allowedOrigins = [
+  'https://r1memories.com',
+  'https://shiny-jalebi-9ccb2b.netlify.app',
+  'http://localhost:3000'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️ Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400 // 24 hours
+};
+
+// Enable CORS with options
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Debug logging middleware
 app.use((req, res, next) => {
   console.log('\n🌐 Incoming Request:', new Date().toISOString());
   console.log('📍 Path:', req.path);
   console.log('📝 Method:', req.method);
+  console.log('🔑 Origin:', req.headers.origin);
   console.log('🔑 Headers:', JSON.stringify(req.headers, null, 2));
   next();
 });
-
-// Enable CORS
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Create router for API endpoints
 const router = express.Router();
@@ -419,6 +447,12 @@ router.post('/memories', async (req, res) => {
 
 router.get('/memories', async (req, res) => {
   try {
+    // Set CORS headers explicitly for this route
+    res.header('Access-Control-Allow-Origin', allowedOrigins);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', true);
+
     // Ensure MongoDB is connected
     if (mongoose.connection.readyState !== 1) {
       await connectWithRetry();
@@ -461,6 +495,27 @@ router.get('/memories/:id', async (req, res) => {
       status: 'error',
       timestamp: new Date().toISOString(),
       message: error.message
+    });
+  }
+});
+
+// Upload endpoint
+router.post('/memories/upload', async (req, res) => {
+  try {
+    // Set CORS headers explicitly for this route
+    res.header('Access-Control-Allow-Origin', allowedOrigins);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', true);
+
+    // Rest of the upload logic...
+  } catch (error) {
+    console.error('Error uploading memory:', error);
+    res.status(400).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      message: error.message || 'Failed to upload memory',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
