@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Card, CardContent, Typography, CardMedia, CircularProgress } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
 
 interface Memory {
@@ -16,6 +17,7 @@ interface Memory {
     siteName?: string;
     description?: string;
     size?: number;
+    contentType?: string;
   };
 }
 
@@ -23,15 +25,23 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const handleImageLoad = () => {
     setIsLoading(false);
+    setError(null);
   };
 
   const handleImageError = () => {
     setIsLoading(false);
     setError('Failed to load image');
   };
+
+  const handleRetry = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    setRetryCount(count => count + 1);
+  }, []);
 
   const renderContent = () => {
     switch (memory.type) {
@@ -61,18 +71,35 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 sx={{
                   height: '100%',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   bgcolor: 'error.light',
                   color: 'error.contrastText',
+                  gap: 1,
+                  p: 2,
                 }}
               >
-                <Typography variant="body2">{error}</Typography>
+                <Typography variant="body2" align="center">
+                  {error}
+                </Typography>
+                <IconButton 
+                  onClick={handleRetry}
+                  size="small"
+                  sx={{ 
+                    color: 'inherit',
+                    '&:hover': {
+                      bgcolor: 'error.dark',
+                    }
+                  }}
+                >
+                  <RefreshIcon />
+                </IconButton>
               </Box>
             ) : (
               <CardMedia
                 component="img"
-                image={memory.url}
+                image={`${memory.url}${retryCount > 0 ? '?retry=' + retryCount : ''}`}
                 alt={memory.metadata?.fileName || 'Memory image'}
                 sx={{
                   height: '100%',
@@ -89,10 +116,14 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
       case 'audio':
         return (
           <Box sx={{ p: 2 }}>
-            <audio controls style={{ width: '100%' }}>
+            <audio 
+              controls 
+              style={{ width: '100%' }}
+              onError={() => setError('Failed to load audio')}
+            >
               <source 
                 src={memory.url} 
-                type={memory.metadata?.format ? `audio/${memory.metadata.format}` : 'audio/mpeg'} 
+                type={memory.metadata?.contentType || memory.metadata?.format ? `audio/${memory.metadata.format}` : 'audio/mpeg'} 
               />
               Your browser does not support the audio element.
             </audio>
@@ -101,8 +132,19 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
       case 'url':
         return (
           <Box sx={{ p: 2 }}>
-            <Typography variant="h6">{memory.metadata?.siteName || 'Website'}</Typography>
-            <Typography variant="body2">{memory.metadata?.description || 'No description available'}</Typography>
+            <Typography variant="h6" noWrap>{memory.metadata?.siteName || 'Website'}</Typography>
+            <Typography 
+              variant="body2" 
+              sx={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                mb: 1,
+              }}
+            >
+              {memory.metadata?.description || 'No description available'}
+            </Typography>
             <Typography 
               variant="body2" 
               component="a" 
@@ -111,7 +153,6 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
               rel="noopener noreferrer"
               sx={{ 
                 display: 'block',
-                mt: 1,
                 color: 'primary.main',
                 textDecoration: 'none',
                 '&:hover': {
@@ -208,21 +249,23 @@ const MemoryGrid: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchMemories = async () => {
-      try {
-        const response = await axios.get('/api/memories');
-        setMemories(response.data);
-      } catch (err) {
-        setError('Failed to load memories');
-        console.error('Error fetching memories:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMemories();
+  const fetchMemories = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/memories');
+      setMemories(response.data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load memories');
+      console.error('Error fetching memories:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchMemories();
+  }, [fetchMemories]);
 
   if (loading) {
     return (
@@ -234,8 +277,23 @@ const MemoryGrid: React.FC = () => {
 
   if (error) {
     return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
+      <Box 
+        sx={{ 
+          p: 4, 
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2,
+        }}
+      >
         <Typography color="error">{error}</Typography>
+        <IconButton 
+          onClick={fetchMemories}
+          color="primary"
+        >
+          <RefreshIcon />
+        </IconButton>
       </Box>
     );
   }

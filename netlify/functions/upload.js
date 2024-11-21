@@ -23,7 +23,9 @@ const memorySchema = new mongoose.Schema({
     fps: Number,
     duration: String,
     siteName: String,
-    description: String
+    description: String,
+    size: Number,
+    contentType: String
   },
   createdAt: {
     type: Date,
@@ -47,52 +49,64 @@ const getFileType = (contentType) => {
   return 'url';
 };
 
-const parseMultipartForm = event => {
+const parseMultipartForm = async (event) => {
   try {
+    // Extract boundary from content type
     const boundary = event.headers['content-type'].split('boundary=')[1];
+    if (!boundary) {
+      throw new Error('No boundary found in content-type');
+    }
+
+    // Convert base64 body to buffer
     const rawBody = Buffer.from(event.body, 'base64');
     
-    // Split the body into parts using the boundary
-    const parts = rawBody.toString().split(`--${boundary}`);
+    // Split body into parts using boundary
+    const boundaryBuffer = Buffer.from('--' + boundary);
+    const parts = [];
+    let start = 0;
+
+    // Find all boundary positions
+    while (true) {
+      const boundaryPos = rawBody.indexOf(boundaryBuffer, start);
+      if (boundaryPos === -1) break;
+      
+      if (start !== 0) {
+        parts.push(rawBody.slice(start, boundaryPos));
+      }
+      start = boundaryPos + boundaryBuffer.length;
+    }
+
     const result = {
       fields: {},
       files: {}
     };
 
+    // Process each part
     for (const part of parts) {
-      if (!part.includes('Content-Disposition: form-data;')) continue;
-
-      // Split headers and content
-      const [headerSection, ...contentSections] = part.split('\r\n\r\n');
-      if (!headerSection || contentSections.length === 0) continue;
-
-      // Get content without the trailing boundary and \r\n
-      let content = contentSections.join('\r\n\r\n');
-      if (content.endsWith('\r\n')) {
-        content = content.slice(0, -2);
-      }
+      // Find the end of headers (double CRLF)
+      const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+      if (headerEnd === -1) continue;
 
       // Parse headers
-      const nameMatch = headerSection.match(/name="([^"]+)"/);
-      const filenameMatch = headerSection.match(/filename="([^"]+)"/);
-      const contentTypeMatch = headerSection.match(/Content-Type: (.+)/);
+      const headers = part.slice(0, headerEnd).toString();
+      const nameMatch = headers.match(/name="([^"]+)"/);
+      const filenameMatch = headers.match(/filename="([^"]+)"/);
+      const contentTypeMatch = headers.match(/Content-Type: (.+?)(\r\n|\$)/);
+
+      // Get content (skip the double CRLF)
+      const content = part.slice(headerEnd + 4);
 
       if (filenameMatch && contentTypeMatch) {
         // This is a file
-        const startPos = part.indexOf('\r\n\r\n') + 4;
-        const fileContent = rawBody.slice(
-          rawBody.indexOf(Buffer.from(part.slice(startPos))),
-          rawBody.indexOf(Buffer.from(`--${boundary}`, startPos))
-        );
-
         result.files.file = {
           name: filenameMatch[1],
           type: contentTypeMatch[1].trim(),
-          content: fileContent
+          content: content,
+          size: content.length
         };
       } else if (nameMatch) {
-        // This is a regular field
-        result.fields[nameMatch[1]] = content.trim();
+        // This is a field
+        result.fields[nameMatch[1]] = content.toString().trim();
       }
     }
 
@@ -107,7 +121,8 @@ exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json'
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -137,20 +152,19 @@ exports.handler = async (event, context) => {
 
     console.log('MongoDB Connection State:', mongoose.connection.readyState);
     console.log('Database Name:', mongoose.connection.db.databaseName);
-    console.log('Content-Type:', event.headers['content-type']);
 
     let memoryData;
     const contentType = event.headers['content-type'] || '';
 
     if (contentType.includes('multipart/form-data')) {
       // Handle file upload
-      const formData = parseMultipartForm(event);
-      console.log('Parsed form data:', { 
+      const formData = await parseMultipartForm(event);
+      console.log('Parsed form data:', {
         fields: formData.fields,
         fileInfo: formData.files.file ? {
           name: formData.files.file.name,
           type: formData.files.file.type,
-          size: formData.files.file.content.length
+          size: formData.files.file.size
         } : null
       });
 
@@ -163,10 +177,39 @@ exports.handler = async (event, context) => {
       }
 
       const file = formData.files.file;
-      
-      // Convert binary content to base64 and create proper data URL
+
+      // Validate file size (e.g., 10MB limit)
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (file.size > MAX_FILE_SIZE) {
+        return {
+          statusCode: 413,
+          headers,
+          body: JSON.stringify({ error: 'File too large. Maximum size is 10MB.' })
+        };
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        return {
+          statusCode: 415,
+          headers,
+          body: JSON.stringify({ error: 'Unsupported file type. Allowed types: JPEG, PNG, GIF, WebP' })
+        };
+      }
+
+      // Convert to base64 and create data URL
       const base64Content = file.content.toString('base64');
       const dataUrl = `data:${file.type};base64,${base64Content}`;
+
+      // Get image dimensions if possible
+      let dimensions = '';
+      try {
+        // You might want to add image-size or similar package to get dimensions
+        // For now, we'll skip this
+      } catch (error) {
+        console.warn('Could not get image dimensions:', error);
+      }
 
       memoryData = {
         type: getFileType(file.type),
@@ -174,7 +217,9 @@ exports.handler = async (event, context) => {
         metadata: {
           fileName: file.name,
           format: file.type.split('/')[1],
-          size: file.content.length,
+          size: file.size,
+          contentType: file.type,
+          resolution: dimensions
         }
       };
     } else {
@@ -200,13 +245,15 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log('Memory data to save:', {
+    console.log('Saving memory data:', {
       ...memoryData,
       url: memoryData.url.substring(0, 50) + '...' // Truncate URL for logging
     });
 
     const memory = new Memory(memoryData);
     const savedMemory = await memory.save();
+
+    console.log('Memory saved successfully');
 
     return {
       statusCode: 201,
@@ -222,10 +269,10 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
-        error: 'Internal server error', 
+      body: JSON.stringify({
+        error: 'Internal server error',
         details: error.message,
-        stack: error.stack 
+        stack: error.stack
       })
     };
   }
