@@ -11,8 +11,7 @@ import {
   Link,
   Collapse,
   Button,
-  Stack,
-  Badge
+  Stack
 } from '@mui/material';
 import {
   Link as LinkIcon,
@@ -195,7 +194,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
             {metadata?.favicon && (
               <Box
                 component="img"
-                src={`/.netlify/functions/get-favicon?url=${encodeURIComponent(url)}`}
+                src={metadata.favicon}
                 alt={metadata?.siteName || 'Website favicon'}
                 sx={{ width: 16, height: 16, objectFit: 'contain' }}
                 onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
