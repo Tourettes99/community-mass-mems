@@ -11,13 +11,11 @@ const DB_NAME = 'memories';
 const memorySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['image', 'gif', 'video', 'audio', 'document', 'url'],
+    enum: ['image', 'gif', 'video', 'audio', 'document', 'url', 'text'],
     required: true
   },
-  url: {
-    type: String,
-    required: true
-  },
+  url: String,
+  content: String,
   metadata: {
     fileName: String,
     resolution: String,
@@ -84,13 +82,58 @@ exports.handler = async (event, context) => {
     const body = JSON.parse(event.body);
     console.log('Received request body:', body);
 
-    const { url, type } = body;
+    const { url, type, content, metadata } = body;
 
+    // Handle text upload
+    if (type === 'text') {
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Text content is required' })
+        };
+      }
+
+      const memoryData = {
+        type: 'text',
+        content: content.trim(),
+        metadata: {
+          contentType: 'text/plain',
+          ...(metadata || {}),
+          size: {
+            original: content.length,
+            compressed: content.length
+          }
+        }
+      };
+
+      console.log('Creating new text memory');
+      const memory = new Memory(memoryData);
+      const savedMemory = await memory.save();
+      console.log('Memory saved successfully:', savedMemory._id);
+
+      return {
+        statusCode: 201,
+        headers,
+        body: JSON.stringify({
+          message: 'Upload successful',
+          memory: {
+            _id: savedMemory._id,
+            type: savedMemory.type,
+            content: savedMemory.content,
+            metadata: savedMemory.metadata,
+            createdAt: savedMemory.createdAt
+          }
+        })
+      };
+    }
+
+    // Handle URL upload
     if (!url) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'URL is required' })
+        body: JSON.stringify({ error: 'URL is required for non-text uploads' })
       };
     }
 
@@ -109,11 +152,11 @@ exports.handler = async (event, context) => {
       url: url,
       metadata: {
         siteName: new URL(url).hostname,
-        ...(body.metadata || {})
+        ...(metadata || {})
       }
     };
 
-    console.log('Creating new memory:', JSON.stringify(memoryData, null, 2));
+    console.log('Creating new URL memory:', JSON.stringify(memoryData, null, 2));
     const memory = new Memory(memoryData);
     const savedMemory = await memory.save();
     console.log('Memory saved successfully:', savedMemory._id);
