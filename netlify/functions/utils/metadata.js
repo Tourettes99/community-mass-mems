@@ -1,0 +1,142 @@
+const { unfurl } = require('unfurl.js');
+const fileType = require('file-type');
+const { getMetadata } = require('page-metadata-parser');
+const domino = require('domino');
+const fetch = require('node-fetch');
+
+async function extractUrlMetadata(url) {
+  try {
+    const result = await unfurl(url);
+    
+    // Handle YouTube videos
+    const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const youtubeMatch = url.match(youtubeRegex);
+    
+    if (youtubeMatch) {
+      const videoId = youtubeMatch[1];
+      return {
+        title: result.title,
+        description: result.description,
+        siteName: 'YouTube',
+        mediaType: 'video',
+        image: result.open_graph?.images?.[0]?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        playbackHtml: `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+      };
+    }
+
+    // Handle Twitter embeds
+    if (url.includes('twitter.com') || url.includes('x.com')) {
+      const tweetId = url.split('/').pop()?.split('?')[0];
+      if (tweetId) {
+        return {
+          title: result.title,
+          description: result.description,
+          siteName: 'Twitter',
+          mediaType: 'social',
+          image: result.open_graph?.images?.[0]?.url,
+          playbackHtml: `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`
+        };
+      }
+    }
+
+    // Handle Instagram embeds
+    if (url.includes('instagram.com')) {
+      const postId = url.split('/p/')?.pop()?.split('/')[0];
+      if (postId) {
+        return {
+          title: result.title,
+          description: result.description,
+          siteName: 'Instagram',
+          mediaType: 'social',
+          image: result.open_graph?.images?.[0]?.url,
+          playbackHtml: `<blockquote class="instagram-media" data-instgrm-permalink="${url}"><a href="${url}"></a></blockquote><script async src="//www.instagram.com/embed.js"></script>`
+        };
+      }
+    }
+
+    // Default metadata for other URLs
+    return {
+      title: result.title,
+      description: result.description,
+      siteName: result.site_name,
+      mediaType: 'url',
+      image: result.open_graph?.images?.[0]?.url || result.favicon,
+      url: result.url
+    };
+  } catch (error) {
+    console.error('Error extracting URL metadata:', error);
+    return {
+      title: url,
+      description: 'No description available',
+      mediaType: 'url',
+      url: url
+    };
+  }
+}
+
+async function extractFileMetadata(buffer, filename) {
+  try {
+    const type = await fileType.fromBuffer(buffer);
+    const size = buffer.length;
+
+    const baseMetadata = {
+      fileName: filename,
+      size: {
+        original: size,
+      },
+      contentType: type?.mime || 'application/octet-stream'
+    };
+
+    if (type?.mime.startsWith('image/')) {
+      const sizeOf = require('image-size');
+      const dimensions = sizeOf(buffer);
+      return {
+        ...baseMetadata,
+        mediaType: 'image',
+        dimensions: {
+          width: dimensions.width,
+          height: dimensions.height
+        },
+        format: type.ext
+      };
+    }
+
+    if (type?.mime.startsWith('video/')) {
+      // For video files, we could use ffprobe to get more metadata
+      // but for now we'll return basic info
+      return {
+        ...baseMetadata,
+        mediaType: 'video',
+        format: type.ext
+      };
+    }
+
+    if (type?.mime.startsWith('audio/')) {
+      return {
+        ...baseMetadata,
+        mediaType: 'audio',
+        format: type.ext
+      };
+    }
+
+    return {
+      ...baseMetadata,
+      mediaType: 'static',
+      format: type?.ext || filename.split('.').pop()
+    };
+  } catch (error) {
+    console.error('Error extracting file metadata:', error);
+    return {
+      fileName: filename,
+      mediaType: 'static',
+      size: {
+        original: buffer.length
+      }
+    };
+  }
+}
+
+module.exports = {
+  extractUrlMetadata,
+  extractFileMetadata
+};
