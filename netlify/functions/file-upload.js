@@ -1,14 +1,40 @@
 const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
-const Sharp = require('sharp');
-const ffmpeg = require('fluent-ffmpeg');
-const { PassThrough } = require('stream');
-const zlib = require('zlib');
 
 const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 
-const DB_NAME = 'memories';
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+// Initialize MongoDB connection
+let cachedDb = null;
+async function connectToDatabase() {
+  console.log('Attempting to connect to MongoDB...');
+  
+  if (cachedDb && mongoose.connection.readyState === 1) {
+    console.log('Using cached database connection');
+    return cachedDb;
+  }
+
+  try {
+    console.log('Connecting to MongoDB...');
+    const connection = await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      bufferCommands: false,
+      dbName: 'memories'
+    });
+
+    console.log('MongoDB connected successfully');
+    cachedDb = connection;
+    return connection;
+  } catch (error) {
+    console.error('MongoDB connection error:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
@@ -43,39 +69,6 @@ const memorySchema = new mongoose.Schema({
   strict: false 
 });
 
-// Initialize MongoDB connection
-let cachedDb = null;
-async function connectToDatabase() {
-  console.log('Attempting to connect to MongoDB...');
-  
-  if (cachedDb && mongoose.connection.readyState === 1) {
-    console.log('Using cached database connection');
-    return cachedDb;
-  }
-
-  try {
-    console.log('Connecting to MongoDB...');
-    const connection = await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
-      bufferCommands: false,
-      dbName: 'memories' // Explicitly set the database name
-    });
-
-    console.log('MongoDB connected successfully');
-    cachedDb = connection;
-    return connection;
-  } catch (error) {
-    console.error('MongoDB connection error:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
-}
-
 // Initialize Memory model
 let Memory = mongoose.models.Memory || mongoose.model('Memory', memorySchema);
 
@@ -108,10 +101,17 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Connect to MongoDB first
+    console.log('Connecting to database...');
+    await connectToDatabase();
+    console.log('Database connection established');
+
     // Parse request body
     let body;
     try {
-      console.log('Parsing request body:', event.body);
+      console.log('Raw request body:', event.body);
+      console.log('Content-Type:', event.headers['content-type']);
+      
       body = JSON.parse(event.body);
       console.log('Parsed body:', body);
     } catch (error) {
@@ -135,16 +135,11 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Connect to MongoDB
-    console.log('Connecting to database...');
-    await connectToDatabase();
-    console.log('Database connection established');
-
     // Create memory object
     const memoryData = {
       type: body.type,
-      url: body.url,
-      content: body.content,
+      url: body.url || '',
+      content: body.content || '',
       tags: body.tags || [],
       metadata: {
         title: body.type === 'text' ? body.content?.slice(0, 50) : body.url,
@@ -186,7 +181,8 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         error: 'Internal server error',
         message: error.message,
-        type: error.name
+        type: error.name,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }

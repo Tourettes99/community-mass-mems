@@ -114,48 +114,24 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     setError('');
 
     try {
-      // Validate file type
-      const fileExtension = file.name.split('.').pop();
-      if (!fileExtension) {
-        setError('Invalid file: no file extension found');
-        return;
-      }
-
-      const ext = '.' + fileExtension.toLowerCase();
-      const fileType = Object.entries(SUPPORTED_FILE_TYPES).find(([_, exts]) => exts.includes(ext))?.[0];
-
-      if (!fileType) {
-        setError(`Unsupported file type. Supported types: ${Object.values(SUPPORTED_FILE_TYPES).flat().join(', ')}`);
-        return;
-      }
-
-      // Upload file to Netlify Function
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const uploadResponse = await fetch('/.netlify/functions/file-upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Failed to upload file');
-      }
-
-      const { memory } = await uploadResponse.json();
-      if (!memory?.url) {
-        throw new Error('No URL received from server');
-      }
-
-      setUrl(memory.url);
-      setType(fileType as MemoryType);
-
-      // For static text files, read content
-      if (fileType === 'static' && file.type.includes('text')) {
+      // Read file content directly
+      if (file.type.includes('text')) {
         const text = await file.text();
         setContent(text);
+        setType('text');
+      } else {
+        // For now, just store the file name as URL
+        // In a real app, you'd upload the file to a storage service
+        setUrl(file.name);
+        
+        // Set type based on file type
+        if (file.type.includes('image')) setType('image');
+        else if (file.type.includes('video')) setType('video');
+        else if (file.type.includes('audio')) setType('audio');
+        else setType('static');
       }
+
+      setSuccess(true);
     } catch (error) {
       console.error('Error processing file:', error);
       setError(error instanceof Error ? error.message : 'Failed to process file');
@@ -170,7 +146,8 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     setError(null);
 
     try {
-      // Create the request body as JSON
+      console.log('Submitting memory:', { type, url, content, tags });
+      
       const requestBody = {
         type,
         url,
@@ -192,7 +169,9 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
       }
 
       const data = await response.json();
-      onMemoryCreated(data);
+      console.log('Server response:', data);
+      
+      onMemoryCreated(data.memory);
       setSuccess(true);
       setUrl('');
       setContent('');
