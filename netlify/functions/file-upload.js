@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 
-const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  throw new Error('MONGODB_URI environment variable is required');
+}
 
 // Initialize MongoDB connection
 let cachedDb = null;
@@ -18,7 +21,7 @@ async function connectToDatabase() {
     const connection = await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       bufferCommands: false,
       dbName: 'memories'
     });
