@@ -112,14 +112,26 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 
 const MemoryGrid: React.FC = () => {
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMemories = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/memories`);
+        setError(null);
+        const response = await axios.get('/api/memories');
         setMemories(response.data);
-      } catch (error) {
+      } catch (error: any) {
+        let errorMessage = 'Failed to load memories. Please try again later.';
+        if (error.code === 'ERR_NETWORK') {
+          errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+        } else if (error.response?.status === 404) {
+          errorMessage = 'The memories endpoint is currently unavailable. Our team has been notified.';
+        }
+        setError(errorMessage);
         console.error('Failed to fetch memories:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -128,6 +140,36 @@ const MemoryGrid: React.FC = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <Typography variant="h6">Loading memories...</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '50vh',
+        gap: 2,
+        p: 3,
+        textAlign: 'center'
+      }}>
+        <Typography variant="h6" color="error">
+          {error}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          We're working on fixing this issue. Please check back in a few minutes.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box
