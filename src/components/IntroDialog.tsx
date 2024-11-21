@@ -134,7 +134,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         wavesurfer.on('ready', () => {
           addDebugInfo('WaveSurfer ready - Audio loaded successfully');
           try {
-            const duration = wavesurfer.getDurationSeconds();
+            const duration = wavesurfer.getDuration();
             addDebugInfo(`Audio duration: ${duration} seconds`);
           } catch (err) {
             addDebugInfo('Could not get duration');
@@ -200,7 +200,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         addDebugInfo('Pause command sent');
       } else {
         try {
-          const duration = wavesurfer.getDurationSeconds();
+          const duration = wavesurfer.getDuration();
           addDebugInfo(`Current duration: ${duration} seconds`);
           
           if (duration === 0) {
