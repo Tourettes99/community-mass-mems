@@ -6,7 +6,9 @@ import {
   DialogActions, 
   Button, 
   Box,
-  Alert
+  Alert,
+  CircularProgress,
+  Typography
 } from '@mui/material';
 import WaveSurfer from 'wavesurfer.js';
 
@@ -20,12 +22,26 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer>();
 
+  const addDebugInfo = (info: string) => {
+    setDebugInfo(prev => `${prev}\n${new Date().toISOString()}: ${info}`);
+  };
+
   useEffect(() => {
     if (waveformRef.current && open) {
+      setIsLoading(true);
+      setError(null);
+      addDebugInfo('Initializing WaveSurfer...');
+
       try {
+        // Destroy previous instance if it exists
+        if (wavesurferRef.current) {
+          wavesurferRef.current.destroy();
+        }
+
         wavesurferRef.current = WaveSurfer.create({
           container: waveformRef.current,
           waveColor: '#FF5F1F',
@@ -36,27 +52,29 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           responsive: true,
           height: 100,
           normalize: true,
-          backend: 'WebAudio'
+          backend: 'WebAudio',
+          autoplay: false
         });
 
-        const fullPath = `${process.env.PUBLIC_URL}/${audioPath}`;
-        console.log('Loading audio from:', fullPath);
+        const fullPath = `${window.location.origin}/${audioPath}`;
+        addDebugInfo(`Loading audio from: ${fullPath}`);
 
         // Type-safe event handlers
         wavesurferRef.current.on('error', () => {
-          console.error('WaveSurfer error occurred');
-          setError('Failed to load audio file. Please try again.');
+          const errorMsg = 'Failed to load audio file. Please try again.';
+          addDebugInfo(`Error: ${errorMsg}`);
+          setError(errorMsg);
           setIsLoading(false);
         });
 
         wavesurferRef.current.on('ready', () => {
-          console.log('WaveSurfer ready');
+          addDebugInfo('WaveSurfer ready');
           setIsLoading(false);
           setError(null);
         });
 
         wavesurferRef.current.on('finish', () => {
-          console.log('Playback finished');
+          addDebugInfo('Playback finished');
           setIsPlaying(false);
         });
 
@@ -65,11 +83,13 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
         return () => {
           if (wavesurferRef.current) {
+            addDebugInfo('Destroying WaveSurfer instance');
             wavesurferRef.current.destroy();
           }
         };
       } catch (err) {
-        console.error('Error initializing WaveSurfer:', err);
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        addDebugInfo(`Error initializing WaveSurfer: ${errorMsg}`);
         setError('Failed to initialize audio player.');
         setIsLoading(false);
       }
@@ -77,22 +97,29 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
   }, [open, audioPath]);
 
   const handlePlayPause = async () => {
-    if (wavesurferRef.current) {
-      try {
-        if (isPlaying) {
-          wavesurferRef.current.pause();
-        } else {
-          await wavesurferRef.current.play();
-        }
-        setIsPlaying(!isPlaying);
-      } catch (err) {
-        console.error('Error playing/pausing audio:', err);
-        setError('Failed to play audio. Please try again.');
+    if (!wavesurferRef.current) {
+      addDebugInfo('WaveSurfer instance not found');
+      return;
+    }
+
+    try {
+      addDebugInfo(`Attempting to ${isPlaying ? 'pause' : 'play'} audio`);
+      if (isPlaying) {
+        wavesurferRef.current.pause();
+      } else {
+        await wavesurferRef.current.play();
       }
+      setIsPlaying(!isPlaying);
+      addDebugInfo(`Successfully ${isPlaying ? 'paused' : 'played'} audio`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      addDebugInfo(`Error playing/pausing audio: ${errorMsg}`);
+      setError('Failed to play audio. Please try again.');
     }
   };
 
   const handleSkip = () => {
+    addDebugInfo('Skipping intro');
     if (wavesurferRef.current) {
       wavesurferRef.current.stop();
     }
@@ -101,18 +128,21 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
   // Function to check if audio file exists
   const checkAudioFile = async () => {
+    const fullPath = `${window.location.origin}/${audioPath}`;
     try {
-      const response = await fetch(`${process.env.PUBLIC_URL}/${audioPath}`);
+      addDebugInfo(`Checking audio file at: ${fullPath}`);
+      const response = await fetch(fullPath);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const contentType = response.headers.get('content-type');
-      console.log('Audio file content type:', contentType);
+      addDebugInfo(`Audio file content type: ${contentType}`);
       if (!contentType?.includes('audio')) {
-        console.warn('Content-Type is not audio:', contentType);
+        addDebugInfo(`Warning: Content-Type is not audio: ${contentType}`);
       }
     } catch (err) {
-      console.error('Error checking audio file:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      addDebugInfo(`Error checking audio file: ${errorMsg}`);
       setError('Audio file not found or inaccessible.');
     }
   };
@@ -144,6 +174,18 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           </Alert>
         )}
         <Box ref={waveformRef} sx={{ my: 2 }} />
+        {isLoading && (
+          <Box display="flex" justifyContent="center" my={2}>
+            <CircularProgress />
+          </Box>
+        )}
+        {process.env.NODE_ENV === 'development' && (
+          <Box mt={2} p={1} bgcolor="grey.100" borderRadius={1}>
+            <Typography variant="caption" component="pre" style={{ whiteSpace: 'pre-wrap' }}>
+              {debugInfo}
+            </Typography>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
         <Button 
