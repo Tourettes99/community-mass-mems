@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -9,6 +9,8 @@ import {
   IconButton,
   CardActions,
   Link,
+  Collapse,
+  Button,
 } from '@mui/material';
 import {
   Link as LinkIcon,
@@ -19,7 +21,10 @@ import {
   Description,
   Share,
   Favorite,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
+import EmbedPlayer from './EmbedPlayer';
 
 interface Memory {
   _id: string;
@@ -32,6 +37,7 @@ interface Memory {
     mediaType?: string;
     siteName?: string;
     image?: string;
+    playbackHtml?: string;
     [key: string]: any;
   };
   tags: string[];
@@ -59,54 +65,70 @@ const getMemoryTypeIcon = (type: string) => {
   }
 };
 
-const getMemoryPreview = (memory: Memory) => {
+const getMemoryPreview = (memory: Memory, expanded: boolean) => {
   const { type, url, content, metadata } = memory;
+
+  // For media content, use the EmbedPlayer
+  if ((type === 'video' || type === 'audio') && url) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <EmbedPlayer
+          type={type}
+          url={url}
+          title={metadata?.title}
+          metadata={metadata}
+        />
+      </Box>
+    );
+  }
 
   switch (type) {
     case 'url':
+      if (metadata?.playbackHtml) {
+        return (
+          <Box sx={{ p: 2 }}>
+            <EmbedPlayer
+              type={type}
+              url={url || ''}
+              title={metadata?.title}
+              metadata={metadata}
+            />
+          </Box>
+        );
+      }
       return metadata?.image ? (
-        <CardMedia
-          component="img"
-          height="140"
-          image={metadata.image}
-          alt={metadata.title || 'URL preview'}
-        />
+        <Link href={url} target="_blank" rel="noopener noreferrer">
+          <CardMedia
+            component="img"
+            height="140"
+            image={metadata.image}
+            alt={metadata.title || 'URL preview'}
+          />
+        </Link>
       ) : null;
+
     case 'image':
       return url ? (
         <CardMedia
           component="img"
-          height="140"
+          sx={{ maxHeight: expanded ? '400px' : '140px', objectFit: 'contain' }}
           image={url}
           alt={metadata?.title || 'Image memory'}
         />
       ) : null;
-    case 'video':
-      return url ? (
-        <CardMedia
-          component="video"
-          height="140"
-          image={url}
-          title={metadata?.title || 'Video memory'}
-          controls
-        />
-      ) : null;
-    case 'audio':
-      return url ? (
-        <CardMedia
-          component="audio"
-          image={url}
-          title={metadata?.title || 'Audio memory'}
-          controls
-        />
-      ) : null;
+
     default:
       return null;
   }
 };
 
 const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
-  const { type, metadata, tags, createdAt } = memory;
+  const [expanded, setExpanded] = useState(false);
+  const { type, metadata, tags, createdAt, url, content } = memory;
+
+  const handleExpandClick = () => {
+    setExpanded(!expanded);
+  };
 
   return (
     <Card 
@@ -120,7 +142,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         },
       }}
     >
-      {getMemoryPreview(memory)}
+      {getMemoryPreview(memory, expanded)}
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
           {getMemoryTypeIcon(type)}
@@ -133,32 +155,52 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
           </Typography>
         </Box>
 
+        {url && type === 'url' && (
+          <Link
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            color="primary"
+            sx={{ display: 'block', mb: 1 }}
+          >
+            {metadata?.siteName || url}
+          </Link>
+        )}
+
         <Typography variant="h6" component="div" gutterBottom noWrap>
           {metadata?.title || 'Untitled Memory'}
         </Typography>
 
-        <Typography 
-          variant="body2" 
-          color="text.secondary"
-          sx={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            mb: 2
-          }}
-        >
-          {metadata?.description || memory.content || 'No description available'}
-        </Typography>
+        <Collapse in={expanded} timeout="auto" unmountOnExit>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            {metadata?.description || content || 'No description available'}
+          </Typography>
+        </Collapse>
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {!expanded && (
+          <Typography 
+            variant="body2" 
+            color="text.secondary"
+            sx={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              mb: 2
+            }}
+          >
+            {metadata?.description || content || 'No description available'}
+          </Typography>
+        )}
+
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
           {tags.map((tag, index) => (
             <Chip
               key={index}
               label={tag}
               size="small"
               variant="outlined"
-              sx={{ borderRadius: 1 }}
+              color="primary"
             />
           ))}
         </Box>
@@ -171,6 +213,14 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         <IconButton aria-label="add to favorites">
           <Favorite />
         </IconButton>
+        <Button
+          onClick={handleExpandClick}
+          endIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          size="small"
+          sx={{ ml: 'auto' }}
+        >
+          {expanded ? 'Show Less' : 'Show More'}
+        </Button>
       </CardActions>
     </Card>
   );
