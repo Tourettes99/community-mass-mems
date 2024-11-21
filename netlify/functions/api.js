@@ -3,7 +3,10 @@ const serverless = require('serverless-http');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
-const path = require('path');
+const sharp = require('sharp');
+const gifInfo = require('gif-info');
+const musicMetadata = require('music-metadata');
+const urlMetadata = require('url-metadata');
 
 // Initialize express app
 const app = express();
@@ -43,8 +46,9 @@ const MEMORY_TYPES = {
 
 // Configure multer for file uploads
 const upload = multer({
+  storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024 // 10MB
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = {
@@ -64,6 +68,49 @@ const upload = multer({
   }
 }).single('file');
 
+// Utility functions
+const formatDuration = (seconds) => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
+const getImageMetadata = async (buffer) => {
+  const metadata = await sharp(buffer).metadata();
+  return {
+    width: metadata.width,
+    height: metadata.height,
+    format: metadata.format.toUpperCase(),
+    size: buffer.length,
+    aspectRatio: metadata.width / metadata.height
+  };
+};
+
+const getGifMetadata = (buffer) => {
+  const metadata = gifInfo(buffer);
+  return {
+    width: metadata.width,
+    height: metadata.height,
+    format: 'GIF',
+    frames: metadata.images.length,
+    duration: metadata.images[0].delay * metadata.images.length,
+    size: buffer.length,
+    aspectRatio: metadata.width / metadata.height
+  };
+};
+
+const getAudioMetadata = async (buffer) => {
+  const metadata = await musicMetadata.parseBuffer(buffer);
+  return {
+    format: metadata.format.container.toUpperCase(),
+    duration: formatDuration(metadata.format.duration),
+    bitrate: metadata.format.bitrate,
+    sampleRate: metadata.format.sampleRate,
+    channels: metadata.format.numberOfChannels,
+    size: buffer.length
+  };
+};
+
 // Memory Schema
 const memorySchema = new mongoose.Schema({
   title: String,
@@ -79,7 +126,8 @@ const memorySchema = new mongoose.Schema({
   },
   metadata: {
     type: Map,
-    of: mongoose.Schema.Types.Mixed
+    of: mongoose.Schema.Types.Mixed,
+    default: new Map()
   },
   createdAt: {
     type: Date,
@@ -102,27 +150,57 @@ router.get('/memories', async (req, res) => {
 
 router.post('/memories/upload', upload, async (req, res) => {
   try {
-    const { title, description, type, content } = req.body;
-    
+    const { title, description, type } = req.body;
+    let content = req.body.content;
+    let metadata = new Map();
+
+    // Handle different memory types
+    if (type === MEMORY_TYPES.URL) {
+      try {
+        const urlData = await urlMetadata(content);
+        metadata.set('title', urlData.title);
+        metadata.set('description', urlData.description);
+        metadata.set('image', urlData.image);
+        metadata.set('siteName', urlData.siteName);
+      } catch (error) {
+        console.error('Error fetching URL metadata:', error);
+      }
+    } else if (req.file) {
+      content = req.file.buffer.toString('base64');
+      metadata.set('filename', req.file.originalname);
+      metadata.set('mimetype', req.file.mimetype);
+
+      try {
+        let fileMetadata;
+        if (type === MEMORY_TYPES.IMAGE) {
+          fileMetadata = await getImageMetadata(req.file.buffer);
+        } else if (type === MEMORY_TYPES.GIF) {
+          fileMetadata = getGifMetadata(req.file.buffer);
+        } else if (type === MEMORY_TYPES.AUDIO) {
+          fileMetadata = await getAudioMetadata(req.file.buffer);
+        }
+        
+        for (const [key, value] of Object.entries(fileMetadata)) {
+          metadata.set(key, value);
+        }
+      } catch (error) {
+        console.error('Error extracting file metadata:', error);
+      }
+    }
+
     const memory = new Memory({
       title,
       description,
       type,
       content,
-      metadata: {}
+      metadata
     });
-
-    if (req.file) {
-      memory.metadata.set('filename', req.file.originalname);
-      memory.metadata.set('size', req.file.size);
-      memory.metadata.set('mimetype', req.file.mimetype);
-    }
 
     await memory.save();
     res.json(memory);
   } catch (error) {
     console.error('Error uploading memory:', error);
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
