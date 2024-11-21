@@ -170,6 +170,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 
             {hasEmbed ? (
               <Box 
+                component="div"
                 sx={{ 
                   position: 'relative',
                   paddingTop: '56.25%', // 16:9 aspect ratio
@@ -177,8 +178,20 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                   overflow: 'hidden',
                   borderRadius: 1
                 }}
-                dangerouslySetInnerHTML={{ __html: metadata.embedHtml }}
-              />
+              >
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%'
+                  }}
+                  dangerouslySetInnerHTML={{ 
+                    __html: metadata.embedHtml || '' 
+                  }} 
+                />
+              </Box>
             ) : hasPlayableMedia ? (
               <Box sx={{ mb: 2 }}>
                 {metadata.mediaType === 'video' ? (
