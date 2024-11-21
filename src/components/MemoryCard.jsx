@@ -34,6 +34,7 @@ const MemoryCard = ({ memory }) => {
     publishedTime,
     embedHtml,
     previewType,
+    metadata
   } = memory;
 
   const getMediaIcon = () => {
@@ -50,7 +51,6 @@ const MemoryCard = ({ memory }) => {
   };
 
   const renderMedia = () => {
-    // Only render media if we have embedHtml or a valid preview type
     if (!previewType || previewType === 'none') {
       return null;
     }
@@ -60,7 +60,7 @@ const MemoryCard = ({ memory }) => {
         <Box
           sx={{
             position: 'relative',
-            paddingTop: '56.25%', // 16:9 aspect ratio
+            paddingTop: '56.25%',
             bgcolor: 'background.default',
             overflow: 'hidden',
           }}
@@ -69,15 +69,15 @@ const MemoryCard = ({ memory }) => {
       );
     }
 
-    if (imageUrl) {
+    if (imageUrl || metadata?.previewUrl) {
       return (
         <CardMedia
           component="img"
-          image={imageUrl}
+          image={imageUrl || metadata.previewUrl}
           alt={title || 'Memory image'}
           sx={{
             height: 0,
-            paddingTop: '56.25%', // 16:9 aspect ratio
+            paddingTop: '56.25%',
             objectFit: 'cover',
           }}
         />
@@ -86,6 +86,9 @@ const MemoryCard = ({ memory }) => {
 
     return null;
   };
+
+  // Don't render a card for empty or invalid memories
+  if (!url && !description && !title) return null;
 
   return (
     <Card
@@ -101,71 +104,75 @@ const MemoryCard = ({ memory }) => {
         },
       }}
     >
-      <CardActionArea
-        component={Link}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        sx={{ flexGrow: 1 }}
-      >
-        {renderMedia()}
-        
-        <CardContent>
-          <Stack spacing={1}>
-            {siteName && (
-              <Chip
-                label={siteName}
-                size="small"
-                icon={getMediaIcon()}
-                sx={{ alignSelf: 'flex-start' }}
-              />
-            )}
-            
-            <Typography
-              gutterBottom
-              variant="h6"
-              component="h2"
-              sx={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                lineHeight: 1.2,
-                mb: 1
-              }}
+      {renderMedia()}
+      
+      <CardContent>
+        <Stack spacing={1}>
+          {siteName && (
+            <Chip
+              label={siteName}
+              size="small"
+              icon={getMediaIcon()}
+              sx={{ alignSelf: 'flex-start' }}
+            />
+          )}
+          
+          {title && (
+            <Link
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+              color="inherit"
             >
-              {title || 'Untitled Memory'}
-            </Typography>
-            
-            {description && (
               <Typography
-                variant="body2"
-                color="text.secondary"
+                variant="h6"
+                component="h2"
                 sx={{
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   display: '-webkit-box',
-                  WebkitLineClamp: 3,
+                  WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
+                  lineHeight: 1.2,
+                  mb: 1,
+                  '&:hover': {
+                    color: 'primary.main',
+                  }
                 }}
               >
-                {description}
+                {title}
               </Typography>
-            )}
+            </Link>
+          )}
+          
+          {description && (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+              }}
+            >
+              {description}
+            </Typography>
+          )}
 
-            {(authorName || publishedTime) && (
-              <Box sx={{ mt: 'auto', pt: 1 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {authorName && `By ${authorName}`}
-                  {authorName && publishedTime && ' · '}
-                  {publishedTime && new Date(publishedTime).toLocaleDateString()}
-                </Typography>
-              </Box>
-            )}
-          </Stack>
-        </CardContent>
-      </CardActionArea>
+          {(authorName || publishedTime) && (
+            <Box sx={{ mt: 'auto', pt: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                {authorName && `By ${authorName}`}
+                {authorName && publishedTime && ' · '}
+                {publishedTime && new Date(publishedTime).toLocaleDateString()}
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+      </CardContent>
     </Card>
   );
 };
