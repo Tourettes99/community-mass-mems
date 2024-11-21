@@ -148,12 +148,47 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     try {
       console.log('Submitting memory:', { type, url, content, tags });
       
-      const requestBody = {
+      const requestBody: any = {
         type,
-        url: url || undefined,
-        content: content || undefined,
-        tags: tags || []
+        tags,
       };
+
+      // Add URL or content based on type
+      if (type === 'url') {
+        if (!url) {
+          throw new Error('URL is required for URL type memories');
+        }
+        requestBody.url = url;
+      } else if (type === 'text') {
+        if (!content) {
+          throw new Error('Content is required for text type memories');
+        }
+        requestBody.content = content;
+      } else if (fileInputRef.current?.files?.length) {
+        const file = fileInputRef.current.files[0];
+        const reader = new FileReader();
+        
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              // Remove data URL prefix
+              const base64Data = reader.result.split(',')[1];
+              resolve(base64Data);
+            } else {
+              reject(new Error('Failed to read file'));
+            }
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+
+        requestBody.file = base64;
+        requestBody.fileName = file.name;
+        requestBody.contentType = file.type;
+      } else {
+        throw new Error('No content provided');
+      }
 
       const response = await fetch('/.netlify/functions/file-upload', {
         method: 'POST',
@@ -177,10 +212,16 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
 
       onMemoryCreated(data.memory);
       setSuccess(true);
+      
+      // Reset form
       setUrl('');
       setContent('');
       setTags([]);
+      setCurrentTag('');
       setType('url');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (err) {
       console.error('Error uploading memory:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload memory');

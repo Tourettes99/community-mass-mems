@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
+const { extractUrlMetadata, extractFileMetadata } = require('./utils/metadata');
+const { MongoClient } = require('mongodb');
+const { unfurl } = require('unfurl.js');
+const { fileTypeFromBuffer } = require('file-type');
+const getMetadata = require('page-metadata-parser').getMetadata;
+const domino = require('domino');
+const fetch = require('node-fetch');
+const sizeOf = require('image-size');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -43,7 +51,7 @@ async function connectToDatabase() {
 const memorySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['url', 'image', 'video', 'audio', 'text', 'static'],
+    enum: ['url', 'image', 'video', 'audio', 'text', 'static', 'social'],
     required: true
   },
   url: String,
@@ -53,27 +61,90 @@ const memorySchema = new mongoose.Schema({
     title: String,
     description: String,
     siteName: String,
-    favicon: String,
     mediaType: String,
-    previewUrl: String,
+    image: String,
     playbackHtml: String,
-    isPlayable: Boolean,
-    fileSize: Number,
-    contentType: String,
-    resolution: String,
-    duration: String,
+    fileName: String,
     format: String,
-    encoding: String,
-    lastModified: Date,
-    rawContent: String
+    dimensions: {
+      width: Number,
+      height: Number
+    },
+    size: {
+      original: Number,
+      compressed: Number
+    },
+    contentType: String,
+    oEmbed: Object,
+    openGraph: Object,
+    twitterCard: Object
   }
-}, { 
+}, {
   timestamps: true,
   strict: false 
 });
 
 // Initialize Memory model
 let Memory = mongoose.models.Memory || mongoose.model('Memory', memorySchema);
+
+async function extractUrlMetadata(url) {
+  try {
+    // Fetch URL content
+    const response = await fetch(url);
+    const html = await response.text();
+    
+    // Create virtual DOM
+    const doc = domino.createWindow(html).document;
+    
+    // Get basic metadata
+    const metadata = getMetadata(doc, url);
+    
+    // Get unfurl metadata (includes oEmbed data)
+    const unfurlData = await unfurl(url);
+    
+    return {
+      ...metadata,
+      oEmbed: unfurlData.oEmbed || null,
+      openGraph: unfurlData.open_graph || null,
+      twitterCard: unfurlData.twitter_card || null
+    };
+  } catch (error) {
+    console.error('Error extracting URL metadata:', error);
+    return null;
+  }
+}
+
+async function extractFileMetadata(base64Data, contentType) {
+  try {
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Get file type information
+    const fileType = await fileTypeFromBuffer(buffer);
+    
+    let metadata = {
+      type: fileType ? fileType.mime : contentType,
+      ext: fileType ? fileType.ext : contentType.split('/')[1]
+    };
+    
+    // Extract image dimensions if it's an image
+    if (metadata.type.startsWith('image/')) {
+      try {
+        const dimensions = sizeOf(buffer);
+        metadata.dimensions = {
+          width: dimensions.width,
+          height: dimensions.height
+        };
+      } catch (err) {
+        console.error('Error getting image dimensions:', err);
+      }
+    }
+    
+    return metadata;
+  } catch (error) {
+    console.error('Error extracting file metadata:', error);
+    return null;
+  }
+}
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -104,17 +175,11 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Connect to MongoDB first
-    console.log('Connecting to database...');
     await connectToDatabase();
-    console.log('Database connection established');
-
-    // Parse request body
+    
     let body;
     try {
       console.log('Raw request body:', event.body);
-      console.log('Content-Type:', event.headers['content-type']);
-      
       body = JSON.parse(event.body);
       console.log('Parsed body:', body);
     } catch (error) {
@@ -129,8 +194,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Validate required fields
-    if (!body.type || !['url', 'image', 'video', 'audio', 'text', 'static'].includes(body.type)) {
+    if (!body.type || !['url', 'image', 'video', 'audio', 'text', 'static', 'social'].includes(body.type)) {
       return {
         statusCode: 400,
         headers,
@@ -138,28 +202,38 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Create memory object
+    // Extract metadata based on type
+    let metadata = {};
+    if (body.type === 'url' && body.url) {
+      metadata = await extractUrlMetadata(body.url);
+    } else if (body.type === 'text') {
+      metadata = {
+        title: body.content?.slice(0, 50),
+        description: body.content,
+        mediaType: 'text'
+      };
+    } else if (body.file) {
+      const buffer = Buffer.from(body.file, 'base64');
+      metadata = await extractFileMetadata(buffer, body.fileName || 'unknown');
+    }
+
+    // Create memory object with metadata
     const memoryData = {
-      type: body.type,
+      type: metadata.mediaType || body.type,
       url: body.url || '',
       content: body.content || '',
       tags: body.tags || [],
       metadata: {
-        title: body.type === 'text' ? body.content?.slice(0, 50) : body.url,
-        mediaType: body.type,
-        description: body.content || body.url
+        ...metadata,
+        title: metadata.title || (body.type === 'text' ? body.content?.slice(0, 50) : body.url),
+        description: metadata.description || body.content || body.url
       }
     };
 
     console.log('Creating memory with data:', memoryData);
     
-    // Create and save memory
     const memory = new Memory(memoryData);
-    console.log('Validating memory...');
     await memory.validate();
-    console.log('Memory validated successfully');
-    
-    console.log('Saving memory...');
     const savedMemory = await memory.save();
     console.log('Memory saved successfully:', savedMemory._id);
 
@@ -171,21 +245,15 @@ exports.handler = async (event, context) => {
         memory: savedMemory
       })
     };
+
   } catch (error) {
-    console.error('Error processing request:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
+    console.error('Error processing request:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',
-        message: error.message,
-        type: error.name,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: error.message
       })
     };
   }
