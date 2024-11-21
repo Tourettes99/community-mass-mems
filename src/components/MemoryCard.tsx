@@ -11,7 +11,8 @@ import {
   Link,
   Collapse,
   Button,
-  Stack
+  Stack,
+  Badge
 } from '@mui/material';
 import {
   Link as LinkIcon,
@@ -24,6 +25,8 @@ import {
   Favorite,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  ThumbUp,
+  ThumbDown
 } from '@mui/icons-material';
 import EmbedPlayer from './EmbedPlayer';
 
@@ -44,10 +47,12 @@ interface Memory {
   };
   tags: string[];
   createdAt: string;
+  votes?: number;
 }
 
 interface MemoryCardProps {
   memory: Memory;
+  onVote?: (memoryId: string, vote: 1 | -1) => Promise<void>;
 }
 
 const getMemoryTypeIcon = (type: string) => {
@@ -124,12 +129,40 @@ const getMemoryPreview = (memory: Memory, expanded: boolean) => {
   }
 };
 
-const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
+const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
   const [expanded, setExpanded] = useState(false);
+  const [votes, setVotes] = useState(memory.votes || 0);
+  const [userVote, setUserVote] = useState<1 | -1 | 0>(0);
+  const [isVoting, setIsVoting] = useState(false);
   const { type, metadata, tags, createdAt, url, content } = memory;
 
   const handleExpandClick = () => {
     setExpanded(!expanded);
+  };
+
+  const handleVote = async (vote: 1 | -1) => {
+    if (isVoting || !onVote) return;
+
+    setIsVoting(true);
+    try {
+      // If user is clicking the same vote button again, remove their vote
+      const newVote = userVote === vote ? 0 : vote;
+      const voteDiff = newVote - userVote;
+      
+      // Optimistically update UI
+      setVotes(prev => prev + voteDiff);
+      setUserVote(newVote);
+
+      // Call the API
+      await onVote(memory._id, vote);
+    } catch (error) {
+      // Revert on error
+      setVotes(prev => prev - (vote - userVote));
+      setUserVote(userVote);
+      console.error('Failed to vote:', error);
+    } finally {
+      setIsVoting(false);
+    }
   };
 
   return (
@@ -222,6 +255,25 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
       </CardContent>
 
       <CardActions disableSpacing>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <IconButton 
+            onClick={() => handleVote(1)}
+            color={userVote === 1 ? "primary" : "default"}
+            disabled={isVoting}
+          >
+            <ThumbUp />
+          </IconButton>
+          <Typography variant="body2" color="text.secondary">
+            {votes}
+          </Typography>
+          <IconButton 
+            onClick={() => handleVote(-1)}
+            color={userVote === -1 ? "primary" : "default"}
+            disabled={isVoting}
+          >
+            <ThumbDown />
+          </IconButton>
+        </Stack>
         <IconButton aria-label="share">
           <Share />
         </IconButton>

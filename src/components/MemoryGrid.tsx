@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton, CardHeader, Avatar, Link, Stack, Chip } from '@mui/material';
+import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton, CardHeader, Avatar, Link, Stack, Chip, Button } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
@@ -16,7 +16,12 @@ interface MemoryGridProps {
   isBackgroundRefresh?: boolean;
 }
 
-const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
+interface MemoryCardProps {
+  memory: Memory;
+  onVote: (memoryId: string, vote: 1 | -1) => void;
+}
+
+const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
   const [expanded, setExpanded] = useState(false);
   const [mediaError, setMediaError] = useState(false);
   const [orangeFavicon, setOrangeFavicon] = useState<string | null>(null);
@@ -231,6 +236,20 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
             color: theme.palette.mode === 'dark' ? '#B3B3B3' : '#808080',
           }
         }}
+        action={
+          <Button
+            variant="contained"
+            onClick={() => onVote(memory._id, 1)}
+            sx={{ 
+              color: RAL_2005,
+              '&:hover': {
+                bgcolor: `${RAL_2005}20`,
+              }
+            }}
+          >
+            Vote
+          </Button>
+        }
       />
       {renderCardContent()}
       {memory.tags && memory.tags.length > 0 && (
@@ -273,47 +292,79 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
   onRefresh,
   isBackgroundRefresh = false
 }) => {
-  const theme = useTheme();
-  
-  return (
-    <Box sx={{ width: '100%', position: 'relative' }}>
-      {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          Error: {error}
+  const [voteError, setVoteError] = useState<string | null>(null);
+
+  const handleVote = async (memoryId: string, vote: 1 | -1) => {
+    try {
+      const response = await fetch('/.netlify/functions/vote-memory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ memoryId, vote })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to vote');
+      }
+
+      await response.json();
+    } catch (error) {
+      setVoteError(error instanceof Error ? error.message : 'Failed to vote');
+      throw error;
+    }
+  };
+
+  if (loading && !isBackgroundRefresh) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ textAlign: 'center', p: 4 }}>
+        <Typography color="error" gutterBottom>
+          {error}
         </Typography>
-      )}
-      {onRefresh && (
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <IconButton 
-            onClick={onRefresh} 
-            disabled={loading}
-            sx={{
-              color: RAL_2005,
-              '&:hover': {
-                bgcolor: `${RAL_2005}20`,
-              },
-              ...(loading && {
-                opacity: 0.5,
-              })
-            }}
+        {onRefresh && (
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={onRefresh}
+            variant="contained"
           >
-            <RefreshIcon />
-          </IconButton>
-        </Box>
-      )}
-      {loading && !isBackgroundRefresh && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 1
-          }}
-        >
-          <CircularProgress sx={{ color: RAL_2005 }} />
-        </Box>
-      )}
+            Retry
+          </Button>
+        )}
+      </Box>
+    );
+  }
+
+  if (!memories.length) {
+    return (
+      <Box sx={{ textAlign: 'center', p: 4 }}>
+        <Typography variant="h6" color="text.secondary">
+          No memories found
+        </Typography>
+        {onRefresh && (
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={onRefresh}
+            variant="contained"
+            sx={{ mt: 2 }}
+          >
+            Refresh
+          </Button>
+        )}
+      </Box>
+    );
+  }
+
+  return (
+    <>
       <Box
         sx={{
           display: 'grid',
@@ -332,12 +383,23 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.2 }}
             >
-              <MemoryCard memory={memory} />
+              <MemoryCard memory={memory} onVote={handleVote} />
             </motion.div>
           ))}
         </AnimatePresence>
       </Box>
-    </Box>
+
+      <Snackbar
+        open={!!voteError}
+        autoHideDuration={6000}
+        onClose={() => setVoteError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setVoteError(null)}>
+          {voteError}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 
