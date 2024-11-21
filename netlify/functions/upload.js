@@ -324,11 +324,11 @@ const generateEmbedHtml = (url, platform, videoId) => {
 };
 
 // Function to fetch URL metadata
-const fetchUrlMetadata = async (url) => {
+const fetchUrlMetadata = async (url, userMetadata = {}) => {
   try {
     const result = await unfurl(url, {
-      follow: 5, // Follow up to 5 redirects
-      timeout: 10000, // 10 second timeout
+      follow: 5,
+      timeout: 10000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; CommunityMassMems/1.0; +https://communitymems.example.com)'
       }
@@ -340,18 +340,22 @@ const fetchUrlMetadata = async (url) => {
       twitterImage: result.twitter_card?.image?.url
     });
 
-    // Determine content type from metadata
-    let contentType = result.open_graph?.type || 'website';
+    // Determine content type from metadata or user input
+    let contentType = userMetadata.type || result.open_graph?.type || 'website';
     if (result.open_graph?.video) contentType = 'video';
     else if (result.open_graph?.audio) contentType = 'audio';
     else if (result.twitter_card?.card === 'player') contentType = 'media';
 
     return {
-      // Basic metadata
-      title: result.title || result.open_graph?.title || result.twitter_card?.title,
-      description: result.description || result.open_graph?.description || result.twitter_card?.description,
-      siteName: result.site_name || result.open_graph?.site_name || new URL(url).hostname,
-      contentType,
+      // Basic metadata - prioritize user input
+      title: userMetadata.title || result.title || result.open_graph?.title || result.twitter_card?.title,
+      description: userMetadata.description || result.description || result.open_graph?.description || result.twitter_card?.description,
+      siteName: userMetadata.siteName || result.site_name || result.open_graph?.site_name || new URL(url).hostname,
+      contentType: userMetadata.type || contentType,
+      
+      // User-provided content takes precedence
+      content: userMetadata.content,
+      tags: userMetadata.tags || [],
       
       // Open Graph metadata
       ogTitle: result.open_graph?.title,
@@ -371,18 +375,18 @@ const fetchUrlMetadata = async (url) => {
       twitterPlayer: result.twitter_card?.player?.url,
       
       // Article metadata
-      articleSection: result.open_graph?.article?.section,
-      articleTags: result.open_graph?.article?.tags || [],
+      articleSection: userMetadata.section || result.open_graph?.article?.section,
+      articleTags: userMetadata.tags || result.open_graph?.article?.tags || [],
       articlePublisher: result.open_graph?.article?.publisher,
       
       // Media and preview information
       ...mediaInfo,
       
       // Additional metadata
-      language: result.language,
-      publishedDate: result.open_graph?.article?.published_time || result.published,
-      modifiedDate: result.open_graph?.article?.modified_time || result.modified,
-      author: result.open_graph?.article?.author || result.author,
+      language: userMetadata.language || result.language,
+      publishedDate: userMetadata.publishedDate || result.open_graph?.article?.published_time || result.published,
+      modifiedDate: userMetadata.modifiedDate || result.open_graph?.article?.modified_time || result.modified,
+      author: userMetadata.author || result.open_graph?.article?.author || result.author,
       favicon: result.favicon,
       
       // Structured data
@@ -397,17 +401,17 @@ const fetchUrlMetadata = async (url) => {
       raw: {
         openGraph: result.open_graph,
         twitterCard: result.twitter_card,
-        jsonLd: result.json_ld
+        jsonLd: result.json_ld,
+        userProvided: userMetadata
       }
     };
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
-    // Try to get basic media info even if metadata fetch fails
-    const mediaInfo = await getMediaInfo(url, {});
+    // Return user metadata even if URL fetch fails
     return {
-      siteName: new URL(url).hostname,
-      error: 'Failed to fetch metadata',
-      ...mediaInfo
+      ...userMetadata,
+      siteName: userMetadata.siteName || new URL(url).hostname,
+      error: 'Failed to fetch URL metadata'
     };
   }
 };
@@ -514,7 +518,7 @@ exports.handler = async (event, context) => {
     }
 
     console.log('Fetching metadata for URL:', url);
-    const urlMetadata = await fetchUrlMetadata(url);
+    const urlMetadata = await fetchUrlMetadata(url, userMetadata);
     
     // Get media info including preview and playback HTML
     const mediaInfo = await getMediaInfo(url, urlMetadata);
@@ -524,8 +528,7 @@ exports.handler = async (event, context) => {
       url: url,
       metadata: {
         ...urlMetadata,
-        ...mediaInfo,
-        ...userMetadata
+        ...mediaInfo
       }
     };
 

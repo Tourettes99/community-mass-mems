@@ -12,11 +12,14 @@ import {
   Alert,
   Button,
   Grid,
-  useMediaQuery
+  useMediaQuery,
+  Tabs,
+  Tab
 } from '@mui/material';
-import { Refresh as RefreshIcon } from '@mui/icons-material';
+import { Refresh as RefreshIcon, Link as LinkIcon, TextFields as TextIcon } from '@mui/icons-material';
 import MemoryCard from './components/MemoryCard';
 import SocialScripts from './components/SocialScripts';
+import TextUploadForm from './components/TextUploadForm';
 
 // Create a theme instance
 const theme = createTheme({
@@ -55,124 +58,101 @@ function App() {
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [uploadType, setUploadType] = useState('link');
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
-  useEffect(() => {
-    fetchMemories();
-  }, []);
 
   const fetchMemories = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const response = await fetch('/.netlify/functions/get-memories');
-      if (!response.ok) {
-        throw new Error('Failed to fetch memories');
-      }
+      const response = await fetch('/.netlify/functions/getMemories');
+      if (!response.ok) throw new Error('Failed to fetch memories');
       const data = await response.json();
-      setMemories(data.memories);
+      setMemories(data);
+      setError(null);
     } catch (err) {
-      console.error('Error fetching memories:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <Box
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-          justifyContent="center"
-          minHeight="50vh"
-        >
-          <CircularProgress size={48} />
-          <Typography variant="h6" sx={{ mt: 2 }}>
-            Loading memories...
-          </Typography>
-        </Box>
-      );
-    }
+  useEffect(() => {
+    fetchMemories();
+  }, []);
 
-    if (error) {
-      return (
-        <Box sx={{ maxWidth: 600, mx: 'auto', mt: 4 }}>
-          <Alert
-            severity="error"
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                startIcon={<RefreshIcon />}
-                onClick={fetchMemories}
-              >
-                Retry
-              </Button>
-            }
-          >
-            {error}
-          </Alert>
-        </Box>
-      );
-    }
-
-    if (memories.length === 0) {
-      return (
-        <Box
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-          justifyContent="center"
-          minHeight="50vh"
-        >
-          <Typography variant="h6" color="text.secondary" align="center">
-            No memories found. Start by sharing your first memory!
-          </Typography>
-        </Box>
-      );
-    }
-
-    return (
-      <Grid container spacing={3}>
-        {memories.map((memory) => (
-          <Grid item key={memory._id} xs={12} sm={6} md={4} lg={3}>
-            <MemoryCard memory={memory} />
-          </Grid>
-        ))}
-      </Grid>
-    );
+  const handleUpload = async (newMemory) => {
+    await fetchMemories();
   };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <SocialScripts />
-      
-      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
-        <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'background.paper' }}>
+      <Box sx={{ flexGrow: 1 }}>
+        <AppBar position="static" color="default" elevation={1}>
           <Toolbar>
-            <Typography
-              variant="h1"
-              component="h1"
-              sx={{
-                flexGrow: 1,
-                color: 'text.primary',
-                fontSize: isMobile ? '1.75rem' : '2.5rem',
-                py: 2,
-              }}
-            >
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               Community Mass Mems
             </Typography>
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={fetchMemories}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
           </Toolbar>
         </AppBar>
 
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-          {renderContent()}
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Box sx={{ mb: 3 }}>
+            <Tabs
+              value={uploadType}
+              onChange={(e, newValue) => setUploadType(newValue)}
+              centered={!isMobile}
+              variant={isMobile ? "scrollable" : "standard"}
+              scrollButtons={isMobile ? "auto" : false}
+            >
+              <Tab 
+                icon={<LinkIcon />} 
+                label="Link" 
+                value="link"
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
+              />
+              <Tab 
+                icon={<TextIcon />} 
+                label="Text" 
+                value="text"
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
+              />
+            </Tabs>
+          </Box>
+
+          {uploadType === 'text' && (
+            <TextUploadForm onUpload={handleUpload} />
+          )}
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <Grid container spacing={3}>
+            {loading ? (
+              <Grid item xs={12} sx={{ textAlign: 'center', py: 4 }}>
+                <CircularProgress />
+              </Grid>
+            ) : (
+              memories.map((memory) => (
+                <Grid item xs={12} sm={6} md={4} key={memory._id}>
+                  <MemoryCard memory={memory} />
+                </Grid>
+              ))
+            )}
+          </Grid>
         </Container>
       </Box>
+      <SocialScripts />
     </ThemeProvider>
   );
 }
