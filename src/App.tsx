@@ -13,11 +13,32 @@ function App() {
     return localStorage.getItem('introShown') !== 'true';
   });
 
+  const [memories, setMemories] = useState([]);
+
+  const fetchMemories = async () => {
+    try {
+      const response = await fetch('/.netlify/functions/get-memories');
+      if (!response.ok) throw new Error('Failed to fetch memories');
+      const data = await response.json();
+      setMemories(data);
+    } catch (error) {
+      console.error('Error fetching memories:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMemories();
+  }, []);
+
   useEffect(() => {
     if (!showIntro) {
       localStorage.setItem('introShown', 'true');
     }
   }, [showIntro]);
+
+  const handleMemoryCreated = (newMemory) => {
+    setMemories(prev => [newMemory, ...prev]);
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -30,8 +51,8 @@ function App() {
       }}>
         <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
           <InfoBar />
-          <UploadBar />
-          <MemoryGrid />
+          <UploadBar onMemoryCreated={handleMemoryCreated} />
+          <MemoryGrid memories={memories} />
           <PatreonBar />
         </Container>
         <IntroDialog 
