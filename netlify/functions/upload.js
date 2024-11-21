@@ -13,7 +13,7 @@ const DB_NAME = 'memories';
 const memorySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['image', 'gif', 'video', 'audio', 'document', 'url', 'text'],
+    enum: ['image', 'gif', 'video', 'audio', 'document', 'url', 'text', 'social'],
     required: true
   },
   url: String,
@@ -73,6 +73,13 @@ const memorySchema = new mongoose.Schema({
     embedHtml: String,
     embedThumbnail: String,
     
+    // Media and preview information
+    mediaType: String,
+    previewType: String,
+    previewUrl: String,
+    playbackHtml: String,
+    isPlayable: Boolean,
+    
     // Custom metadata
     tags: [String],
     category: String,
@@ -116,6 +123,106 @@ const getVideoId = (url) => {
   return { videoId, platform };
 };
 
+// Function to determine media type and preview
+const getMediaInfo = (url, metadata) => {
+  // Image extensions
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+  // Video extensions
+  const videoExts = ['.mp4', '.webm', '.ogg', '.mov', '.avi'];
+  // Audio extensions
+  const audioExts = ['.mp3', '.wav', '.ogg', '.m4a'];
+
+  const urlObj = new URL(url);
+  const path = urlObj.pathname.toLowerCase();
+  const hostname = urlObj.hostname.toLowerCase();
+
+  let mediaType = 'url';
+  let previewType = 'none';
+  let previewUrl = null;
+  let playbackHtml = null;
+  let isPlayable = false;
+
+  // Check if it's a direct media file
+  if (imageExts.some(ext => path.endsWith(ext))) {
+    mediaType = 'image';
+    previewType = 'image';
+    previewUrl = url;
+    playbackHtml = `<img src="${url}" alt="Direct image" style="max-width: 100%; height: auto;">`;
+    isPlayable = true;
+  } else if (videoExts.some(ext => path.endsWith(ext))) {
+    mediaType = 'video';
+    previewType = 'video';
+    previewUrl = url;
+    playbackHtml = `<video controls style="max-width: 100%;"><source src="${url}" type="video/${path.split('.').pop()}">Your browser does not support the video tag.</video>`;
+    isPlayable = true;
+  } else if (audioExts.some(ext => path.endsWith(ext))) {
+    mediaType = 'audio';
+    previewType = 'audio';
+    previewUrl = url;
+    playbackHtml = `<audio controls><source src="${url}" type="audio/${path.split('.').pop()}">Your browser does not support the audio tag.</audio>`;
+    isPlayable = true;
+  }
+
+  // Check for special platforms
+  if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+    mediaType = 'video';
+    previewType = 'youtube';
+    const videoId = getVideoId(url).videoId;
+    previewUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    isPlayable = true;
+  } else if (hostname.includes('vimeo.com')) {
+    mediaType = 'video';
+    previewType = 'vimeo';
+    // Vimeo preview URL will be extracted from metadata
+    previewUrl = metadata?.ogImage;
+    isPlayable = true;
+  } else if (hostname.includes('spotify.com')) {
+    mediaType = 'audio';
+    previewType = 'spotify';
+    previewUrl = metadata?.ogImage;
+    isPlayable = true;
+  } else if (hostname.includes('soundcloud.com')) {
+    mediaType = 'audio';
+    previewType = 'soundcloud';
+    previewUrl = metadata?.ogImage;
+    isPlayable = true;
+  } else if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+    mediaType = 'social';
+    previewType = 'twitter';
+    previewUrl = metadata?.twitterImage || metadata?.ogImage;
+    isPlayable = true;
+  } else if (hostname.includes('instagram.com')) {
+    mediaType = 'social';
+    previewType = 'instagram';
+    previewUrl = metadata?.ogImage;
+    isPlayable = true;
+  }
+
+  // If no specific preview was found but we have OG image, use it
+  if (!previewUrl && metadata?.ogImage) {
+    previewUrl = metadata.ogImage;
+    if (!previewType || previewType === 'none') {
+      previewType = 'image';
+    }
+  }
+
+  // If still no preview but we have Twitter image, use it
+  if (!previewUrl && metadata?.twitterImage) {
+    previewUrl = metadata.twitterImage;
+    if (!previewType || previewType === 'none') {
+      previewType = 'image';
+    }
+  }
+
+  return {
+    mediaType,
+    previewType,
+    previewUrl,
+    playbackHtml,
+    isPlayable
+  };
+};
+
 // Function to generate embed HTML
 const generateEmbedHtml = (url, platform, videoId) => {
   switch (platform) {
@@ -125,6 +232,22 @@ const generateEmbedHtml = (url, platform, videoId) => {
       return `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
     case 'twitter':
       return `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`;
+    case 'spotify':
+      const spotifyMatch = url.match(/spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+      if (spotifyMatch) {
+        const [, type, id] = spotifyMatch;
+        return `<iframe src="https://open.spotify.com/embed/${type}/${id}" width="300" height="380" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>`;
+      }
+      return null;
+    case 'soundcloud':
+      return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}"></iframe>`;
+    case 'instagram':
+      const instagramMatch = url.match(/instagram\.com\/p\/([a-zA-Z0-9_-]+)/);
+      if (instagramMatch) {
+        const postId = instagramMatch[1];
+        return `<blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/${postId}/"><a href="https://www.instagram.com/p/${postId}/"></a></blockquote><script async src="//www.instagram.com/embed.js"></script>`;
+      }
+      return null;
     default:
       return null;
   }
@@ -136,6 +259,12 @@ const fetchUrlMetadata = async (url) => {
     const result = await unfurl(url);
     const { videoId, platform } = getVideoId(url);
     const embedHtml = generateEmbedHtml(url, platform, videoId);
+    
+    // Get media info after we have metadata
+    const mediaInfo = getMediaInfo(url, {
+      ogImage: result.open_graph?.image?.url,
+      twitterImage: result.twitter_card?.image?.url
+    });
 
     return {
       // Basic metadata
@@ -162,10 +291,12 @@ const fetchUrlMetadata = async (url) => {
       articleTags: result.open_graph?.article?.tags,
       articlePublisher: result.open_graph?.article?.publisher,
       
-      // Embed information
-      embedType: platform,
-      embedHtml: embedHtml,
-      embedThumbnail: result.open_graph?.image?.url || result.twitter_card?.image?.url,
+      // Media and preview information
+      mediaType: mediaInfo.mediaType,
+      previewType: mediaInfo.previewType,
+      previewUrl: mediaInfo.previewUrl,
+      playbackHtml: mediaInfo.playbackHtml || embedHtml,
+      isPlayable: mediaInfo.isPlayable,
       
       // Additional metadata
       language: result.language,
@@ -175,9 +306,16 @@ const fetchUrlMetadata = async (url) => {
     };
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
+    // Try to get basic media info even if metadata fetch fails
+    const mediaInfo = getMediaInfo(url, {});
     return {
       siteName: new URL(url).hostname,
-      error: 'Failed to fetch metadata'
+      error: 'Failed to fetch metadata',
+      mediaType: mediaInfo.mediaType,
+      previewType: mediaInfo.previewType,
+      previewUrl: mediaInfo.previewUrl,
+      playbackHtml: mediaInfo.playbackHtml,
+      isPlayable: mediaInfo.isPlayable
     };
   }
 };
