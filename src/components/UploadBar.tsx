@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, ChangeEvent, React.KeyboardEvent, FormEvent } from 'react';
 import {
   Box,
   Button,
@@ -14,7 +14,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -25,30 +26,35 @@ import VideoFileIcon from '@mui/icons-material/VideoFile';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { styled } from '@mui/material/styles';
+import { Memory } from '../types';
 
 const SUPPORTED_FILE_TYPES = {
   image: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
   video: ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'],
   audio: ['.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'],
   static: ['.txt', '.html', '.json', '.xml', '.md', '.csv']
-};
+} as const;
 
 const Input = styled('input')({
   display: 'none'
 });
 
-const UploadBar = ({ onMemoryCreated }) => {
-  const [type, setType] = useState('url');
+interface UploadBarProps {
+  onMemoryCreated: (memory: Memory) => void;
+}
+
+const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
+  const [type, setType] = useState<Memory['type']>('url');
   const [url, setUrl] = useState('');
   const [content, setContent] = useState('');
-  const [tags, setTags] = useState([]);
+  const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleTypeChange = (event) => {
+  const handleTypeChange = (event: SelectChangeEvent<Memory['type']>) => {
     setType(event.target.value);
     setUrl('');
     setContent('');
@@ -61,18 +67,18 @@ const UploadBar = ({ onMemoryCreated }) => {
     }
   };
 
-  const handleTagDelete = (tagToDelete) => {
+  const handleTagDelete = (tagToDelete: string) => {
     setTags(tags.filter(tag => tag !== tagToDelete));
   };
 
-  const handleKeyPress = (event) => {
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' && currentTag) {
       event.preventDefault();
       handleTagAdd();
     }
   };
 
-  const handleFileChange = async (event) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -103,53 +109,55 @@ const UploadBar = ({ onMemoryCreated }) => {
     }
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      const formData = new FormData();
+      formData.append('type', type);
+      formData.append('url', url);
+      formData.append('content', content);
+      formData.append('tags', JSON.stringify(tags));
+
       const response = await fetch('/.netlify/functions/upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type,
-          url: type === 'text' ? null : url,
-          content: type === 'text' ? content : null,
-          tags
-        }),
+        body: formData
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create memory');
+        throw new Error('Failed to upload memory');
       }
 
+      const data: Memory = await response.json();
+      onMemoryCreated(data);
       setSuccess(true);
       setUrl('');
       setContent('');
       setTags([]);
-      onMemoryCreated(data.memory);
-    } catch (error) {
-      console.error('Error creating memory:', error);
-      setError(error.message);
+    } catch (err) {
+      console.error('Error uploading memory:', err);
+      setError(err instanceof Error ? err.message : 'Failed to upload memory');
     } finally {
       setLoading(false);
     }
   };
 
-  const getInputIcon = () => {
-    switch (type) {
-      case 'url': return <LinkIcon />;
-      case 'text': return <TextFieldsIcon />;
-      case 'image': return <ImageIcon />;
-      case 'video': return <VideoFileIcon />;
-      case 'audio': return <AudioFileIcon />;
-      case 'static': return <InsertDriveFileIcon />;
-      default: return <LinkIcon />;
+  const getTypeIcon = (memoryType: Memory['type']) => {
+    switch (memoryType) {
+      case 'url':
+        return <LinkIcon />;
+      case 'text':
+        return <TextFieldsIcon />;
+      case 'image':
+        return <ImageIcon />;
+      case 'video':
+        return <VideoFileIcon />;
+      case 'audio':
+        return <AudioFileIcon />;
+      case 'static':
+        return <InsertDriveFileIcon />;
     }
   };
 
@@ -163,7 +171,7 @@ const UploadBar = ({ onMemoryCreated }) => {
             value={type}
             onChange={handleTypeChange}
             label="Memory Type"
-            startAdornment={getInputIcon()}
+            startAdornment={getTypeIcon(type)}
           >
             <MenuItem value="url">URL</MenuItem>
             <MenuItem value="text">Text</MenuItem>
@@ -183,7 +191,7 @@ const UploadBar = ({ onMemoryCreated }) => {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               InputProps={{
-                startAdornment: getInputIcon()
+                startAdornment: getTypeIcon(type)
               }}
             />
             <Tooltip title={`Upload ${type} file`}>
