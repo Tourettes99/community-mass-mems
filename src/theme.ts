@@ -1,21 +1,44 @@
 import { createTheme } from '@mui/material/styles';
+import { PaletteMode } from '@mui/material';
 
-export const theme = createTheme({
+export const getTheme = (mode: PaletteMode) => createTheme({
   palette: {
-    primary: {
-      main: '#FF5F1F', // Bright Orange RAL 2005
-    },
-    secondary: {
-      main: '#808080', // Gray
-    },
-    background: {
-      default: '#FFFFFF', // White
-      paper: '#F5F5F5', // Light Gray
-    },
-    text: {
-      primary: '#666666', // Gray text
-      secondary: '#808080',
-    },
+    mode,
+    ...(mode === 'light'
+      ? {
+          // Light mode colors
+          primary: {
+            main: '#1976d2',
+          },
+          background: {
+            default: '#f5f5f5',
+            paper: '#ffffff',
+          },
+          secondary: {
+            main: '#808080', // Gray
+          },
+          text: {
+            primary: '#666666', // Gray text
+            secondary: '#808080',
+          },
+        }
+      : {
+          // Dark mode colors
+          primary: {
+            main: '#90caf9',
+          },
+          background: {
+            default: '#121212',
+            paper: '#1e1e1e',
+          },
+          secondary: {
+            main: '#808080', // Gray
+          },
+          text: {
+            primary: '#FFFFFF', // White text
+            secondary: '#B3B3B3',
+          },
+        }),
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
