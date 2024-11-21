@@ -162,7 +162,7 @@ const getMediaInfo = async (url, metadata) => {
   let playbackHtml = null;
   let isPlayable = false;
 
-  // First check if it's a direct image URL
+  // First check if it's a direct media file
   const isImage = await isImageUrl(url);
   if (isImage || imageExts.some(ext => path.endsWith(ext))) {
     mediaType = 'image';
@@ -196,65 +196,45 @@ const getMediaInfo = async (url, metadata) => {
     mediaType = 'video';
     previewType = 'vimeo';
     const videoId = getVideoId(url).videoId;
+    // Use the provided metadata image from Vimeo
     previewUrl = metadata?.ogImage;
     playbackHtml = generateEmbedHtml(url, 'vimeo', videoId);
     isPlayable = true;
   } else if (hostname.includes('spotify.com')) {
     mediaType = 'audio';
     previewType = 'spotify';
+    // Use Spotify's provided preview image
     previewUrl = metadata?.ogImage;
     playbackHtml = generateEmbedHtml(url, 'spotify');
     isPlayable = true;
   } else if (hostname.includes('soundcloud.com')) {
     mediaType = 'audio';
     previewType = 'soundcloud';
+    // Use SoundCloud's provided preview image
     previewUrl = metadata?.ogImage;
     playbackHtml = generateEmbedHtml(url, 'soundcloud');
     isPlayable = true;
   } else if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
     mediaType = 'social';
     previewType = 'twitter';
-    previewUrl = metadata?.twitterImage || metadata?.ogImage;
+    // Use Twitter's provided preview image
+    previewUrl = metadata?.twitterImage;
     playbackHtml = generateEmbedHtml(url, 'twitter');
     isPlayable = true;
   } else if (hostname.includes('instagram.com')) {
     mediaType = 'social';
     previewType = 'instagram';
+    // Use Instagram's provided preview image
     previewUrl = metadata?.ogImage;
     playbackHtml = generateEmbedHtml(url, 'instagram');
     isPlayable = true;
-  }
-
-  // If no specific preview was found but we have OG image, use it
-  if (!previewUrl && metadata?.ogImage) {
-    previewUrl = metadata.ogImage;
-    if (!previewType || previewType === 'none') {
-      previewType = 'image';
-      isPlayable = true;
-    }
-  }
-
-  // If still no preview but we have Twitter image, use it
-  if (!previewUrl && metadata?.twitterImage) {
-    previewUrl = metadata.twitterImage;
-    if (!previewType || previewType === 'none') {
-      previewType = 'image';
-      isPlayable = true;
-    }
-  }
-
-  // For URLs that we couldn't determine a preview for, try to fetch OpenGraph data
-  if (!previewUrl && !playbackHtml) {
-    try {
-      const ogData = await unfurl(url);
-      if (ogData.open_graph?.image?.url) {
-        previewUrl = ogData.open_graph.image.url;
-        previewType = 'image';
-        isPlayable = true;
-      }
-    } catch (error) {
-      console.error('Error fetching OpenGraph data:', error);
-    }
+  } else if (hostname.includes('tiktok.com')) {
+    mediaType = 'social';
+    previewType = 'tiktok';
+    // Use TikTok's provided preview image
+    previewUrl = metadata?.ogImage;
+    playbackHtml = generateEmbedHtml(url, 'tiktok');
+    isPlayable = true;
   }
 
   return {
