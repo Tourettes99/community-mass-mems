@@ -140,7 +140,7 @@ exports.handler = async (event, context) => {
     }
 
     // Validate based on type
-    if (type === 'url') {
+    if (type === 'url' || type === 'image') {
       if (!url || !url.trim()) {
         logger.warn('Invalid URL provided', { url });
         return {
@@ -148,6 +148,20 @@ exports.handler = async (event, context) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ error: 'Invalid URL provided' })
         };
+      }
+      // Detect if URL is a direct media file
+      const urlLower = url.toLowerCase();
+      const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/.test(urlLower);
+      const isVideoUrl = /\.(mp4|webm|ogg|mov)(\?.*)?$/.test(urlLower);
+      const isAudioUrl = /\.(mp3|wav|ogg|m4a)(\?.*)?$/.test(urlLower);
+      
+      // Override type if URL is a direct media file
+      if (isImageUrl) {
+        type = 'image';
+      } else if (isVideoUrl) {
+        type = 'video';
+      } else if (isAudioUrl) {
+        type = 'audio';
       }
     } else if (type === 'text') {
       if (!content) {

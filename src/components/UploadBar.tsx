@@ -154,12 +154,28 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
       };
 
       // Add URL or content based on type
-      if (type === 'url') {
+      if (type === 'url' || type === 'image') {
         if (!url.trim()) {
-          throw new Error('URL is required for URL type memories');
+          throw new Error('URL is required');
         }
+        
+        // Detect if URL is a direct media file
+        const urlLower = url.toLowerCase();
+        const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/.test(urlLower);
+        const isVideoUrl = /\.(mp4|webm|ogg|mov)(\?.*)?$/.test(urlLower);
+        const isAudioUrl = /\.(mp3|wav|ogg|m4a)(\?.*)?$/.test(urlLower);
+        
+        // Set the appropriate type based on URL
+        if (isImageUrl) {
+          requestBody.type = 'image';
+        } else if (isVideoUrl) {
+          requestBody.type = 'video';
+        } else if (isAudioUrl) {
+          requestBody.type = 'audio';
+        }
+        
         requestBody.url = url.trim();
-        requestBody.content = url.trim(); // Add content field for URL type
+        requestBody.content = url.trim();
       } else if (type === 'text') {
         if (!content) {
           throw new Error('Content is required for text type memories');
