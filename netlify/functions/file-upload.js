@@ -8,6 +8,7 @@ const getMetadata = require('page-metadata-parser').getMetadata;
 const domino = require('domino');
 const fetch = require('node-fetch');
 const sizeOf = require('image-size');
+const logger = require('./utils/logger');
 
 const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 const DB_NAME = 'memories';
@@ -18,12 +19,12 @@ let cachedClient = null;
 
 async function connectToDatabase() {
   if (cachedDb && cachedClient) {
-    console.log('Using cached database connection');
+    logger.debug('Using cached database connection');
     return { db: cachedDb, client: cachedClient };
   }
 
   try {
-    console.log('Connecting to MongoDB...');
+    logger.info('Connecting to MongoDB...', { uri: MONGODB_URI.replace(/\/\/.*@/, '//***:***@') });
     const client = await MongoClient.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -36,13 +37,15 @@ async function connectToDatabase() {
     const db = client.db(DB_NAME);
     cachedDb = db;
     cachedClient = client;
-    console.log(`MongoDB connected successfully to ${DB_NAME} database`);
+    logger.info('MongoDB connected successfully', { 
+      database: DB_NAME,
+      collection: COLLECTION_NAME 
+    });
     return { db, client };
   } catch (error) {
-    console.error('MongoDB connection error:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
+    logger.error('MongoDB connection error', error, {
+      database: DB_NAME,
+      collection: COLLECTION_NAME
     });
     throw error;
   }
@@ -117,7 +120,7 @@ async function extractUrlMetadata(url) {
       twitterCard: unfurlData.twitter_card || null
     };
   } catch (error) {
-    console.error('Error extracting URL metadata:', error);
+    logger.error('Error extracting URL metadata:', error);
     return null;
   }
 }
@@ -143,13 +146,13 @@ async function extractFileMetadata(base64Data, contentType) {
           height: dimensions.height
         };
       } catch (err) {
-        console.error('Error getting image dimensions:', err);
+        logger.error('Error getting image dimensions:', err);
       }
     }
     
     return metadata;
   } catch (error) {
-    console.error('Error extracting file metadata:', error);
+    logger.error('Error extracting file metadata:', error);
     return null;
   }
 }
@@ -164,17 +167,17 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Important: this prevents function timeout from waiting for MongoDB connection to close
   context.callbackWaitsForEmptyEventLoop = false;
 
   try {
-    console.log('Request received:', {
+    logger.info('Request received', {
       method: event.httpMethod,
       path: event.path,
       headers: event.headers
     });
 
     if (event.httpMethod !== 'POST') {
+      logger.warn('Invalid HTTP method', { method: event.httpMethod });
       return {
         statusCode: 405,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -185,7 +188,7 @@ exports.handler = async (event, context) => {
     let data;
     try {
       data = JSON.parse(event.body);
-      console.log('Parsed request body:', {
+      logger.debug('Parsed request body', {
         type: data.type,
         hasUrl: !!data.url,
         hasContent: !!data.content,
@@ -193,7 +196,7 @@ exports.handler = async (event, context) => {
         fileName: data.fileName
       });
     } catch (error) {
-      console.error('Error parsing request body:', error);
+      logger.error('Error parsing request body', error);
       return {
         statusCode: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -204,6 +207,7 @@ exports.handler = async (event, context) => {
     const { type, url, content, tags, file, fileName, contentType } = data;
 
     if (!type || (!url && !content && !file)) {
+      logger.warn('Missing required fields', { type, hasUrl: !!url, hasContent: !!content, hasFile: !!file });
       return {
         statusCode: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -212,10 +216,10 @@ exports.handler = async (event, context) => {
     }
 
     // Connect to database
-    console.log('Connecting to database...');
+    logger.info('Connecting to database...');
     const { db } = await connectToDatabase();
     const memories = db.collection(COLLECTION_NAME);
-    console.log(`Using collection: ${COLLECTION_NAME}`);
+    logger.debug(`Using collection: ${COLLECTION_NAME}`);
 
     // Prepare memory document
     const memory = {
@@ -235,21 +239,21 @@ exports.handler = async (event, context) => {
       memory.content = content;
     }
 
-    console.log('Processing content type:', type);
+    logger.info('Processing content type:', { type });
 
     // Handle different types of content
     try {
       if (type === 'url' && url) {
-        console.log('Processing URL:', url);
+        logger.info('Processing URL', { url });
         memory.url = url;
         
         // Enhanced URL metadata extraction
         let urlMetadata;
         try {
           urlMetadata = await extractUrlMetadata(url);
-          console.log('Extracted URL metadata:', urlMetadata);
+          logger.debug('Extracted URL metadata', { metadata: urlMetadata });
         } catch (metadataError) {
-          console.error('Metadata extraction error:', metadataError);
+          logger.error('Metadata extraction error', metadataError, { url });
           urlMetadata = {
             title: url,
             description: 'Failed to extract metadata',
@@ -269,7 +273,7 @@ exports.handler = async (event, context) => {
           favicon: urlMetadata.favicon || `https://www.google.com/s2/favicons?domain=${url}`
         };
       } else if (type === 'text' && content) {
-        console.log('Processing text content');
+        logger.info('Processing text content');
         memory.metadata = {
           ...memory.metadata,
           title: content.slice(0, 50),
@@ -278,10 +282,11 @@ exports.handler = async (event, context) => {
           rawContent: content
         };
       } else if (file) {
-        console.log('Processing file:', fileName);
+        logger.info('Processing file', { fileName });
         const buffer = Buffer.from(file, 'base64');
         memory.fileName = fileName;
         const fileMetadata = await extractFileMetadata(buffer, fileName);
+        logger.debug('Extracted file metadata', { metadata: fileMetadata });
         memory.metadata = {
           ...memory.metadata,
           ...fileMetadata,
@@ -290,10 +295,10 @@ exports.handler = async (event, context) => {
           fileSize: buffer.length,
           contentType: fileMetadata.contentType || contentType
         };
-        memory.file = file; // Store base64 file data
+        memory.file = file;
       }
     } catch (error) {
-      console.error('Error processing content:', error);
+      logger.error('Error processing content', error, { type });
       memory.metadata = {
         ...memory.metadata,
         error: 'Failed to process content',
@@ -302,22 +307,22 @@ exports.handler = async (event, context) => {
     }
 
     // Insert memory into database
-    console.log('Inserting memory into database...');
+    logger.info('Inserting memory into database...');
     const result = await memories.insertOne(memory);
     
     if (!result.acknowledged) {
       throw new Error('Failed to insert memory');
     }
 
-    console.log('Memory created successfully:', result.insertedId);
+    logger.info('Memory created successfully', { id: result.insertedId });
 
     // Remove the file content from the response to reduce payload size
     const responseMemory = { 
       ...memory,
-      _id: result.insertedId.toString(), // Convert ObjectId to string
+      _id: result.insertedId.toString(),
       metadata: {
         ...memory.metadata,
-        lastModified: new Date().toISOString() // Add lastModified date
+        lastModified: new Date().toISOString()
       }
     };
     
@@ -334,11 +339,7 @@ exports.handler = async (event, context) => {
       })
     };
   } catch (error) {
-    console.error('Error creating memory:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
+    logger.error('Error creating memory', error);
     
     return {
       statusCode: 500,
