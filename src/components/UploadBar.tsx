@@ -31,12 +31,19 @@ import { Memory } from '../types';
 
 type MemoryFileType = 'image' | 'video' | 'audio' | 'static';
 
-const SUPPORTED_FILE_TYPES: Record<MemoryFileType, string[]> = {
-  image: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'] as string[],
-  video: ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'] as string[],
-  audio: ['.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'] as string[],
-  static: ['.txt', '.html', '.json', '.xml', '.md', '.csv'] as string[]
-} as const;
+interface FileTypes {
+  image: string[];
+  video: string[];
+  audio: string[];
+  static: string[];
+}
+
+const SUPPORTED_FILE_TYPES: FileTypes = {
+  image: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
+  video: ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'],
+  audio: ['.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'],
+  static: ['.txt', '.html', '.json', '.xml', '.md', '.csv']
+};
 
 const Input = styled('input')({
   display: 'none'

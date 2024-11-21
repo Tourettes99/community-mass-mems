@@ -14,8 +14,6 @@
     "@types/date-fns": "^2.5.3",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.18.119",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
     "aws4": "^1.13.2",
     "axios": "^1.7.7",
     "date-fns": "^2.30.0",
@@ -31,7 +29,6 @@
     "react-grid-layout": "^1.5.0",
     "react-router-dom": "^6.28.0",
     "react-scripts": "5.0.1",
-    "typescript": "^4.9.5",
     "unfurl.js": "^6.4.0",
     "wavesurfer.js": "^6.6.4",
     "web-vitals": "^2.1.4"
@@ -59,5 +56,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^4.9.5"
   }
 }
