@@ -28,27 +28,10 @@ exports.handler = async (event, context) => {
     const collection = await connectToDatabase();
     console.log('Connected to memories.memories collection');
 
-    // Parse query parameters
-    const { tags, type, limit = 20, skip = 0 } = event.queryStringParameters || {};
-
-    // Build query
-    const query = {};
-    if (tags) {
-      query.tags = { $in: tags.split(',') };
-    }
-    if (type) {
-      query.type = type;
-    }
-
-    // Get total count for pagination
-    const total = await collection.countDocuments(query);
-
-    // Fetch memories with pagination
-    const items = await collection
-      .find(query)
+    // Fetch memories and sort by creation date (newest first)
+    const memories = await collection
+      .find({})
       .sort({ createdAt: -1 })
-      .skip(parseInt(skip))
-      .limit(parseInt(limit))
       .toArray();
 
     return {
@@ -57,12 +40,7 @@ exports.handler = async (event, context) => {
         ...corsHeaders,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        items,
-        total,
-        limit: parseInt(limit),
-        skip: parseInt(skip)
-      })
+      body: JSON.stringify(memories)
     };
   } catch (error) {
     console.error('Error fetching memories:', error);
