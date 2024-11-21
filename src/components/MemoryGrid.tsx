@@ -126,35 +126,39 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         }}
         onClick={handleCardClick}
       >
-        <CardHeader
-          avatar={
-            metadata.favicon ? (
-              <Avatar 
-                src={metadata.favicon} 
-                sx={{ width: 24, height: 24 }}
-                imgProps={{ style: { objectFit: 'contain' } }}
-              />
-            ) : null
-          }
-          title={
-            <Link
-              href={memory.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              sx={{
-                color: 'inherit',
-                textDecoration: 'none',
-                '&:hover': {
-                  textDecoration: 'underline',
-                },
-              }}
-            >
-              {metadata.title}
-            </Link>
-          }
-          subheader={metadata.siteName}
-        />
+        {(metadata.favicon || metadata.title || metadata.siteName) && (
+          <CardHeader
+            avatar={
+              metadata.favicon ? (
+                <Avatar 
+                  src={metadata.favicon} 
+                  sx={{ width: 24, height: 24 }}
+                  imgProps={{ style: { objectFit: 'contain' } }}
+                />
+              ) : null
+            }
+            title={
+              metadata.title ? (
+                <Link
+                  href={memory.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  sx={{
+                    color: 'inherit',
+                    textDecoration: 'none',
+                    '&:hover': {
+                      textDecoration: 'underline',
+                    },
+                  }}
+                >
+                  {metadata.title}
+                </Link>
+              ) : null
+            }
+            subheader={metadata.siteName}
+          />
+        )}
 
         {metadata.isPlayable && metadata.playbackHtml ? (
           <Box 
@@ -171,7 +175,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           <CardMedia
             component="img"
             image={metadata.previewUrl}
-            alt={metadata.title || "Preview"}
+            alt={metadata.title || ""}
             sx={{
               width: '100%',
               height: 'auto',
@@ -182,7 +186,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         ) : null}
 
         {metadata.description && (
-          <CardContent sx={{ flexGrow: 1, pt: 2 }}>
+          <CardContent>
             <Typography
               variant="body2"
               color="text.secondary"
@@ -191,7 +195,6 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 WebkitLineClamp: expanded ? 'unset' : 3,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
-                cursor: 'pointer',
               }}
             >
               {metadata.description}
@@ -211,6 +214,22 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 />
               ))}
             </Stack>
+          </CardContent>
+        )}
+
+        {!metadata.title && !metadata.description && !metadata.previewUrl && !metadata.playbackHtml && (
+          <CardContent>
+            <Link
+              href={memory.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                color: 'inherit',
+                wordBreak: 'break-all',
+              }}
+            >
+              {memory.url}
+            </Link>
           </CardContent>
         )}
       </Card>

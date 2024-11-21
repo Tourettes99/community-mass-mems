@@ -28,15 +28,7 @@ const memorySchema = new mongoose.Schema({
     playbackHtml: String,
     isPlayable: Boolean
   },
-  tags: [String],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
+  tags: [String]
 }, { timestamps: true });
 
 // Create the Memory model
@@ -48,7 +40,7 @@ try {
 }
 
 // Function to fetch URL metadata
-const fetchUrlMetadata = async (url, userMetadata = {}) => {
+const fetchUrlMetadata = async (url) => {
   try {
     const result = await unfurl(url, {
       follow: 5,
@@ -58,17 +50,30 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
       }
     });
 
-    // Extract media information
-    let mediaType = 'url';
-    let previewUrl = null;
-    let playbackHtml = null;
-    let isPlayable = false;
+    const metadata = {};
 
-    // Check for video/audio content
+    // Only add fields if they exist in OpenGraph or Twitter Cards
+    if (result.open_graph?.title || result.twitter_card?.title) {
+      metadata.title = result.open_graph?.title || result.twitter_card?.title;
+    }
+
+    if (result.open_graph?.description || result.twitter_card?.description) {
+      metadata.description = result.open_graph?.description || result.twitter_card?.description;
+    }
+
+    if (result.open_graph?.site_name) {
+      metadata.siteName = result.open_graph.site_name;
+    }
+
+    if (result.favicon) {
+      metadata.favicon = result.favicon;
+    }
+
+    // Handle media content
     if (result.open_graph?.video?.url || result.twitter_card?.player?.url) {
-      mediaType = 'video';
-      isPlayable = true;
-      playbackHtml = `<iframe 
+      metadata.mediaType = 'video';
+      metadata.isPlayable = true;
+      metadata.playbackHtml = `<iframe 
         width="100%" 
         style="aspect-ratio: 16/9;" 
         src="${result.open_graph?.video?.url || result.twitter_card?.player?.url}"
@@ -76,61 +81,23 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
         allowfullscreen
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
       </iframe>`;
+    } else {
+      metadata.mediaType = 'url';
     }
 
-    // Get preview image
-    previewUrl = result.open_graph?.image?.url || 
-                 result.twitter_card?.image?.url ||
-                 null;
+    // Only add preview URL if explicitly provided
+    if (result.open_graph?.image?.url || result.twitter_card?.image?.url) {
+      metadata.previewUrl = result.open_graph?.image?.url || result.twitter_card?.image?.url;
+    }
 
-    // Get basic metadata
-    const title = userMetadata.title || 
-                 result.open_graph?.title || 
-                 result.twitter_card?.title ||
-                 result.title ||
-                 new URL(url).hostname;
-
-    const description = userMetadata.description || 
-                       result.open_graph?.description || 
-                       result.twitter_card?.description ||
-                       result.description || '';
-
-    const siteName = userMetadata.siteName || 
-                    result.open_graph?.site_name || 
-                    new URL(url).hostname;
-
-    const favicon = result.favicon || 
-                   `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`;
-
-    return {
-      title,
-      description,
-      siteName,
-      favicon,
-      mediaType,
-      previewUrl,
-      playbackHtml,
-      isPlayable
-    };
+    return metadata;
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
-    // Fallback to basic URL info
-    const hostname = new URL(url).hostname;
-    return {
-      title: hostname,
-      description: '',
-      siteName: hostname,
-      favicon: `https://www.google.com/s2/favicons?domain=${hostname}`,
-      mediaType: 'url',
-      previewUrl: null,
-      playbackHtml: null,
-      isPlayable: false
-    };
+    return {};
   }
 };
 
 exports.handler = async (event, context) => {
-  // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -138,13 +105,8 @@ exports.handler = async (event, context) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    return { 
-      statusCode: 204, 
-      headers, 
-      body: '' 
-    };
+    return { statusCode: 204, headers, body: '' };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -156,11 +118,9 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Parse the incoming request
     const data = JSON.parse(event.body);
     const { type, url, content, tags, file } = data;
 
-    // Validate memory type
     if (!type || !['url', 'image', 'video', 'audio', 'text'].includes(type)) {
       return {
         statusCode: 400,
@@ -169,16 +129,13 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
     
     let memoryData = {
       type,
-      tags: tags || [],
-      content
+      tags: tags || []
     };
 
-    // Handle different memory types
     switch (type) {
       case 'url':
         if (!url) {
@@ -189,7 +146,6 @@ exports.handler = async (event, context) => {
           };
         }
 
-        // Validate URL format
         try {
           new URL(url);
         } catch {
@@ -200,25 +156,15 @@ exports.handler = async (event, context) => {
           };
         }
 
-        const urlMetadata = await fetchUrlMetadata(url);
-        memoryData = {
-          ...memoryData,
-          url,
-          metadata: {
-            title: urlMetadata.title,
-            description: urlMetadata.description,
-            siteName: urlMetadata.siteName,
-            favicon: urlMetadata.favicon,
-            mediaType: urlMetadata.mediaType,
-            previewUrl: urlMetadata.previewUrl,
-            playbackHtml: urlMetadata.playbackHtml,
-            isPlayable: urlMetadata.isPlayable
-          }
-        };
+        const metadata = await fetchUrlMetadata(url);
+        memoryData.url = url;
+        if (Object.keys(metadata).length > 0) {
+          memoryData.metadata = metadata;
+        }
         break;
 
       case 'text':
-        if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        if (!content?.trim()) {
           return {
             statusCode: 400,
             headers,
@@ -231,7 +177,7 @@ exports.handler = async (event, context) => {
       case 'image':
       case 'video':
       case 'audio':
-        if (!file) {
+        if (!file?.url) {
           return {
             statusCode: 400,
             headers,
@@ -239,24 +185,17 @@ exports.handler = async (event, context) => {
           };
         }
         
-        // Add file metadata
-        memoryData = {
-          ...memoryData,
-          url: file.url, // URL from file upload
-          metadata: {
-            title: file.originalname || file.name,
-            mediaType: type,
-            previewUrl: type === 'image' ? file.url : null,
-            isPlayable: type !== 'image',
-            playbackHtml: type !== 'image' ? 
-              `<${type} controls style="width: 100%"><source src="${file.url}" type="${file.contentType}">Your browser does not support ${type} playback.</${type}>` : 
-              null
-          }
+        memoryData.url = file.url;
+        memoryData.metadata = {
+          mediaType: type,
+          ...(type === 'image' ? { previewUrl: file.url } : {
+            isPlayable: true,
+            playbackHtml: `<${type} controls><source src="${file.url}" type="${file.contentType}"></${type}>`
+          })
         };
         break;
     }
 
-    // Create and save the memory
     const memory = new Memory(memoryData);
     await memory.save();
 
