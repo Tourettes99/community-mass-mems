@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const serverless = require('serverless-http');
 const mongoose = require('mongoose');
@@ -21,6 +22,8 @@ const router = express.Router();
 
 // MongoDB Connection URL - ensure this is set in your Netlify environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
+console.log('Checking MongoDB URI:', MONGODB_URI ? 'URI exists' : 'URI is missing');
+
 if (!MONGODB_URI) {
   console.error('MONGODB_URI is not set in environment variables!');
   throw new Error('MONGODB_URI is required');
@@ -108,6 +111,9 @@ const connectDB = async () => {
     throw error;
   }
 };
+
+// Connect to MongoDB on startup
+connectDB().catch(console.error);
 
 // Utility functions
 const formatDuration = (seconds) => {
