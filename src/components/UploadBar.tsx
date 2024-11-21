@@ -1,4 +1,4 @@
-import React, { useState, useRef, ChangeEvent, KeyboardEvent, FormEvent } from 'react';
+import React, { useState, ChangeEvent, KeyboardEvent, FormEvent } from 'react';
 import {
   Box,
   Button,
@@ -9,50 +9,19 @@ import {
   Stack,
   Chip,
   IconButton,
-  Tooltip,
-  Typography,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent,
-  TextFieldProps
+  SelectChangeEvent
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
 import LinkIcon from '@mui/icons-material/Link';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
-import ImageIcon from '@mui/icons-material/Image';
-import VideoFileIcon from '@mui/icons-material/VideoFile';
-import AudioFileIcon from '@mui/icons-material/AudioFile';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import { styled } from '@mui/material/styles';
 import { Memory } from '../types';
 
-type FileType = keyof FileTypes;
-type MemoryType = FileType | 'text' | 'url';
-
-interface FileTypes {
-  image: string[];
-  video: string[];
-  audio: string[];
-  static: string[];
-}
-
-const SUPPORTED_FILE_TYPES: FileTypes = {
-  image: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
-  video: ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'],
-  audio: ['.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'],
-  static: ['.txt', '.html', '.json', '.xml', '.md', '.csv']
-};
-
-const isFileType = (type: MemoryType): type is FileType => {
-  return type in SUPPORTED_FILE_TYPES;
-};
-
-const Input = styled('input')({
-  display: 'none'
-});
+type MemoryType = 'text' | 'url';
 
 interface UploadBarProps {
   onMemoryCreated: (memory: Memory) => void;
@@ -67,7 +36,6 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTypeChange = (event: SelectChangeEvent<MemoryType>) => {
     const newType = event.target.value as MemoryType;
@@ -106,40 +74,6 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     setCurrentTag(event.target.value);
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Read file content directly
-      if (file.type.includes('text')) {
-        const text = await file.text();
-        setContent(text);
-        setType('text');
-      } else {
-        // For now, just store the file name as URL
-        // In a real app, you'd upload the file to a storage service
-        setUrl(file.name);
-        
-        // Set type based on file type
-        if (file.type.includes('image')) setType('image');
-        else if (file.type.includes('video')) setType('video');
-        else if (file.type.includes('audio')) setType('audio');
-        else setType('static');
-      }
-
-      setSuccess(true);
-    } catch (error) {
-      console.error('Error processing file:', error);
-      setError(error instanceof Error ? error.message : 'Failed to process file');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
@@ -153,8 +87,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         tags,
       };
 
-      // Add URL or content based on type
-      if (type === 'url' || type === 'image') {
+      if (type === 'url') {
         if (!url.trim()) {
           throw new Error('URL is required');
         }
@@ -181,28 +114,6 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
           throw new Error('Content is required for text type memories');
         }
         requestBody.content = content;
-      } else if (fileInputRef.current?.files?.length) {
-        const file = fileInputRef.current.files[0];
-        const reader = new FileReader();
-        
-        // Convert file to base64
-        const base64 = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => {
-            if (typeof reader.result === 'string') {
-              // Remove data URL prefix
-              const base64Data = reader.result.split(',')[1];
-              resolve(base64Data);
-            } else {
-              reject(new Error('Failed to read file'));
-            }
-          };
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
-
-        requestBody.file = base64;
-        requestBody.fileName = file.name;
-        requestBody.contentType = file.type;
       } else {
         throw new Error('No content provided');
       }
@@ -236,9 +147,6 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
       setTags([]);
       setCurrentTag('');
       setType('url');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     } catch (err) {
       console.error('Error uploading memory:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload memory');
@@ -253,14 +161,6 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         return <LinkIcon />;
       case 'text':
         return <TextFieldsIcon />;
-      case 'image':
-        return <ImageIcon />;
-      case 'video':
-        return <VideoFileIcon />;
-      case 'audio':
-        return <AudioFileIcon />;
-      case 'static':
-        return <InsertDriveFileIcon />;
     }
   };
 
@@ -278,41 +178,20 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
           >
             <MenuItem value="url">URL</MenuItem>
             <MenuItem value="text">Text</MenuItem>
-            <MenuItem value="image">Image</MenuItem>
-            <MenuItem value="video">Video</MenuItem>
-            <MenuItem value="audio">Audio</MenuItem>
-            <MenuItem value="static">Static File</MenuItem>
           </Select>
         </FormControl>
 
-        {/* URL or File Upload Input */}
-        {type !== 'text' && (
-          <Stack direction="row" spacing={1}>
-            <TextField
-              fullWidth
-              label={`${type.charAt(0).toUpperCase() + type.slice(1)} URL`}
-              value={url}
-              onChange={handleUrlChange}
-              InputProps={{
-                startAdornment: getTypeIcon(type)
-              }}
-            />
-            <Tooltip title={`Upload ${type} file`}>
-              <Button
-                variant="outlined"
-                component="label"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Upload
-                <Input
-                  ref={fileInputRef}
-                  type="file"
-                  onChange={handleFileChange}
-                  accept={isFileType(type) ? SUPPORTED_FILE_TYPES[type].join(',') : undefined}
-                />
-              </Button>
-            </Tooltip>
-          </Stack>
+        {/* URL Input */}
+        {type === 'url' && (
+          <TextField
+            fullWidth
+            label="URL"
+            value={url}
+            onChange={handleUrlChange}
+            InputProps={{
+              startAdornment: getTypeIcon(type)
+            }}
+          />
         )}
 
         {/* Text Content Input */}
