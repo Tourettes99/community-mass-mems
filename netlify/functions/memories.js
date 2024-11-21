@@ -2,7 +2,10 @@ const mongoose = require('mongoose');
 const { MongoClient } = require('mongodb');
 
 // MongoDB Connection URI
-const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  throw new Error('MONGODB_URI environment variable is required');
+}
 const DB_NAME = 'memories';
 const COLLECTION_NAME = 'memories';
 
