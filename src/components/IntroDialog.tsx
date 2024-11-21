@@ -56,7 +56,8 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           autoplay: false
         });
 
-        const fullPath = `${window.location.origin}/${audioPath}`;
+        // Use absolute path from root
+        const fullPath = `/${audioPath}`;
         addDebugInfo(`Loading audio from: ${fullPath}`);
 
         // Type-safe event handlers
@@ -128,7 +129,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
   // Function to check if audio file exists
   const checkAudioFile = async () => {
-    const fullPath = `${window.location.origin}/${audioPath}`;
+    const fullPath = `/${audioPath}`;
     try {
       addDebugInfo(`Checking audio file at: ${fullPath}`);
       const response = await fetch(fullPath);
