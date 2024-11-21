@@ -145,84 +145,108 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
       }
     };
 
-    // Handle social media embeds
-    const getSocialMediaEmbed = () => {
+    // Handle all types of URL embeds
+    const getUrlEmbed = () => {
       if (!memory.url) return null;
       
-      const domain = getUrlDomain(memory.url);
       const url = memory.url;
+      const domain = getUrlDomain(url);
       
-      // Twitter/X embed
-      if (domain.includes('twitter.com') || domain.includes('x.com')) {
-        const tweetId = url.match(/status\/(\d+)/)?.[1];
-        if (tweetId) {
+      // YouTube videos
+      if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+        const videoId = url.includes('youtu.be') 
+          ? url.split('/').pop() 
+          : new URLSearchParams(new URL(url).search).get('v');
+        if (videoId) {
           return {
-            html: `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js"></script>`,
-            aspectRatio: '100%'
-          };
-        }
-      }
-      
-      // TikTok embed - support both full and shortened URLs
-      if (domain.includes('tiktok.com') || domain.includes('vm.tiktok.com')) {
-        // Handle both URL formats
-        let tiktokUrl = url;
-        if (domain.includes('vm.tiktok.com')) {
-          // For shortened URLs, we'll use the URL as is
-          tiktokUrl = url;
-        }
-        return {
-          html: `<blockquote class="tiktok-embed" cite="${tiktokUrl}">
-            <section><a href="${tiktokUrl}"></a></section>
-          </blockquote>
-          <script async src="https://www.tiktok.com/embed.js"></script>`,
-          aspectRatio: '100%'
-        };
-      }
-      
-      // Facebook video embed - support both formats
-      if (
-        (domain.includes('facebook.com') && url.includes('/videos/')) ||
-        domain.includes('fb.watch')
-      ) {
-        return {
-          html: `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>`,
-          aspectRatio: '56.25%' // 16:9 aspect ratio
-        };
-      }
-
-      // Instagram embed (posts, reels, and videos)
-      if (domain.includes('instagram.com')) {
-        // Extract post ID from various Instagram URLs
-        const instagramId = url.match(/\/(p|reel|tv)\/([^\/\?]+)/)?.[2];
-        if (instagramId) {
-          return {
-            html: `<blockquote class="instagram-media" data-instgrm-permalink="${url}">
-              <a href="${url}"></a>
-            </blockquote>
-            <script async src="//www.instagram.com/embed.js"></script>`,
-            aspectRatio: '100%'
+            html: `<iframe 
+              src="https://www.youtube.com/embed/${videoId}"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen></iframe>`,
+            aspectRatio: '56.25%'
           };
         }
       }
 
-      // Reddit videos
-      if (domain.includes('reddit.com')) {
-        // Handle both old and new Reddit URLs
-        const redditUrl = url.replace('old.reddit.com', 'reddit.com');
+      // Vimeo videos
+      if (domain.includes('vimeo.com')) {
+        const videoId = url.split('/').pop();
+        if (videoId) {
+          return {
+            html: `<iframe 
+              src="https://player.vimeo.com/video/${videoId}"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowfullscreen></iframe>`,
+            aspectRatio: '56.25%'
+          };
+        }
+      }
+
+      // SoundCloud tracks
+      if (domain.includes('soundcloud.com')) {
         return {
-          html: `<iframe id="reddit-embed" src="https://www.redditmedia.com/r/${redditUrl}?ref_source=embed&amp;ref=share&amp;embed=true" 
-            sandbox="allow-scripts allow-same-origin allow-popups" 
-            style="border: none;" height="400" width="100%" 
-            scrolling="no"></iframe>`,
+          html: `<iframe 
+            src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500"
+            allow="autoplay"></iframe>`,
+          aspectRatio: '166px' // SoundCloud's standard height
+        };
+      }
+
+      // Spotify tracks/playlists
+      if (domain.includes('spotify.com')) {
+        const spotifyUrl = url.replace('open.spotify.com', 'open.spotify.com/embed');
+        return {
+          html: `<iframe 
+            src="${spotifyUrl}"
+            allow="encrypted-media; autoplay; clipboard-write; picture-in-picture"
+            allowfullscreen></iframe>`,
+          aspectRatio: '152px' // Spotify's standard height
+        };
+      }
+
+      // Twitch streams/clips
+      if (domain.includes('twitch.tv')) {
+        const isClip = url.includes('/clip/');
+        const channelName = isClip 
+          ? url.split('/clip/')[1]
+          : url.split('twitch.tv/')[1];
+        return {
+          html: `<iframe 
+            src="https://player.twitch.tv/${isClip ? 'clip' : 'embed'}/${channelName}"
+            allowfullscreen></iframe>`,
           aspectRatio: '56.25%'
         };
       }
 
-      return null;
+      // Google Drive files
+      if (domain.includes('drive.google.com')) {
+        const fileId = url.match(/[-\w]{25,}/);
+        if (fileId) {
+          return {
+            html: `<iframe 
+              src="https://drive.google.com/file/d/${fileId[0]}/preview"
+              allow="autoplay"></iframe>`,
+            aspectRatio: '75%'
+          };
+        }
+      }
+
+      // Dropbox files
+      if (domain.includes('dropbox.com')) {
+        const embedUrl = url.replace('?dl=0', '?raw=1');
+        return {
+          html: `<iframe 
+            src="${embedUrl}"
+            allow="autoplay"></iframe>`,
+          aspectRatio: '75%'
+        };
+      }
+
+      // Social media embeds
+      return getSocialMediaEmbed();
     };
 
-    const socialEmbed = getSocialMediaEmbed();
+    const embedContent = getUrlEmbed();
 
     return (
       <Card 
@@ -271,13 +295,13 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         {/* File Metadata */}
         {renderMetadataDetails(metadata)}
 
-        {/* Social Media Embed */}
-        {socialEmbed ? (
+        {/* URL Embed */}
+        {embedContent ? (
           <Box 
             sx={{ 
               width: '100%',
               position: 'relative',
-              paddingTop: socialEmbed.aspectRatio,
+              paddingTop: embedContent.aspectRatio,
               '& iframe': {
                 position: 'absolute',
                 top: 0,
@@ -288,7 +312,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 borderRadius: 1,
               },
             }}
-            dangerouslySetInnerHTML={{ __html: socialEmbed.html }}
+            dangerouslySetInnerHTML={{ __html: embedContent.html }}
           />
         ) : (
           // Regular Media Content
