@@ -22,6 +22,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Basic health check route
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'API is running' });
+});
+
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
 console.log('🔌 MongoDB URI present:', !!MONGODB_URI);
@@ -278,308 +283,163 @@ const memorySchema = new mongoose.Schema({
   type: { 
     type: String, 
     required: true,
-    enum: Object.values(MEMORY_TYPES),
-    default: MEMORY_TYPES.TEXT
-  },
-  content: {
-    text: String,
-    fileUrl: String,
-    originalFilename: String
+    enum: Object.values(MEMORY_TYPES)
   },
   metadata: {
-    // Common metadata
-    filename: String,
-    format: String,
-    fileSize: Number,
-
-    // Image/GIF metadata
-    width: Number,
-    height: Number,
-    frameCount: Number,
-    fps: Number,
-
-    // Audio metadata
-    duration: String,
-    bitrate: Number,
-    sampleRate: Number,
-
-    // URL metadata
-    siteName: String,
-    siteIcon: String,
-    previewImage: String,
-    urlDescription: String
+    type: Map,
+    of: mongoose.Schema.Types.Mixed
+  },
+  content: {
+    type: String,
+    required: true
+  },
+  createdAt: { 
+    type: Date,
+    default: Date.now 
+  },
+  updatedAt: { 
+    type: Date,
+    default: Date.now 
   }
-}, {
-  timestamps: true
 });
 
 const Memory = mongoose.model('Memory', memorySchema);
 
-// Middleware to check MongoDB connection
-async function checkMongoConnection(req, res, next) {
-  const state = mongoose.connection.readyState;
-  const stateText = ['disconnected', 'connected', 'connecting', 'disconnecting'][state];
-  
-  console.log(`🔌 MongoDB Connection Check - State: ${stateText} (${state})`);
-  
-  // If stuck in connecting state for too long or disconnected, try to reconnect
-  if (state === 2 || state === 0) {
-    console.log('🔄 Attempting to establish connection...');
-    const connected = await connectWithRetry();
-    
-    if (!connected) {
-      return res.status(503).json({
-        error: 'Database connection unavailable',
-        state: mongoose.connection.readyState,
-        stateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
-        attempts: connectionAttempts,
-        message: 'Failed to establish database connection after multiple attempts'
-      });
-    }
-  }
-  
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      error: 'Database connection unavailable',
-      state: mongoose.connection.readyState,
-      stateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
-      attempts: connectionAttempts
-    });
-  }
-  
-  next();
-}
-
 // Routes
 const router = express.Router();
-router.use(checkMongoConnection);
 
-// Handle file uploads
+// Memory routes
 router.post('/memories', async (req, res) => {
   try {
-    // Handle file upload if present
-    if (req.headers['content-type']?.includes('multipart/form-data')) {
-      await uploadMiddleware(req, res);
-    }
+    await uploadMiddleware(req, res);
+    
+    const { title, description, type } = req.body;
+    let content, metadata;
 
-    const { title, description, text, url } = req.body;
-    console.log('📝 Received memory request:', { title, description, hasFile: !!req.file });
-
-    if (!title || !description) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        required: ['title', 'description'],
-        received: { title: !!title, description: !!description }
-      });
-    }
-
-    let memoryData = {
-      title: title.trim(),
-      description: description.trim(),
-      timestamp: new Date()
-    };
-
-    // Handle different content types
-    if (req.file) {
-      const file = req.file;
-      console.log('📁 Processing file:', { 
-        name: file.originalname, 
-        type: file.memoryType, 
-        size: file.size 
-      });
-
-      let metadata;
-      try {
-        if (file.memoryType === MEMORY_TYPES.GIF) {
-          metadata = await getGifMetadata(file.buffer, file.originalname);
-        } else if (file.memoryType === MEMORY_TYPES.IMAGE) {
-          metadata = await getImageMetadata(file.buffer, file.originalname);
-        } else if (file.memoryType === MEMORY_TYPES.AUDIO) {
-          metadata = await getAudioMetadata(file.buffer, file.originalname);
+    switch (type) {
+      case MEMORY_TYPES.TEXT:
+        content = req.body.content;
+        metadata = {};
+        break;
+      
+      case MEMORY_TYPES.URL:
+        content = req.body.url;
+        metadata = await getUrlMetadata(content);
+        break;
+      
+      case MEMORY_TYPES.IMAGE:
+      case MEMORY_TYPES.GIF:
+      case MEMORY_TYPES.AUDIO:
+        if (!req.file) {
+          throw new Error('No file uploaded');
         }
-      } catch (metadataError) {
-        console.error('❌ Metadata extraction error:', metadataError);
+        
+        content = req.file.buffer.toString('base64');
+        
+        if (type === MEMORY_TYPES.IMAGE) {
+          metadata = await getImageMetadata(req.file.buffer, req.file.originalname);
+        } else if (type === MEMORY_TYPES.GIF) {
+          metadata = await getGifMetadata(req.file.buffer, req.file.originalname);
+        } else {
+          metadata = await getAudioMetadata(req.file.buffer, req.file.originalname);
+        }
+        break;
+      
+      default:
+        throw new Error('Invalid memory type');
+    }
+
+    const memory = new Memory({
+      title,
+      description,
+      type,
+      content,
+      metadata
+    });
+
+    await memory.save();
+    
+    res.status(201).json({
+      status: 'success',
+      data: {
+        memory: {
+          id: memory._id,
+          title: memory.title,
+          description: memory.description,
+          type: memory.type,
+          metadata: memory.metadata,
+          createdAt: memory.createdAt
+        }
       }
+    });
+  } catch (error) {
+    console.error('Error creating memory:', error);
+    res.status(400).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
 
-      memoryData.type = file.memoryType;
-      memoryData.fileData = file.buffer;
-      memoryData.metadata = metadata || {
-        fileName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype
-      };
+router.get('/memories', async (req, res) => {
+  try {
+    const memories = await Memory.find()
+      .select('-content')  // Exclude the content field
+      .sort('-createdAt');
+    
+    res.json({
+      status: 'success',
+      data: {
+        memories
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching memories:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
 
-    } else if (url) {
-      console.log('🔗 Processing URL memory:', url);
-      const metadata = await getUrlMetadata(url);
-      memoryData.type = MEMORY_TYPES.URL;
-      memoryData.content = { url };
-      memoryData.metadata = metadata;
-
-    } else if (text) {
-      console.log('📝 Processing text memory');
-      memoryData.type = MEMORY_TYPES.TEXT;
-      memoryData.content = { text };
-    } else {
-      return res.status(400).json({
-        error: 'No content provided',
-        message: 'Please provide either a file, URL, or text content'
+router.get('/memories/:id', async (req, res) => {
+  try {
+    const memory = await Memory.findById(req.params.id);
+    
+    if (!memory) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Memory not found'
       });
     }
-
-    const memory = new Memory(memoryData);
-    const savedMemory = await memory.save();
-    console.log('📝 Memory saved successfully:', savedMemory._id);
-
-    // Remove binary data from response
-    const response = savedMemory.toObject();
-    delete response.fileData;
-
-    res.status(201).json(response);
-  } catch (error) {
-    console.error('❌ Memory creation error:', error);
-    res.status(500).json({
-      error: 'Failed to create memory',
-      message: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-});
-
-// Route to serve files
-router.get('/files/:filename', async (req, res) => {
-  try {
-    const memory = await Memory.findOne({ 'content.originalFilename': req.params.filename });
-    
-    if (!memory || !memory.fileData) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-
-    res.set('Content-Type', memory.metadata.format);
-    res.send(memory.fileData);
-
-  } catch (error) {
-    console.error('❌ Error serving file:', error);
-    res.status(500).json({ error: 'Failed to serve file' });
-  }
-});
-
-// Test endpoint
-router.get('/test', async (req, res) => {
-  const state = mongoose.connection.readyState;
-  const stateText = ['disconnected', 'connected', 'connecting', 'disconnecting'][state];
-  
-  console.log('📝 Test endpoint called');
-  console.log('🔌 MongoDB URI present:', !!MONGODB_URI);
-  console.log('🔌 MongoDB URI format:', MONGODB_URI.startsWith('mongodb+srv://'));
-  console.log('📊 Connection State:', state, `(${stateText})`);
-  console.log('🔄 Connection Attempts:', connectionAttempts);
-  
-  try {
-    if (state !== 1) {
-      await connectWithRetry();
-    }
-    
-    // Try to perform a simple database operation
-    const count = await Memory.estimatedDocumentCount();
     
     res.json({
       status: 'success',
-      connection: {
-        state,
-        stateText,
-        attempts: connectionAttempts
-      },
-      database: {
-        name: mongoose.connection.name,
-        host: mongoose.connection.host,
-        memoryCount: count
+      data: {
+        memory
       }
     });
   } catch (error) {
-    console.error('❌ Test endpoint error:', error);
+    console.error('Error fetching memory:', error);
     res.status(500).json({
       status: 'error',
-      connection: {
-        state,
-        stateText,
-        attempts: connectionAttempts
-      },
-      error: {
-        message: error.message,
-        name: error.name,
-        code: error.code
-      }
+      message: error.message
     });
   }
 });
 
-// Add comprehensive database test endpoint
-router.get('/test-db', async (req, res) => {
-  try {
-    // 1. Check connection status
-    const state = mongoose.connection.readyState;
-    let stateText;
-    switch (state) {
-      case 0: stateText = 'Disconnected'; break;
-      case 1: stateText = 'Connected'; break;
-      case 2: stateText = 'Connecting'; break;
-      case 3: stateText = 'Disconnecting'; break;
-      default: stateText = 'Unknown';
-    }
+// Mount all routes
+app.use('/.netlify/functions/api', router);
+app.use('/api', router);  // For local development
 
-    // 2. Get database stats
-    const stats = await mongoose.connection.db.stats();
-    
-    // 3. Test CRUD operations
-    const TestModel = mongoose.model('Test', new mongoose.Schema({
-      message: String,
-      timestamp: { type: Date, default: Date.now }
-    }));
-
-    // Create
-    const testDoc = await TestModel.create({
-      message: 'Test document ' + new Date().toISOString()
-    });
-
-    // Read
-    const foundDoc = await TestModel.findById(testDoc._id);
-
-    // Delete
-    await TestModel.findByIdAndDelete(testDoc._id);
-
-    res.json({
-      status: 'success',
-      connection: {
-        state: stateText,
-        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
-        database: mongoose.connection.name,
-        host: mongoose.connection.host
-      },
-      stats: {
-        collections: stats.collections,
-        documents: stats.objects,
-        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
-        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
-      },
-      testResults: {
-        createSuccess: !!testDoc,
-        readSuccess: !!foundDoc,
-        dataMatch: foundDoc?.message === testDoc?.message,
-        deleteSuccess: true
-      }
-    });
-  } catch (error) {
-    console.error('❌ Database test error:', error);
-    res.status(500).json({
-      status: 'error',
-      error: {
-        message: error.message,
-        name: error.name,
-        code: error.code
-      }
-    });
-  }
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err);
+  res.status(err.status || 500).json({
+    status: 'error',
+    message: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
 // Create handler
