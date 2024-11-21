@@ -197,9 +197,35 @@ const compressFile = async (buffer, contentType, fileName) => {
 };
 
 const parseMultipartForm = async (event) => {
-  // Implementation of multipart form parsing
-  // This is a placeholder - you'll need to implement this based on your needs
-  throw new Error('Multipart form parsing not implemented');
+  const boundary = event.headers['content-type'].split('boundary=')[1];
+  const parts = event.body.split(`--${boundary}`);
+  
+  const files = {};
+  const fields = {};
+
+  for (let part of parts) {
+    if (part.includes('Content-Disposition: form-data;')) {
+      const contentType = part.match(/Content-Type: (.*?)\r\n/)?.[1];
+      const name = part.match(/name="([^"]+)"/)?.[1];
+      const filename = part.match(/filename="([^"]+)"/)?.[1];
+      
+      if (filename && contentType) {
+        // This is a file
+        const content = Buffer.from(part.split('\r\n\r\n')[1].split('\r\n--')[0], 'base64');
+        files[name] = {
+          name: filename,
+          type: contentType,
+          content,
+          size: content.length
+        };
+      } else if (name) {
+        // This is a field
+        fields[name] = part.split('\r\n\r\n')[1].split('\r\n--')[0].trim();
+      }
+    }
+  }
+
+  return { files, fields };
 };
 
 exports.handler = async (event, context) => {
