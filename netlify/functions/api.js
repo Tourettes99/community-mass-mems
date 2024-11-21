@@ -1,5 +1,4 @@
 // API function for R1 Memories
-// Updated with MongoDB Atlas connection and file upload handling
 const express = require('express');
 const serverless = require('serverless-http');
 const mongoose = require('mongoose');
@@ -14,7 +13,8 @@ const router = express.Router();
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  console.error('MONGODB_URI is not defined');
+  console.error('MONGODB_URI environment variable is not defined!');
+  throw new Error('MONGODB_URI must be defined');
 }
 
 // Middleware
@@ -36,10 +36,34 @@ const upload = multer({
   }
 });
 
-// Connect to MongoDB
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('Could not connect to MongoDB:', err));
+// Connect to MongoDB with detailed error logging
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000 // 5 second timeout
+})
+.then(() => {
+  console.log('Successfully connected to MongoDB Atlas');
+})
+.catch(err => {
+  console.error('MongoDB connection error details:', {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    stack: err.stack
+  });
+  throw err; // Re-throw to fail fast if we can't connect
+});
+
+// Add connection error handler
+mongoose.connection.on('error', err => {
+  console.error('MongoDB connection error:', err);
+});
+
+// Add disconnection handler
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected');
+});
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
@@ -61,12 +85,21 @@ const Memory = mongoose.model('Memory', memorySchema);
 router.get('/memories', async (req, res) => {
   console.log('GET /memories request received');
   try {
+    // Check MongoDB connection
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error('MongoDB not connected. Current state: ' + mongoose.connection.readyState);
+    }
+
     const memories = await Memory.find().sort({ timestamp: -1 });
     console.log('Found memories:', memories.length);
     res.json(memories);
   } catch (error) {
     console.error('Error fetching memories:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      mongoState: mongoose.connection.readyState,
+      stack: error.stack
+    });
   }
 });
 
@@ -130,6 +163,7 @@ router.get('/test', (req, res) => {
   res.json({ message: 'API is working!' });
 });
 
-app.use('/', router);
+app.use('/.netlify/functions/api', router);
+app.use('/api', router);
 
 module.exports.handler = serverless(app);
