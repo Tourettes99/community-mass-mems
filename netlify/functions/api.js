@@ -140,11 +140,41 @@ const Memory = mongoose.model('Memory', memorySchema);
 // Routes
 router.get('/memories', async (req, res) => {
   try {
-    const memories = await Memory.find().sort({ createdAt: -1 });
-    res.json(memories);
+    console.log('Fetching memories...');
+    
+    // Check MongoDB connection
+    if (mongoose.connection.readyState !== 1) {
+      console.log('MongoDB not connected. Attempting to connect...');
+      await mongoose.connect(MONGODB_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        dbName: 'memories'
+      });
+    }
+
+    // Fetch memories with proper sorting and field selection
+    const memories = await Memory.find()
+      .select('-__v')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    console.log(`Found ${memories.length} memories`);
+    
+    // Transform metadata from Map to plain object for each memory
+    const transformedMemories = memories.map(memory => ({
+      ...memory,
+      metadata: Object.fromEntries(memory.metadata || new Map())
+    }));
+
+    res.json(transformedMemories);
   } catch (error) {
     console.error('Error fetching memories:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to fetch memories',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
