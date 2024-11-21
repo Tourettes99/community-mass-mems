@@ -2,11 +2,11 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? '/.netlify/functions/api'
+  ? '/api'  // This will be redirected to /.netlify/functions/api by Netlify
   : 'http://localhost:5000/api';
 
 // Create axios instance with base URL
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ export const testAPI = async () => {
 
 export const getMemories = async () => {
   try {
-    const response = await api.get(ENDPOINTS.MEMORIES);
+    const response = await api.get('/memories');
     return response.data;
   } catch (error) {
     console.error('Error fetching memories:', error);
@@ -52,7 +52,7 @@ export const getMemories = async () => {
 
 export const uploadMemory = async (formData) => {
   try {
-    const response = await api.post(ENDPOINTS.UPLOAD, formData, {
+    const response = await api.post('/memories', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
