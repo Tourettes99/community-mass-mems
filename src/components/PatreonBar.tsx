@@ -18,24 +18,19 @@ const PatreonBar: React.FC = () => {
           sx={{
             p: 2,
             mt: 3,
-            bgcolor: 'primary.main',
+            bgcolor: '#FF424D', // Patreon's brand color
             color: 'white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             '&:hover': {
-              bgcolor: 'primary.dark',
+              bgcolor: '#E23833', // Darker shade of Patreon's color
             }
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box
-              component="img"
-              src="https://c5.patreon.com/external/logo/downloads_wordmark_white_on_coral.png"
-              alt="Patreon"
-              sx={{ height: 30 }}
-            />
+            <i className="fa-brands fa-patreon" style={{ fontSize: '24px' }} />
             <Typography variant="h6">
               Support us on Patreon!
             </Typography>
