@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton, CardHeader, Avatar, Link, Stack, Chip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import { Memory } from '../types';
 import EmbedPlayer from './EmbedPlayer';
+import { convertToOrange, RAL_2005 } from '../utils/colorUtils';
+import { useTheme } from '@mui/material/styles';
 
 interface MemoryGridProps {
   memories: Memory[];
@@ -17,6 +19,16 @@ interface MemoryGridProps {
 const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   const [expanded, setExpanded] = useState(false);
   const [mediaError, setMediaError] = useState(false);
+  const [orangeFavicon, setOrangeFavicon] = useState<string | null>(null);
+  const theme = useTheme();
+
+  useEffect(() => {
+    if (memory.metadata?.favicon) {
+      convertToOrange(memory.metadata.favicon)
+        .then(setOrangeFavicon)
+        .catch(() => setOrangeFavicon(null));
+    }
+  }, [memory.metadata?.favicon]);
 
   const handleCardClick = (event: React.MouseEvent) => {
     if ((event.target as HTMLElement).closest('video, audio, iframe, a, button')) {
@@ -112,7 +124,13 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         href={memory.url}
         target="_blank"
         rel="noopener noreferrer"
-        sx={{ wordBreak: 'break-all' }}
+        sx={{ 
+          wordBreak: 'break-all',
+          color: RAL_2005,
+          '&:hover': {
+            color: theme.palette.primary.light,
+          }
+        }}
       >
         {memory.metadata?.title || memory.url}
       </Link>
@@ -180,20 +198,39 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         display: 'flex',
         flexDirection: 'column',
         '&:hover': {
-          boxShadow: 3
+          boxShadow: 3,
+          '& .MuiCardHeader-root': {
+            backgroundColor: `${RAL_2005}10`,
+          }
+        },
+        '& .MuiCardHeader-root': {
+          transition: 'background-color 0.2s ease',
         }
       }}
     >
       <CardHeader
         avatar={
-          memory.metadata?.favicon ? (
-            <Avatar src={memory.metadata.favicon} />
+          orangeFavicon ? (
+            <Avatar src={orangeFavicon} />
           ) : (
-            <Avatar>{memory.type.charAt(0).toUpperCase()}</Avatar>
+            <Avatar sx={{ 
+              bgcolor: `${RAL_2005}20`,
+              color: RAL_2005,
+            }}>
+              {memory.type.charAt(0).toUpperCase()}
+            </Avatar>
           )
         }
         title={memory.metadata?.title || memory.type}
         subheader={memory.metadata?.siteName}
+        sx={{
+          '& .MuiCardHeader-title': {
+            color: theme.palette.mode === 'dark' ? '#fff' : '#666',
+          },
+          '& .MuiCardHeader-subheader': {
+            color: theme.palette.mode === 'dark' ? '#B3B3B3' : '#808080',
+          }
+        }}
       />
       {renderCardContent()}
       {memory.tags && memory.tags.length > 0 && (
@@ -205,7 +242,21 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 size="small"
                 label={tag}
                 icon={<LocalOfferIcon />}
-                sx={{ mt: 1 }}
+                sx={{ 
+                  mt: 1,
+                  bgcolor: theme.palette.mode === 'dark' 
+                    ? `${RAL_2005}20` 
+                    : `${RAL_2005}10`,
+                  color: RAL_2005,
+                  '& .MuiChip-icon': {
+                    color: RAL_2005,
+                  },
+                  '&:hover': {
+                    bgcolor: theme.palette.mode === 'dark' 
+                      ? `${RAL_2005}30` 
+                      : `${RAL_2005}20`,
+                  }
+                }}
               />
             ))}
           </Stack>
@@ -222,6 +273,8 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
   onRefresh,
   isBackgroundRefresh = false
 }) => {
+  const theme = useTheme();
+  
   return (
     <Box sx={{ width: '100%', position: 'relative' }}>
       {error && (
@@ -231,7 +284,19 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
       )}
       {onRefresh && (
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <IconButton onClick={onRefresh} disabled={loading}>
+          <IconButton 
+            onClick={onRefresh} 
+            disabled={loading}
+            sx={{
+              color: RAL_2005,
+              '&:hover': {
+                bgcolor: `${RAL_2005}20`,
+              },
+              ...(loading && {
+                opacity: 0.5,
+              })
+            }}
+          >
             <RefreshIcon />
           </IconButton>
         </Box>
@@ -246,7 +311,7 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
             zIndex: 1
           }}
         >
-          <CircularProgress />
+          <CircularProgress sx={{ color: RAL_2005 }} />
         </Box>
       )}
       <Box
