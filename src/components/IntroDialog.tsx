@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Dialog, 
   DialogTitle, 
@@ -18,9 +18,9 @@ interface IntroDialogProps {
 const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const wavesurferRef = useRef<WaveSurfer>();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (waveformRef.current && open) {
       wavesurferRef.current = WaveSurfer.create({
         container: waveformRef.current,
@@ -31,6 +31,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         barRadius: 3,
         responsive: true,
         height: 100,
+        normalize: true,
       });
 
       wavesurferRef.current.load(`${process.env.PUBLIC_URL}/${audioPath}`);
@@ -49,7 +50,11 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
   const handlePlayPause = () => {
     if (wavesurferRef.current) {
-      wavesurferRef.current.playPause();
+      if (isPlaying) {
+        wavesurferRef.current.pause();
+      } else {
+        wavesurferRef.current.play();
+      }
       setIsPlaying(!isPlaying);
     }
   };
