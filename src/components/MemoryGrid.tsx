@@ -21,6 +21,15 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     setExpanded(!expanded);
   };
 
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString();
+    } catch {
+      return dateString;
+    }
+  };
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -61,6 +70,62 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           {details.join(' • ')}
         </Typography>
       </Box>
+    );
+  };
+
+  const renderTextCard = () => {
+    return (
+      <Card 
+        sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          cursor: 'pointer',
+          '&:hover': {
+            boxShadow: 3,
+          },
+        }}
+        onClick={handleCardClick}
+      >
+        <CardContent>
+          <Typography
+            variant="body1"
+            sx={{
+              display: '-webkit-box',
+              WebkitLineClamp: expanded ? 'unset' : 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}
+          >
+            {memory.content}
+          </Typography>
+          
+          {/* Metadata */}
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Posted on {formatDate(memory.createdAt)}
+            </Typography>
+          </Box>
+
+          {/* Tags */}
+          {memory.tags && memory.tags.length > 0 && (
+            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
+              {memory.tags.map((tag, index) => (
+                <Chip
+                  key={index}
+                  label={tag}
+                  size="small"
+                  sx={{ borderRadius: 1 }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ))}
+            </Stack>
+          )}
+        </CardContent>
+      </Card>
     );
   };
 
@@ -198,6 +263,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 
   // Render different card types based on memory type
   switch (memory.type) {
+    case 'text':
+      return renderTextCard();
     case 'url':
     case 'image':
     case 'video':
@@ -205,7 +272,19 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     case 'static':
       return renderUrlCard();
     default:
-      return null;
+      console.warn(`Unknown memory type: ${memory.type}`, memory);
+      return (
+        <Card>
+          <CardContent>
+            <Typography color="error">
+              Unsupported memory type: {memory.type}
+            </Typography>
+            <Typography variant="caption" component="pre" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
+              {JSON.stringify(memory, null, 2)}
+            </Typography>
+          </CardContent>
+        </Card>
+      );
   }
 };
 
