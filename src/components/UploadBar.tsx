@@ -13,12 +13,15 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CancelIcon from '@mui/icons-material/Cancel';
 import axios from 'axios';
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 const UploadBar: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [url, setUrl] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelTokenRef = useRef<any>(null);
 
   const handleError = (error: any) => {
     let errorMessage = 'Upload failed. Please try again.';
@@ -27,26 +30,56 @@ const UploadBar: React.FC = () => {
     } else if (error.response?.status === 404) {
       errorMessage = 'The upload service is currently unavailable. Our team has been notified.';
     } else if (error.response?.status === 413) {
-      errorMessage = 'File is too large. Please try a smaller file.';
+      errorMessage = 'File is too large. Maximum size is 10MB.';
+    } else if (error.response?.status === 415) {
+      errorMessage = 'Unsupported file type. Please upload JPEG, PNG, GIF, or WebP images.';
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error;
     }
     setError(errorMessage);
     setTimeout(() => setError(null), 5000);
+  };
+
+  const validateFile = (file: File): string | null => {
+    if (file.size > MAX_FILE_SIZE) {
+      return 'File is too large. Maximum size is 10MB.';
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      return 'Unsupported file type. Please upload JPEG, PNG, GIF, or WebP images.';
+    }
+
+    return null;
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files?.length) return;
 
+    const file = files[0];
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     setUploading(true);
     setError(null);
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('file', file);
 
     try {
-      await axios.post('/api/upload', formData, {
+      cancelTokenRef.current = axios.CancelToken.source();
+      
+      await axios.post('/.netlify/functions/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
+        cancelToken: cancelTokenRef.current.token,
         onUploadProgress: (progressEvent) => {
           const progress = progressEvent.total
             ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
@@ -59,29 +92,55 @@ const UploadBar: React.FC = () => {
         fileInputRef.current.value = '';
       }
     } catch (error: any) {
-      handleError(error);
+      if (axios.isCancel(error)) {
+        setError('Upload cancelled');
+      } else {
+        handleError(error);
+      }
     } finally {
       setUploading(false);
       setUploadProgress(0);
+      cancelTokenRef.current = null;
     }
   };
 
   const handleUrlSubmit = async () => {
     if (!url) return;
 
+    // Basic URL validation
+    try {
+      new URL(url);
+    } catch {
+      setError('Please enter a valid URL');
+      return;
+    }
+
     setUploading(true);
     setError(null);
     try {
-      await axios.post('/api/upload', { url, type: 'url' });
+      cancelTokenRef.current = axios.CancelToken.source();
+      
+      await axios.post('/.netlify/functions/upload', 
+        { url, type: 'url' },
+        { cancelToken: cancelTokenRef.current.token }
+      );
       setUrl('');
     } catch (error: any) {
-      handleError(error);
+      if (axios.isCancel(error)) {
+        setError('Upload cancelled');
+      } else {
+        handleError(error);
+      }
     } finally {
       setUploading(false);
+      cancelTokenRef.current = null;
     }
   };
 
   const handleCancel = () => {
+    if (cancelTokenRef.current) {
+      cancelTokenRef.current.cancel('Upload cancelled by user');
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -132,12 +191,11 @@ const UploadBar: React.FC = () => {
             flex: 1,
           }}>
             <input
-              ref={fileInputRef}
               type="file"
-              accept="image/*,video/*,audio/*,.gif"
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
               onChange={handleFileUpload}
               style={{ display: 'none' }}
-              id="file-upload"
+              ref={fileInputRef}
             />
             <label htmlFor="file-upload">
               <Button
@@ -167,6 +225,11 @@ const UploadBar: React.FC = () => {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={uploading}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !uploading) {
+                  handleUrlSubmit();
+                }
+              }}
               size="small"
               sx={{
                 flexGrow: 1,
@@ -183,7 +246,7 @@ const UploadBar: React.FC = () => {
             gap: 1,
             justifyContent: { xs: 'flex-end', sm: 'flex-start' }
           }}>
-            {uploading && (
+            {uploading ? (
               <>
                 <CircularProgress 
                   variant="determinate" 
@@ -198,16 +261,16 @@ const UploadBar: React.FC = () => {
                   <CancelIcon />
                 </IconButton>
               </>
+            ) : url && (
+              <Button
+                onClick={handleUrlSubmit}
+                variant="contained"
+                disabled={uploading}
+                size="small"
+              >
+                Upload URL
+              </Button>
             )}
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleUrlSubmit}
-              disabled={uploading || !url}
-              sx={{ width: { xs: '100%', sm: 'auto' } }}
-            >
-              Submit URL
-            </Button>
           </Box>
         </Box>
       </Paper>
