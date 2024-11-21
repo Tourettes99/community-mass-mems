@@ -63,26 +63,23 @@ router.get('/test-connection', async (req, res) => {
   }
 });
 
-// MongoDB connection
+// MongoDB Configuration
 const MONGODB_URI = process.env.MONGODB_URI;
-console.log('🔌 MongoDB URI present:', !!MONGODB_URI);
-
 if (!MONGODB_URI) {
-  console.error('❌ MONGODB_URI environment variable is not defined!');
-  throw new Error('MONGODB_URI must be defined');
+  console.error('❌ MONGODB_URI is not defined in environment variables');
+  throw new Error('MONGODB_URI is required');
 }
 
-// MongoDB connection options
 const mongooseOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
   family: 4,
   retryWrites: true,
   w: 'majority',
   authSource: 'admin',
-  dbName: 'memories'
+  dbName: 'memories',
+  serverSelectionTimeoutMS: 5000,
+  connectTimeoutMS: 10000,
 };
 
 // MongoDB connection with retry logic
@@ -97,15 +94,15 @@ async function connectWithRetry(retries = MAX_RETRIES) {
   }
 
   try {
+    if (isConnecting) {
+      console.log('⏳ Connection attempt already in progress...');
+      return false;
+    }
+
     isConnecting = true;
     connectionAttempts++;
     
     console.log(`🔄 MongoDB Connection Attempt ${connectionAttempts}/${MAX_RETRIES}`);
-    console.log('🔌 Connection Options:', {
-      uri: MONGODB_URI ? 'URI Present' : 'URI Missing',
-      dbName: mongooseOptions.dbName,
-      authSource: mongooseOptions.authSource
-    });
     
     await mongoose.connect(MONGODB_URI, mongooseOptions);
     
@@ -130,9 +127,15 @@ async function connectWithRetry(retries = MAX_RETRIES) {
       await new Promise(resolve => setTimeout(resolve, 3000));
       return connectWithRetry(retries - 1);
     }
-    return false;
+
+    throw new Error(`Failed to connect to MongoDB after ${MAX_RETRIES} attempts: ${error.message}`);
   }
 }
+
+// Connect to MongoDB on startup
+connectWithRetry().catch(error => {
+  console.error('❌ Initial MongoDB connection failed:', error.message);
+});
 
 // Memory types enum
 const MEMORY_TYPES = {
@@ -416,23 +419,19 @@ router.post('/memories', async (req, res) => {
 
 router.get('/memories', async (req, res) => {
   try {
-    const memories = await Memory.find()
-      .select('-content')  // Exclude the content field
-      .sort('-createdAt');
-    
-    res.json({
-      status: 'success',
-      timestamp: new Date().toISOString(),
-      data: {
-        memories
-      }
-    });
+    // Ensure MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      await connectWithRetry();
+    }
+
+    const memories = await Memory.find().sort({ createdAt: -1 });
+    res.json(memories);
   } catch (error) {
     console.error('Error fetching memories:', error);
     res.status(500).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      message: error.message
+      error: 'Failed to fetch memories',
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
