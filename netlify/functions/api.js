@@ -238,7 +238,6 @@ router.get('/memories', async (req, res) => {
   }
 });
 
-// Updated upload endpoint
 router.post('/memories', handleUpload, async (req, res) => {
   console.log('POST /memories request received');
   console.log('Request body:', req.body);
@@ -249,16 +248,21 @@ router.post('/memories', handleUpload, async (req, res) => {
   } : 'No file');
   
   try {
-    if (!req.body.title || !req.body.description) {
-      throw new Error('Title and description are required');
+    const { title, description, url } = req.body;
+    
+    if (!title || !description) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['title', 'description'],
+        received: { title: !!title, description: !!description }
+      });
     }
 
     const memoryData = {
-      title: req.body.title.trim(),
-      description: req.body.description.trim(),
-      tags: req.body.tags ? JSON.parse(req.body.tags) : [],
-      content: req.body.content || '',
-      timestamp: new Date()
+      title: title.trim(),
+      description: description.trim(),
+      url: url || null,
+      fileUrl: null // We'll handle file uploads separately
     };
 
     // Handle file upload
@@ -291,12 +295,17 @@ router.post('/memories', handleUpload, async (req, res) => {
     }
 
     console.log('Memory saved successfully');
-    res.status(201).json(response);
+    res.status(201).json({
+      message: 'Memory created successfully',
+      memory: response
+    });
+    
   } catch (error) {
     console.error('Error saving memory:', error);
     res.status(500).json({
-      error: error.message,
-      stack: error.stack
+      error: 'Failed to create memory',
+      details: error.message,
+      code: error.code
     });
   }
 });
