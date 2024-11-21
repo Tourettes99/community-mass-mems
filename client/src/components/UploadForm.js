@@ -18,6 +18,8 @@ import LinkIcon from '@mui/icons-material/Link';
 
 const UploadForm = ({ onUploadComplete }) => {
   const [activeTab, setActiveTab] = useState(0);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
   const [url, setUrl] = useState('');
   const [file, setFile] = useState(null);
@@ -35,6 +37,15 @@ const UploadForm = ({ onUploadComplete }) => {
   };
 
   const validateForm = () => {
+    if (!title.trim()) {
+      setError('Title is required');
+      return false;
+    }
+    if (!description.trim()) {
+      setError('Description is required');
+      return false;
+    }
+
     switch (activeTab) {
       case 0: // Text
         if (!content.trim()) {
@@ -113,6 +124,8 @@ const UploadForm = ({ onUploadComplete }) => {
 
     try {
       const formData = new FormData();
+      formData.append('title', title.trim());
+      formData.append('description', description.trim());
 
       switch (activeTab) {
         case 0: // Text
@@ -143,6 +156,8 @@ const UploadForm = ({ onUploadComplete }) => {
       console.log('Upload successful:', response);
       
       // Clear form
+      setTitle('');
+      setDescription('');
       setContent('');
       setUrl('');
       setFile(null);
@@ -170,17 +185,6 @@ const UploadForm = ({ onUploadComplete }) => {
     }
   };
 
-  const getAcceptedFileTypes = () => {
-    switch (activeTab) {
-      case 1: // Image/GIF
-        return 'image/*,.gif';
-      case 2: // Audio
-        return 'audio/*';
-      default:
-        return '';
-    }
-  };
-
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', maxWidth: 600 }}>
       {error && (
@@ -195,10 +199,31 @@ const UploadForm = ({ onUploadComplete }) => {
         </Alert>
       )}
 
+      <Box sx={{ mb: 3 }}>
+        <TextField
+          fullWidth
+          label="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          margin="normal"
+          required
+        />
+        <TextField
+          fullWidth
+          label="Description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          margin="normal"
+          multiline
+          rows={2}
+          required
+        />
+      </Box>
+
       <Tabs 
         value={activeTab} 
-        onChange={handleTabChange} 
-        variant="fullWidth" 
+        onChange={handleTabChange}
+        variant="fullWidth"
         sx={{ mb: 3 }}
       >
         <Tab icon={<TextFieldsIcon />} label="Text" />
@@ -210,43 +235,34 @@ const UploadForm = ({ onUploadComplete }) => {
       {activeTab === 0 && (
         <TextField
           fullWidth
-          label="Memory Content"
+          label="Content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          margin="normal"
           multiline
           rows={4}
           required
-          error={!content && error}
-          placeholder="Write your memory here..."
         />
       )}
 
       {(activeTab === 1 || activeTab === 2) && (
-        <Box sx={{ my: 2 }}>
-          <input
-            accept={getAcceptedFileTypes()}
-            style={{ display: 'none' }}
-            id="memory-file-input"
-            type="file"
-            onChange={handleFileChange}
-            ref={fileInputRef}
-          />
-          <label htmlFor="memory-file-input">
-            <Button 
-              variant="outlined" 
-              component="span" 
-              fullWidth
-              startIcon={activeTab === 1 ? <ImageIcon /> : <AudiotrackIcon />}
-            >
-              {file ? `Selected: ${file.name}` : `Choose ${activeTab === 1 ? 'Image/GIF' : 'Audio'} File`}
-            </Button>
-          </label>
-          {file && (
-            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-              Size: {(file.size / 1024 / 1024).toFixed(2)}MB
-            </Typography>
-          )}
+        <input
+          type="file"
+          accept={activeTab === 1 ? 'image/*,.gif' : 'audio/*'}
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+          ref={fileInputRef}
+        />
+      )}
+
+      {(activeTab === 1 || activeTab === 2) && (
+        <Box>
+          <Button
+            variant="outlined"
+            onClick={() => fileInputRef.current?.click()}
+            fullWidth
+          >
+            {file ? file.name : `Choose ${activeTab === 1 ? 'Image' : 'Audio'} File`}
+          </Button>
         </Box>
       )}
 
@@ -256,21 +272,19 @@ const UploadForm = ({ onUploadComplete }) => {
           label="URL"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          margin="normal"
           required
-          error={!url && error}
-          placeholder="Enter URL to save..."
         />
       )}
 
       <Button
         type="submit"
         variant="contained"
+        color="primary"
         fullWidth
         disabled={loading}
-        sx={{ mt: 2 }}
+        sx={{ mt: 3 }}
       >
-        {loading ? <CircularProgress size={24} /> : 'Save Memory'}
+        {loading ? <CircularProgress size={24} /> : 'Upload Memory'}
       </Button>
     </Box>
   );
