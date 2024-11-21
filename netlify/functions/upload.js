@@ -3,6 +3,8 @@ const { Buffer } = require('buffer');
 const formidable = require('formidable-serverless');
 
 const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+const DB_NAME = 'memories';
+const COLLECTION_NAME = 'memories';
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
@@ -28,6 +30,8 @@ const memorySchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  collection: COLLECTION_NAME // Explicitly set collection name
 });
 
 let Memory;
@@ -79,12 +83,19 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Connect to MongoDB with explicit database selection
     if (!mongoose.connection.readyState) {
       await mongoose.connect(MONGODB_URI, {
         useNewUrlParser: true,
-        useUnifiedTopology: true
+        useUnifiedTopology: true,
+        dbName: DB_NAME // Explicitly set database name
       });
     }
+
+    // Log connection status and database info
+    console.log('MongoDB Connection State:', mongoose.connection.readyState);
+    console.log('Database Name:', mongoose.connection.db.databaseName);
+    console.log('Collections:', await mongoose.connection.db.listCollections().toArray());
 
     let memoryData;
     const contentType = event.headers['content-type'] || '';
@@ -146,10 +157,15 @@ exports.handler = async (event, context) => {
     };
   } catch (error) {
     console.error('Error processing upload:', error);
+    console.error('Stack:', error.stack);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Internal server error', details: error.message })
+      body: JSON.stringify({ 
+        error: 'Internal server error', 
+        details: error.message,
+        stack: error.stack 
+      })
     };
   }
 };
