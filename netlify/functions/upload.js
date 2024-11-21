@@ -92,7 +92,8 @@ const memorySchema = new mongoose.Schema({
     // Additional metadata
     favicon: String,
     structuredData: mongoose.Schema.Types.Mixed,
-    raw: mongoose.Schema.Types.Mixed
+    raw: mongoose.Schema.Types.Mixed,
+    mediaData: mongoose.Schema.Types.Mixed
   }
 }, { timestamps: true });
 
@@ -127,6 +128,33 @@ const getMediaInfo = async (url, metadata) => {
     mediaType = 'audio';
     playbackHtml = `<audio controls style="width: 100%;"><source src="${url}" type="audio/${path.split('.').pop()}">Your browser does not support audio playback.</audio>`;
     isPlayable = true;
+  } else {
+    // Check for embedded media in metadata
+    const ogVideo = metadata?.ogVideo || metadata?.openGraph?.video?.url;
+    const ogAudio = metadata?.ogAudio || metadata?.openGraph?.audio?.url;
+    const twitterPlayer = metadata?.twitterPlayer || metadata?.twitterCard?.player?.url;
+    
+    if (ogVideo) {
+      mediaType = 'video';
+      if (ogVideo.endsWith('.mp4')) {
+        playbackHtml = `<video controls style="width: 100%; max-height: 400px;"><source src="${ogVideo}" type="video/mp4">Your browser does not support video playback.</video>`;
+      } else {
+        playbackHtml = `<iframe src="${ogVideo}" style="width: 100%; aspect-ratio: 16/9; border: none;" allowfullscreen></iframe>`;
+      }
+      isPlayable = true;
+    } else if (ogAudio) {
+      mediaType = 'audio';
+      if (ogAudio.endsWith('.mp3')) {
+        playbackHtml = `<audio controls style="width: 100%;"><source src="${ogAudio}" type="audio/mpeg">Your browser does not support audio playback.</audio>`;
+      } else {
+        playbackHtml = `<iframe src="${ogAudio}" style="width: 100%; height: 80px; border: none;"></iframe>`;
+      }
+      isPlayable = true;
+    } else if (twitterPlayer) {
+      mediaType = 'video';
+      playbackHtml = `<iframe src="${twitterPlayer}" style="width: 100%; aspect-ratio: 16/9; border: none;" allowfullscreen></iframe>`;
+      isPlayable = true;
+    }
   }
 
   return {
@@ -150,7 +178,12 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
     
     const mediaInfo = await getMediaInfo(url, {
       ogImage: result.open_graph?.image?.url,
-      twitterImage: result.twitter_card?.image?.url
+      twitterImage: result.twitter_card?.image?.url,
+      ogVideo: result.open_graph?.video?.url,
+      ogAudio: result.open_graph?.audio?.url,
+      twitterPlayer: result.twitter_card?.player?.url,
+      openGraph: result.open_graph,
+      twitterCard: result.twitter_card
     });
 
     // Get favicon
@@ -182,7 +215,13 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
       mediaType: mediaInfo.mediaType,
       previewUrl: mediaInfo.previewUrl,
       playbackHtml: mediaInfo.playbackHtml,
-      isPlayable: mediaInfo.isPlayable
+      isPlayable: mediaInfo.isPlayable,
+      // Store raw media data for debugging
+      mediaData: {
+        ogVideo: result.open_graph?.video,
+        ogAudio: result.open_graph?.audio,
+        twitterPlayer: result.twitter_card?.player
+      }
     };
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
@@ -311,7 +350,8 @@ exports.handler = async (event, context) => {
         mediaType: urlMetadata.mediaType,
         previewUrl: urlMetadata.previewUrl,
         playbackHtml: urlMetadata.playbackHtml,
-        isPlayable: urlMetadata.isPlayable
+        isPlayable: urlMetadata.isPlayable,
+        mediaData: urlMetadata.mediaData
       }
     };
 
