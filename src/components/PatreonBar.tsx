@@ -1,43 +1,48 @@
 import React from 'react';
-import { Paper, Typography, Box, Link } from '@mui/material';
-import { motion } from 'framer-motion';
+import { Box, Link, Typography } from '@mui/material';
 
 const PatreonBar: React.FC = () => {
   return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+    <Box
+      sx={{
+        mt: 4,
+        p: 2,
+        bgcolor: '#FF424D', // Patreon red color
+        borderRadius: '12px', // Rounded corners
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: 3,
+        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: 6,
+        },
+      }}
     >
-      <Link 
-        href="https://patreon.com/Foxplaid19773" 
-        target="_blank" 
+      <Link
+        href="https://www.patreon.com/communitymass"
+        target="_blank"
         rel="noopener noreferrer"
-        underline="none"
+        sx={{
+          textDecoration: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+        }}
       >
-        <Paper
+        <Typography
+          variant="h6"
           sx={{
-            p: 2,
-            mt: 3,
-            bgcolor: '#FF424D', // Patreon's brand color
             color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            '&:hover': {
-              bgcolor: '#E23833', // Darker shade of Patreon's color
-            }
+            fontWeight: 'bold',
+            textAlign: 'center',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <i className="fa-brands fa-patreon" style={{ fontSize: '24px' }} />
-            <Typography variant="h6">
-              Support us on Patreon!
-            </Typography>
-          </Box>
-        </Paper>
+          Support Community Mass on Patreon
+        </Typography>
       </Link>
-    </motion.div>
+    </Box>
   );
 };
 
