@@ -41,42 +41,55 @@ const memorySchema = new mongoose.Schema({
     lastModified: Date,
     rawContent: String
   }
-}, { timestamps: true });
+}, { 
+  timestamps: true,
+  strict: false 
+});
 
 // Initialize MongoDB connection
 let cachedDb = null;
 async function connectToDatabase() {
-  if (cachedDb) {
+  console.log('Attempting to connect to MongoDB...');
+  console.log('MongoDB URI exists:', !!process.env.MONGODB_URI);
+  
+  if (cachedDb && mongoose.connection.readyState === 1) {
+    console.log('Using cached database connection');
     return cachedDb;
   }
 
   try {
-    const connection = await mongoose.connect(MONGODB_URI, {
+    console.log('Connecting to MongoDB...');
+    const connection = await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      dbName: DB_NAME,
-      serverSelectionTimeoutMS: 5000
+      serverSelectionTimeoutMS: 5000,
+      bufferCommands: false
     });
 
+    console.log('MongoDB connected successfully');
     cachedDb = connection;
-    return cachedDb;
+    return connection;
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('MongoDB connection error:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 }
 
 // Initialize Memory model
-let Memory;
-try {
-  Memory = mongoose.model('Memory');
-} catch {
-  Memory = mongoose.model('Memory', memorySchema);
-}
+let Memory = mongoose.models.Memory || mongoose.model('Memory', memorySchema);
 
 exports.handler = async (event, context) => {
-  // Make sure to close the DB connection when the function exits
   context.callbackWaitsForEmptyEventLoop = false;
+
+  console.log('Function invoked with event:', {
+    method: event.httpMethod,
+    headers: event.headers,
+    path: event.path
+  });
 
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -98,18 +111,21 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Connect to MongoDB
-    await connectToDatabase();
-
     // Parse request body
     let body;
     try {
+      console.log('Parsing request body:', event.body);
       body = JSON.parse(event.body);
+      console.log('Parsed body:', body);
     } catch (error) {
+      console.error('Error parsing request body:', error);
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Invalid request body' })
+        body: JSON.stringify({ 
+          error: 'Invalid request body',
+          details: error.message 
+        })
       };
     }
 
@@ -122,34 +138,33 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Connect to MongoDB
+    console.log('Connecting to database...');
+    await connectToDatabase();
+    console.log('Database connection established');
+
     // Create memory object
     const memoryData = {
       type: body.type,
       url: body.url,
       content: body.content,
-      tags: body.tags || []
+      tags: body.tags || [],
+      metadata: {
+        title: body.type === 'text' ? body.content?.slice(0, 50) : body.url,
+        mediaType: body.type,
+        description: body.content || body.url
+      }
     };
 
-    // Add metadata based on type
-    if (body.type === 'url' && body.url) {
-      try {
-        memoryData.metadata = {
-          title: body.url,
-          mediaType: 'url'
-        };
-      } catch (error) {
-        console.error('Error fetching URL metadata:', error);
-      }
-    } else if (body.type === 'text' && body.content) {
-      memoryData.metadata = {
-        title: body.content.slice(0, 50) + (body.content.length > 50 ? '...' : ''),
-        mediaType: 'text',
-        description: body.content
-      };
-    }
-
-    console.log('Creating new memory:', JSON.stringify(memoryData, null, 2));
+    console.log('Creating memory with data:', memoryData);
+    
+    // Create and save memory
     const memory = new Memory(memoryData);
+    console.log('Validating memory...');
+    await memory.validate();
+    console.log('Memory validated successfully');
+    
+    console.log('Saving memory...');
     const savedMemory = await memory.save();
     console.log('Memory saved successfully:', savedMemory._id);
 
@@ -162,14 +177,19 @@ exports.handler = async (event, context) => {
       })
     };
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error('Error processing request:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',
-        message: error.message
+        message: error.message,
+        type: error.name
       })
     };
   }

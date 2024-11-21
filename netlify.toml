@@ -36,7 +36,7 @@ Referrer-Policy = "strict-origin-when-cross-origin"
 [[plugins]]
 package = "@netlify/plugin-functions-install-core"
 
-[functions.upload]
+[functions.file-upload]
 included_files = []
 external_node_modules = ["mongoose", "file-type", "image-size"]
 
