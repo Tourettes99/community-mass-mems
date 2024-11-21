@@ -320,39 +320,12 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
       twitterImage: result.twitter_card?.image?.url
     });
 
-    // Extract dimensions from various sources
-    const dimensions = {
-      width: result.open_graph?.video?.width || 
-             result.twitter_card?.player?.width ||
-             result.open_graph?.image?.width ||
-             result.twitter_card?.image?.width,
-      height: result.open_graph?.video?.height || 
-              result.twitter_card?.player?.height ||
-              result.open_graph?.image?.height ||
-              result.twitter_card?.image?.height
-    };
-
-    // Extract size information if available
-    const size = {
-      original: result.open_graph?.video?.size || 
-                result.twitter_card?.player?.size ||
-                result.open_graph?.image?.size ||
-                result.twitter_card?.image?.size,
-      compressed: null // Will be set after processing if applicable
-    };
-
-    // Determine content type from metadata or user input
-    let contentType = userMetadata.type || result.open_graph?.type || 'website';
-    if (result.open_graph?.video) contentType = 'video';
-    else if (result.open_graph?.audio) contentType = 'audio';
-    else if (result.twitter_card?.card === 'player') contentType = 'media';
-
     // Extract the most relevant title
     const title = userMetadata.title || 
                  result.open_graph?.title || 
                  result.twitter_card?.title ||
                  result.title ||
-                 new URL(url).pathname.split('/').pop() || 'Untitled';
+                 '';
 
     // Extract the most relevant description
     const description = userMetadata.description || 
@@ -362,59 +335,50 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
 
     // Extract the site name
     const siteName = userMetadata.siteName || 
-                    result.site_name || 
                     result.open_graph?.site_name || 
+                    result.site_name || 
                     new URL(url).hostname;
 
+    // Extract author information
+    const author = userMetadata.author || 
+                  result.open_graph?.article?.author || 
+                  result.author;
+
+    // Extract dates
+    const publishedDate = userMetadata.publishedDate || 
+                         result.open_graph?.article?.published_time || 
+                         result.published;
+                         
+    const modifiedDate = userMetadata.modifiedDate || 
+                        result.open_graph?.article?.modified_time || 
+                        result.modified;
+
+    // Extract preview image
+    const previewUrl = mediaInfo.previewUrl || 
+                      result.open_graph?.image?.url || 
+                      result.twitter_card?.image?.url;
+
     return {
-      // Basic metadata - prioritize user input
+      // Core metadata
       title,
       description,
       siteName,
-      contentType,
-      dimensions,
-      size,
+      author,
+      publishedDate,
+      modifiedDate,
       
-      // User-provided content takes precedence
-      content: userMetadata.content,
-      tags: userMetadata.tags || [],
-      
-      // Open Graph metadata
-      ogTitle: result.open_graph?.title,
-      ogDescription: result.open_graph?.description,
-      ogImage: result.open_graph?.image?.url,
-      ogType: result.open_graph?.type,
-      ogUrl: result.open_graph?.url,
-      ogAudio: result.open_graph?.audio?.url,
-      ogVideo: result.open_graph?.video?.url,
-      
-      // Twitter Card metadata
-      twitterCard: result.twitter_card?.card,
-      twitterTitle: result.twitter_card?.title,
-      twitterDescription: result.twitter_card?.description,
-      twitterImage: result.twitter_card?.image?.url,
-      twitterCreator: result.twitter_card?.creator,
-      twitterPlayer: result.twitter_card?.player?.url,
-      
-      // Article metadata
-      articleSection: userMetadata.section || result.open_graph?.article?.section,
-      articleTags: userMetadata.tags || result.open_graph?.article?.tags || [],
-      articlePublisher: result.open_graph?.article?.publisher,
-      
-      // Media and preview information
-      ...mediaInfo,
+      // Media info
+      mediaType: mediaInfo.mediaType,
+      previewType: mediaInfo.previewType,
+      previewUrl,
+      embedHtml: mediaInfo.playbackHtml,
+      isPlayable: mediaInfo.isPlayable,
       
       // Additional metadata
       language: userMetadata.language || result.language,
-      publishedDate: userMetadata.publishedDate || result.open_graph?.article?.published_time || result.published,
-      modifiedDate: userMetadata.modifiedDate || result.open_graph?.article?.modified_time || result.modified,
-      author: userMetadata.author || result.open_graph?.article?.author || result.author,
-      favicon: result.favicon,
+      tags: userMetadata.tags || [],
       
-      // Structured data
-      structuredData: result.json_ld || [],
-      
-      // Raw metadata for debugging
+      // Raw metadata (for debugging)
       raw: {
         openGraph: result.open_graph,
         twitterCard: result.twitter_card,
@@ -426,11 +390,10 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
     console.error('Error fetching URL metadata:', error);
     // Return basic metadata even if URL fetch fails
     return {
-      title: userMetadata.title || new URL(url).pathname.split('/').pop() || 'Untitled',
+      title: userMetadata.title || '',
       description: userMetadata.description || '',
-      siteName: userMetadata.siteName || new URL(url).hostname,
-      contentType: userMetadata.type || 'website',
-      error: 'Failed to fetch URL metadata'
+      siteName: new URL(url).hostname,
+      mediaType: 'url'
     };
   }
 };

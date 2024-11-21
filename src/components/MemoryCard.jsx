@@ -24,21 +24,23 @@ const MemoryCard = ({ memory }) => {
   if (!memory) return null;
 
   const {
-    title,
-    description,
     url,
-    imageUrl,
     type,
-    siteName,
-    authorName,
-    publishedTime,
-    embedHtml,
-    previewType,
-    metadata
+    metadata = {}
   } = memory;
 
+  const {
+    title,
+    description,
+    siteName,
+    previewUrl,
+    embedHtml,
+    previewType,
+    mediaType,
+  } = metadata;
+
   const getMediaIcon = () => {
-    switch (type) {
+    switch (mediaType || type) {
       case 'image':
         return <ImageIcon />;
       case 'video':
@@ -51,10 +53,6 @@ const MemoryCard = ({ memory }) => {
   };
 
   const renderMedia = () => {
-    if (!previewType || previewType === 'none') {
-      return null;
-    }
-
     if (embedHtml) {
       return (
         <Box
@@ -69,12 +67,12 @@ const MemoryCard = ({ memory }) => {
       );
     }
 
-    if (imageUrl || metadata?.previewUrl) {
+    if (previewUrl) {
       return (
         <CardMedia
           component="img"
-          image={imageUrl || metadata.previewUrl}
-          alt={title || 'Memory image'}
+          image={previewUrl}
+          alt={title || 'Preview'}
           sx={{
             height: 0,
             paddingTop: '56.25%',
@@ -87,7 +85,7 @@ const MemoryCard = ({ memory }) => {
     return null;
   };
 
-  // Don't render a card for empty or invalid memories
+  // Don't render empty cards
   if (!url && !description && !title) return null;
 
   return (
@@ -160,16 +158,6 @@ const MemoryCard = ({ memory }) => {
             >
               {description}
             </Typography>
-          )}
-
-          {(authorName || publishedTime) && (
-            <Box sx={{ mt: 'auto', pt: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                {authorName && `By ${authorName}`}
-                {authorName && publishedTime && ' · '}
-                {publishedTime && new Date(publishedTime).toLocaleDateString()}
-              </Typography>
-            </Box>
           )}
         </Stack>
       </CardContent>

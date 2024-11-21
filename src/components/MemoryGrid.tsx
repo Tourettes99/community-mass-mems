@@ -18,6 +18,11 @@ interface Memory {
     description?: string;
     size?: number;
     contentType?: string;
+    embedHtml?: string;
+    previewUrl?: string;
+    isPlayable?: boolean;
+    mediaType?: string;
+    favicon?: string;
   };
 }
 
@@ -130,21 +135,108 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           </Box>
         );
       case 'url':
+        const { metadata } = memory;
+        const hasEmbed = metadata?.embedHtml;
+        const hasPreviewImage = metadata?.previewUrl;
+        const hasPlayableMedia = metadata?.isPlayable;
+        const siteIcon = metadata?.favicon || `https://www.google.com/s2/favicons?domain=${new URL(memory.url).hostname}`;
+
         return (
           <Box sx={{ p: 2 }}>
-            <Typography variant="h6" noWrap>{memory.metadata?.siteName || 'Website'}</Typography>
-            <Typography 
-              variant="body2" 
-              sx={{
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                mb: 1,
-              }}
-            >
-              {memory.metadata?.description || 'No description available'}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Box
+                component="img"
+                src={siteIcon}
+                alt="Site Icon"
+                sx={{
+                  width: 16,
+                  height: 16,
+                  mr: 1,
+                  borderRadius: '2px'
+                }}
+              />
+              <Typography 
+                variant="h6" 
+                noWrap 
+                sx={{ 
+                  flex: 1,
+                  fontSize: '1rem',
+                  fontWeight: 500
+                }}
+              >
+                {metadata?.siteName || new URL(memory.url).hostname}
+              </Typography>
+            </Box>
+
+            {hasEmbed ? (
+              <Box 
+                sx={{ 
+                  position: 'relative',
+                  paddingTop: '56.25%', // 16:9 aspect ratio
+                  mb: 2,
+                  overflow: 'hidden',
+                  borderRadius: 1
+                }}
+                dangerouslySetInnerHTML={{ __html: metadata.embedHtml }}
+              />
+            ) : hasPlayableMedia ? (
+              <Box sx={{ mb: 2 }}>
+                {metadata.mediaType === 'video' ? (
+                  <video 
+                    controls
+                    style={{ 
+                      width: '100%',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    <source src={memory.url} type={metadata.contentType} />
+                    Your browser does not support video playback.
+                  </video>
+                ) : metadata.mediaType === 'audio' ? (
+                  <audio 
+                    controls
+                    style={{ width: '100%' }}
+                  >
+                    <source src={memory.url} type={metadata.contentType} />
+                    Your browser does not support audio playback.
+                  </audio>
+                ) : null}
+              </Box>
+            ) : hasPreviewImage ? (
+              <Box 
+                sx={{ 
+                  mb: 2,
+                  borderRadius: 1,
+                  overflow: 'hidden'
+                }}
+              >
+                <CardMedia
+                  component="img"
+                  image={metadata.previewUrl}
+                  alt={metadata.siteName || "Preview"}
+                  sx={{
+                    width: '100%',
+                    aspectRatio: '16/9',
+                    objectFit: 'cover'
+                  }}
+                />
+              </Box>
+            ) : metadata?.description ? (
+              <Typography 
+                variant="body2" 
+                sx={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  mb: 2,
+                  color: 'text.secondary'
+                }}
+              >
+                {metadata.description}
+              </Typography>
+            ) : null}
+
             <Typography 
               variant="body2" 
               component="a" 
@@ -152,7 +244,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
               target="_blank"
               rel="noopener noreferrer"
               sx={{ 
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
                 color: 'primary.main',
                 textDecoration: 'none',
                 '&:hover': {
