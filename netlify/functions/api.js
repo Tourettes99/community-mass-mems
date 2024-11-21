@@ -1,4 +1,3 @@
-// API function for R1 Memories
 const express = require('express');
 const serverless = require('serverless-http');
 const mongoose = require('mongoose');
@@ -6,36 +5,135 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
+// Initialize express app
 const app = express();
-const router = express.Router();
 
 // Debug logging middleware
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  console.log('Headers:', req.headers);
+  console.log('\n🌐 Incoming Request:', new Date().toISOString());
+  console.log('📍 Path:', req.path);
+  console.log('📝 Method:', req.method);
+  console.log('🔑 Headers:', JSON.stringify(req.headers, null, 2));
   next();
 });
 
+// Enable CORS
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
-console.log('MongoDB URI present:', !!MONGODB_URI);
+console.log('🔌 MongoDB URI present:', !!MONGODB_URI);
 
 if (!MONGODB_URI) {
-  console.error('MONGODB_URI environment variable is not defined!');
+  console.error('❌ MONGODB_URI environment variable is not defined!');
   throw new Error('MONGODB_URI must be defined');
 }
 
-// Middleware
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Range', 'Accept'],
-  exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
-  credentials: true
-}));
+// MongoDB connection with retry logic
+let isConnecting = false;
+let connectionAttempts = 0;
+const MAX_RETRIES = 3;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+async function connectWithRetry(retries = MAX_RETRIES) {
+  if (mongoose.connection.readyState === 1) {
+    console.log('✅ MongoDB is already connected');
+    return true;
+  }
+
+  try {
+    isConnecting = true;
+    connectionAttempts++;
+    
+    console.log(`🔄 MongoDB Connection Attempt ${connectionAttempts}/${MAX_RETRIES}`);
+    
+    await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    
+    console.log('✅ MongoDB Connected');
+    isConnecting = false;
+    connectionAttempts = 0;
+    return true;
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    isConnecting = false;
+    
+    if (retries > 0) {
+      console.log(`⏰ Retrying connection in 3 seconds... (${retries} attempts remaining)`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return connectWithRetry(retries - 1);
+    }
+    return false;
+  }
+}
+
+// Test connection endpoint
+app.get('/test-connection', async (req, res) => {
+  console.log('🔌 Test connection endpoint hit');
+  try {
+    const state = mongoose.connection.readyState;
+    let stateText;
+    switch (state) {
+      case 0: stateText = 'Disconnected'; break;
+      case 1: stateText = 'Connected'; break;
+      case 2: stateText = 'Connecting'; break;
+      case 3: stateText = 'Disconnecting'; break;
+      default: stateText = 'Unknown';
+    }
+
+    // Try to connect if not connected
+    if (state !== 1) {
+      await connectWithRetry();
+    }
+
+    // Get database stats if connected
+    let stats = null;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        stats = await mongoose.connection.db.stats();
+        console.log('📈 Database Stats Retrieved');
+      } catch (statsError) {
+        console.error('❌ Error getting database stats:', statsError);
+      }
+    }
+
+    const response = {
+      status: 'success',
+      connection: {
+        state: stateText,
+        readyState: state,
+        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
+        database: mongoose.connection.name,
+        host: mongoose.connection.host
+      }
+    };
+
+    if (stats) {
+      response.stats = {
+        collections: stats.collections,
+        documents: stats.objects,
+        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
+        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
+      };
+    }
+
+    console.log('✅ Sending connection test response:', response);
+    res.json(response);
+  } catch (error) {
+    console.error('❌ MongoDB connection test error:', error);
+    res.status(500).json({
+      status: 'error',
+      error: {
+        message: error.message,
+        name: error.name,
+        code: error.code
+      }
+    });
+  }
+});
 
 // Memory types enum
 const MEMORY_TYPES = {
@@ -194,123 +292,16 @@ const memorySchema = new mongoose.Schema({
 
 const Memory = mongoose.model('Memory', memorySchema);
 
-// MongoDB connection options
-const mongooseOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000, // Reduced timeout
-  socketTimeoutMS: 30000,
-  connectTimeoutMS: 10000,
-  family: 4,
-  retryWrites: true,
-  w: 'majority',
-  maxPoolSize: 1,
-  minPoolSize: 1
-};
-
-// Connection state tracking
-let isConnecting = false;
-let connectionAttempts = 0;
-const MAX_RETRIES = 3;
-
-async function connectWithRetry(retries = MAX_RETRIES) {
-  if (mongoose.connection.readyState === 1) {
-    console.log('MongoDB is already connected');
-    return true;
-  }
-
-  // If we're stuck in connecting state for too long, force a disconnect
-  if (mongoose.connection.readyState === 2 && isConnecting) {
-    console.log('Stuck in connecting state, forcing disconnect...');
-    try {
-      await mongoose.disconnect();
-    } catch (err) {
-      console.error('Error during forced disconnect:', err);
-    }
-  }
-
-  if (isConnecting) {
-    console.log('Connection attempt already in progress...');
-    return false;
-  }
-
-  try {
-    isConnecting = true;
-    connectionAttempts++;
-    
-    console.log(`MongoDB Connection Attempt ${connectionAttempts}/${MAX_RETRIES}`);
-    console.log('Connection Options:', {
-      uri: MONGODB_URI ? 'URI Present' : 'URI Missing',
-      format: MONGODB_URI?.startsWith('mongodb+srv://') ? 'Valid Format' : 'Invalid Format'
-    });
-    
-    // Close existing connection if any
-    if (mongoose.connection.readyState !== 0) {
-      console.log('Closing existing connection...');
-      await mongoose.disconnect();
-    }
-
-    const conn = await mongoose.connect(MONGODB_URI, mongooseOptions);
-    
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-    console.log('Connection State:', mongoose.connection.readyState);
-    console.log('Database Name:', conn.connection.name);
-    
-    isConnecting = false;
-    connectionAttempts = 0;
-
-    mongoose.connection.on('connected', () => {
-      console.log('MongoDB connected event fired');
-      isConnecting = false;
-    });
-
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-      isConnecting = false;
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('MongoDB disconnected event fired');
-      isConnecting = false;
-    });
-
-    return true;
-
-  } catch (error) {
-    console.error('MongoDB connection error:', {
-      name: error.name,
-      message: error.message,
-      code: error.code
-    });
-
-    isConnecting = false;
-
-    if (retries > 0) {
-      console.log(`Retrying connection in 3 seconds... (${retries} attempts remaining)`);
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      return connectWithRetry(retries - 1);
-    } else {
-      console.error('Max retries reached. Could not connect to MongoDB');
-      return false;
-    }
-  }
-}
-
-// Initial connection
-connectWithRetry().catch(err => {
-  console.error('Failed to connect to MongoDB after retries:', err);
-});
-
 // Middleware to check MongoDB connection
 async function checkMongoConnection(req, res, next) {
   const state = mongoose.connection.readyState;
   const stateText = ['disconnected', 'connected', 'connecting', 'disconnecting'][state];
   
-  console.log(`MongoDB Connection Check - State: ${stateText} (${state})`);
+  console.log(`🔌 MongoDB Connection Check - State: ${stateText} (${state})`);
   
   // If stuck in connecting state for too long or disconnected, try to reconnect
   if (state === 2 || state === 0) {
-    console.log('Attempting to establish connection...');
+    console.log('🔄 Attempting to establish connection...');
     const connected = await connectWithRetry();
     
     if (!connected) {
@@ -337,6 +328,7 @@ async function checkMongoConnection(req, res, next) {
 }
 
 // Routes
+const router = express.Router();
 router.use(checkMongoConnection);
 
 // Handle file uploads
@@ -348,7 +340,7 @@ router.post('/memories', async (req, res) => {
     }
 
     const { title, description, text, url } = req.body;
-    console.log('Received memory request:', { title, description, hasFile: !!req.file });
+    console.log('📝 Received memory request:', { title, description, hasFile: !!req.file });
 
     if (!title || !description) {
       return res.status(400).json({
@@ -367,7 +359,7 @@ router.post('/memories', async (req, res) => {
     // Handle different content types
     if (req.file) {
       const file = req.file;
-      console.log('Processing file:', { 
+      console.log('📁 Processing file:', { 
         name: file.originalname, 
         type: file.memoryType, 
         size: file.size 
@@ -383,7 +375,7 @@ router.post('/memories', async (req, res) => {
           metadata = await getAudioMetadata(file.buffer, file.originalname);
         }
       } catch (metadataError) {
-        console.error('Metadata extraction error:', metadataError);
+        console.error('❌ Metadata extraction error:', metadataError);
       }
 
       memoryData.type = file.memoryType;
@@ -395,14 +387,14 @@ router.post('/memories', async (req, res) => {
       };
 
     } else if (url) {
-      console.log('Processing URL memory:', url);
+      console.log('🔗 Processing URL memory:', url);
       const metadata = await getUrlMetadata(url);
       memoryData.type = MEMORY_TYPES.URL;
       memoryData.content = { url };
       memoryData.metadata = metadata;
 
     } else if (text) {
-      console.log('Processing text memory');
+      console.log('📝 Processing text memory');
       memoryData.type = MEMORY_TYPES.TEXT;
       memoryData.content = { text };
     } else {
@@ -414,7 +406,7 @@ router.post('/memories', async (req, res) => {
 
     const memory = new Memory(memoryData);
     const savedMemory = await memory.save();
-    console.log('Memory saved successfully:', savedMemory._id);
+    console.log('📝 Memory saved successfully:', savedMemory._id);
 
     // Remove binary data from response
     const response = savedMemory.toObject();
@@ -422,7 +414,7 @@ router.post('/memories', async (req, res) => {
 
     res.status(201).json(response);
   } catch (error) {
-    console.error('Memory creation error:', error);
+    console.error('❌ Memory creation error:', error);
     res.status(500).json({
       error: 'Failed to create memory',
       message: error.message,
@@ -444,7 +436,7 @@ router.get('/files/:filename', async (req, res) => {
     res.send(memory.fileData);
 
   } catch (error) {
-    console.error('Error serving file:', error);
+    console.error('❌ Error serving file:', error);
     res.status(500).json({ error: 'Failed to serve file' });
   }
 });
@@ -454,11 +446,11 @@ router.get('/test', async (req, res) => {
   const state = mongoose.connection.readyState;
   const stateText = ['disconnected', 'connected', 'connecting', 'disconnecting'][state];
   
-  console.log('Test endpoint called');
-  console.log('MongoDB URI present:', !!MONGODB_URI);
-  console.log('MongoDB URI format:', MONGODB_URI.startsWith('mongodb+srv://'));
-  console.log('Connection State:', state, `(${stateText})`);
-  console.log('Connection Attempts:', connectionAttempts);
+  console.log('📝 Test endpoint called');
+  console.log('🔌 MongoDB URI present:', !!MONGODB_URI);
+  console.log('🔌 MongoDB URI format:', MONGODB_URI.startsWith('mongodb+srv://'));
+  console.log('📊 Connection State:', state, `(${stateText})`);
+  console.log('🔄 Connection Attempts:', connectionAttempts);
   
   try {
     if (state !== 1) {
@@ -482,7 +474,7 @@ router.get('/test', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Test endpoint error:', error);
+    console.error('❌ Test endpoint error:', error);
     res.status(500).json({
       status: 'error',
       connection: {
@@ -490,65 +482,6 @@ router.get('/test', async (req, res) => {
         stateText,
         attempts: connectionAttempts
       },
-      error: {
-        message: error.message,
-        name: error.name,
-        code: error.code
-      }
-    });
-  }
-});
-
-// Test endpoint for MongoDB connection
-router.get('/test-connection', async (req, res) => {
-  console.log('Test connection endpoint hit');
-  try {
-    const state = mongoose.connection.readyState;
-    let stateText;
-    switch (state) {
-      case 0: stateText = 'Disconnected'; break;
-      case 1: stateText = 'Connected'; break;
-      case 2: stateText = 'Connecting'; break;
-      case 3: stateText = 'Disconnecting'; break;
-      default: stateText = 'Unknown';
-    }
-
-    // Get database stats if connected
-    let stats = null;
-    if (state === 1) {
-      try {
-        stats = await mongoose.connection.db.stats();
-      } catch (statsError) {
-        console.error('Error getting database stats:', statsError);
-      }
-    }
-
-    const response = {
-      status: 'success',
-      connection: {
-        state: stateText,
-        readyState: state,
-        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
-        database: mongoose.connection.name,
-        host: mongoose.connection.host
-      }
-    };
-
-    if (stats) {
-      response.stats = {
-        collections: stats.collections,
-        documents: stats.objects,
-        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
-        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
-      };
-    }
-
-    console.log('Sending connection test response:', response);
-    res.json(response);
-  } catch (error) {
-    console.error('MongoDB connection test error:', error);
-    res.status(500).json({
-      status: 'error',
       error: {
         message: error.message,
         name: error.name,
@@ -614,7 +547,7 @@ router.get('/test-db', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Database test error:', error);
+    console.error('❌ Database test error:', error);
     res.status(500).json({
       status: 'error',
       error: {
@@ -629,22 +562,33 @@ router.get('/test-db', async (req, res) => {
 // Mount routes at the root level for Netlify Functions
 app.use('/', router);
 
-// Export handler
-module.exports.handler = serverless(app, {
+// Export the serverless handler
+const handler = serverless(app, {
   binary: ['image/*', 'audio/*'],
-  request: function(request, event, context) {
+  request: (req, event, context) => {
     // Log incoming requests
-    console.log('Request:', {
-      method: request.method,
-      path: request.path,
-      headers: request.headers
+    console.log('📝 Request:', {
+      method: req.method,
+      path: req.path,
+      headers: req.headers
     });
   },
-  response: function(response, event, context) {
+  response: (response, event, context) => {
     // Log outgoing responses
-    console.log('Response:', {
+    console.log('📤 Response:', {
       statusCode: response.statusCode,
       headers: response.headers
     });
   }
 });
+
+// Export the handler function
+exports.handler = async (event, context) => {
+  // Connect to MongoDB before handling the request
+  if (mongoose.connection.readyState !== 1) {
+    await connectWithRetry();
+  }
+  
+  // Handle the request
+  return handler(event, context);
+};
