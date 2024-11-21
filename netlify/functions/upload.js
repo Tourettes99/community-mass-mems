@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { unfurl } = require('unfurl.js');
+const fetch = require('node-fetch');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -17,6 +19,16 @@ const memorySchema = new mongoose.Schema({
   url: String,
   content: String,
   metadata: {
+    // Basic metadata
+    title: String,
+    description: String,
+    siteName: String,
+    author: String,
+    publishedDate: Date,
+    modifiedDate: Date,
+    language: String,
+    
+    // Media metadata
     fileName: String,
     resolution: String,
     format: String,
@@ -24,17 +36,48 @@ const memorySchema = new mongoose.Schema({
     duration: String,
     bitrate: String,
     codec: String,
-    siteName: String,
-    description: String,
+    contentType: String,
     size: {
       original: Number,
       compressed: Number
     },
-    contentType: String,
     dimensions: {
       width: Number,
       height: Number
-    }
+    },
+    
+    // Open Graph metadata
+    ogTitle: String,
+    ogDescription: String,
+    ogImage: String,
+    ogType: String,
+    ogUrl: String,
+    
+    // Twitter Card metadata
+    twitterCard: String,
+    twitterTitle: String,
+    twitterDescription: String,
+    twitterImage: String,
+    twitterCreator: String,
+    
+    // Article metadata
+    articleSection: String,
+    articleTags: [String],
+    articlePublisher: String,
+    
+    // Embed information
+    embedType: {
+      type: String,
+      enum: ['none', 'youtube', 'vimeo', 'twitter', 'instagram', 'spotify', 'soundcloud', 'general']
+    },
+    embedHtml: String,
+    embedThumbnail: String,
+    
+    // Custom metadata
+    tags: [String],
+    category: String,
+    userNotes: String,
+    customFields: mongoose.Schema.Types.Mixed
   }
 }, { timestamps: true });
 
@@ -45,6 +88,99 @@ try {
 } catch {
   Memory = mongoose.model('Memory', memorySchema);
 }
+
+// Function to extract video ID from various platforms
+const getVideoId = (url) => {
+  let videoId = null;
+  let platform = 'none';
+
+  // YouTube
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    platform = 'youtube';
+    const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    if (match) videoId = match[1];
+  }
+  // Vimeo
+  else if (url.includes('vimeo.com')) {
+    platform = 'vimeo';
+    const match = url.match(/vimeo.com\/(?:.*\/)?([0-9]+)/);
+    if (match) videoId = match[1];
+  }
+  // Twitter
+  else if (url.includes('twitter.com') || url.includes('x.com')) {
+    platform = 'twitter';
+    const match = url.match(/twitter\.com\/\w+\/status\/(\d+)/);
+    if (match) videoId = match[1];
+  }
+
+  return { videoId, platform };
+};
+
+// Function to generate embed HTML
+const generateEmbedHtml = (url, platform, videoId) => {
+  switch (platform) {
+    case 'youtube':
+      return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    case 'vimeo':
+      return `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+    case 'twitter':
+      return `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`;
+    default:
+      return null;
+  }
+};
+
+// Function to fetch URL metadata
+const fetchUrlMetadata = async (url) => {
+  try {
+    const result = await unfurl(url);
+    const { videoId, platform } = getVideoId(url);
+    const embedHtml = generateEmbedHtml(url, platform, videoId);
+
+    return {
+      // Basic metadata
+      title: result.title,
+      description: result.description,
+      siteName: result.site_name || new URL(url).hostname,
+      
+      // Open Graph metadata
+      ogTitle: result.open_graph?.title,
+      ogDescription: result.open_graph?.description,
+      ogImage: result.open_graph?.image?.url,
+      ogType: result.open_graph?.type,
+      ogUrl: result.open_graph?.url,
+      
+      // Twitter Card metadata
+      twitterCard: result.twitter_card?.card,
+      twitterTitle: result.twitter_card?.title,
+      twitterDescription: result.twitter_card?.description,
+      twitterImage: result.twitter_card?.image?.url,
+      twitterCreator: result.twitter_card?.creator,
+      
+      // Article metadata
+      articleSection: result.open_graph?.article?.section,
+      articleTags: result.open_graph?.article?.tags,
+      articlePublisher: result.open_graph?.article?.publisher,
+      
+      // Embed information
+      embedType: platform,
+      embedHtml: embedHtml,
+      embedThumbnail: result.open_graph?.image?.url || result.twitter_card?.image?.url,
+      
+      // Additional metadata
+      language: result.language,
+      publishedDate: result.open_graph?.article?.published_time,
+      modifiedDate: result.open_graph?.article?.modified_time,
+      author: result.open_graph?.article?.author
+    };
+  } catch (error) {
+    console.error('Error fetching URL metadata:', error);
+    return {
+      siteName: new URL(url).hostname,
+      error: 'Failed to fetch metadata'
+    };
+  }
+};
 
 exports.handler = async (event, context) => {
   console.log('Starting upload handler');
@@ -82,7 +218,7 @@ exports.handler = async (event, context) => {
     const body = JSON.parse(event.body);
     console.log('Received request body:', body);
 
-    const { url, type, content, metadata } = body;
+    const { url, type, content, metadata: userMetadata } = body;
 
     // Handle text upload
     if (type === 'text') {
@@ -99,7 +235,7 @@ exports.handler = async (event, context) => {
         content: content.trim(),
         metadata: {
           contentType: 'text/plain',
-          ...(metadata || {}),
+          ...userMetadata,
           size: {
             original: content.length,
             compressed: content.length
@@ -147,12 +283,15 @@ exports.handler = async (event, context) => {
       };
     }
 
+    console.log('Fetching metadata for URL:', url);
+    const urlMetadata = await fetchUrlMetadata(url);
+
     const memoryData = {
       type: type || 'url',
       url: url,
       metadata: {
-        siteName: new URL(url).hostname,
-        ...(metadata || {})
+        ...urlMetadata,
+        ...userMetadata
       }
     };
 
