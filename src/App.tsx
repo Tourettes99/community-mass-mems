@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import { CssBaseline, Box, Container, Snackbar, Alert } from '@mui/material';
-import { theme } from './theme';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { useTheme } from './contexts/ThemeContext';
+import { getTheme } from './theme';
 import MemoryGrid from './components/MemoryGrid';
 import UploadBar from './components/UploadBar';
 import IntroDialog from './components/IntroDialog';
 import InfoBar from './components/InfoBar';
 import PatreonBar from './components/PatreonBar';
+import ThemeToggle from './components/ThemeToggle';
 import { Memory } from './types';
 
-function App() {
+const AppContent = () => {
+  const { mode } = useTheme();
+  const theme = getTheme(mode);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +80,6 @@ function App() {
     }
   }, [memories]);
 
-  // Initial fetch and set up polling
   useEffect(() => {
     fetchMemories(false);
 
@@ -114,7 +118,7 @@ function App() {
   };
 
   return (
-    <ThemeProvider theme={theme}>
+    <MuiThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ 
         minHeight: '100vh',
@@ -122,6 +126,7 @@ function App() {
         display: 'flex',
         flexDirection: 'column'
       }}>
+        <ThemeToggle />
         <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
           <InfoBar />
           <UploadBar onMemoryCreated={handleMemoryCreated} />
@@ -154,6 +159,14 @@ function App() {
           </Alert>
         </Snackbar>
       </Box>
+    </MuiThemeProvider>
+  );
+};
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
     </ThemeProvider>
   );
 }
