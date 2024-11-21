@@ -1,8 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './MemoryCard.css';
 
 const MemoryCard = ({ memory }) => {
   const { type, url, content, metadata } = memory;
+
+  useEffect(() => {
+    // Load Instagram embeds
+    if (window.instgrm && metadata?.playbackHtml?.includes('instagram-media')) {
+      window.instgrm.Embeds.process();
+    }
+    // Load Twitter embeds
+    if (window.twttr && metadata?.playbackHtml?.includes('twitter-tweet')) {
+      window.twttr.widgets.load();
+    }
+  }, [metadata?.playbackHtml]);
 
   const renderContent = () => {
     // For text memories
@@ -14,11 +25,11 @@ const MemoryCard = ({ memory }) => {
       );
     }
 
-    // For URL memories with playback HTML
+    // For URLs with playback HTML
     if (metadata?.playbackHtml) {
       return (
         <div 
-          className="memory-embed"
+          className={`memory-embed memory-type-${type}`}
           dangerouslySetInnerHTML={{ __html: metadata.playbackHtml }}
         />
       );
@@ -28,11 +39,13 @@ const MemoryCard = ({ memory }) => {
     if (metadata?.previewUrl) {
       return (
         <div className="memory-preview">
-          <img 
-            src={metadata.previewUrl} 
-            alt={metadata.title || 'Memory preview'} 
-            className="preview-image"
-          />
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <img 
+              src={metadata.previewUrl} 
+              alt={metadata.title || 'Memory preview'} 
+              className="preview-image"
+            />
+          </a>
         </div>
       );
     }
@@ -54,15 +67,19 @@ const MemoryCard = ({ memory }) => {
   return (
     <div className={`memory-card memory-type-${type}`}>
       {/* Title Section */}
-      {metadata?.title && (
-        <h3 className="memory-title">{metadata.title}</h3>
+      {metadata?.title && type !== 'text' && (
+        <h3 className="memory-title">
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            {metadata.title}
+          </a>
+        </h3>
       )}
 
       {/* Main Content */}
       {renderContent()}
 
       {/* Description */}
-      {metadata?.description && (
+      {metadata?.description && type !== 'text' && (
         <p className="memory-description">{metadata.description}</p>
       )}
 

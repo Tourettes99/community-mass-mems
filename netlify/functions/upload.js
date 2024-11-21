@@ -277,10 +277,10 @@ const generateEmbedHtml = (url, platform, videoId) => {
     case 'soundcloud':
       return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}"></iframe>`;
     case 'instagram':
-      const instagramMatch = url.match(/instagram\.com\/p\/([a-zA-Z0-9_-]+)/);
+      const instagramMatch = url.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
       if (instagramMatch) {
         const postId = instagramMatch[1];
-        return `<blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/${postId}/"><a href="https://www.instagram.com/p/${postId}/"></a></blockquote><script async src="//www.instagram.com/embed.js"></script>`;
+        return `<blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/${postId}/" style="max-width:540px; min-width:326px; width:99.375%;"><a href="https://www.instagram.com/p/${postId}/" target="_blank">View on Instagram</a></blockquote><script async src="//www.instagram.com/embed.js"></script>`;
       }
       return null;
     default:
@@ -448,12 +448,16 @@ exports.handler = async (event, context) => {
 
     console.log('Fetching metadata for URL:', url);
     const urlMetadata = await fetchUrlMetadata(url);
-
+    
+    // Get media info including preview and playback HTML
+    const mediaInfo = await getMediaInfo(url, urlMetadata);
+    
     const memoryData = {
-      type: type || 'url',
+      type: type || mediaInfo.mediaType || 'url',
       url: url,
       metadata: {
         ...urlMetadata,
+        ...mediaInfo,
         ...userMetadata
       }
     };
