@@ -75,7 +75,7 @@ const UploadBar: React.FC = () => {
     try {
       cancelTokenRef.current = axios.CancelToken.source();
       
-      await axios.post('/.netlify/functions/upload', formData, {
+      await axios.post('/api/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
@@ -120,7 +120,7 @@ const UploadBar: React.FC = () => {
     try {
       cancelTokenRef.current = axios.CancelToken.source();
       
-      await axios.post('/.netlify/functions/upload', 
+      await axios.post('/api/upload', 
         { url, type: 'url' },
         { cancelToken: cancelTokenRef.current.token }
       );
