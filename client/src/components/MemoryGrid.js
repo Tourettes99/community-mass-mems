@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Fade } from '@mui/material';
+import { Box, Fade, Grid } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Memory from './Memory';
-import Masonry from '@mui/lab/Masonry';
-
-const StyledMasonry = styled(Masonry)(({ theme }) => ({
-  margin: 0,
-  padding: theme.spacing(3),
-}));
 
 const StyledMemoryWrapper = styled(Box)(({ theme, delay }) => ({
   width: '100%',
@@ -53,7 +47,7 @@ const getMemoryTypeWeight = (type) => {
   }
 };
 
-// Get random column span for variety
+// Get random span for variety
 const getRandomSpan = (type) => {
   switch (type) {
     case 'image':
@@ -98,30 +92,25 @@ const MemoryGrid = ({ memories }) => {
   }, []);
 
   return (
-    <Box sx={{ width: '100%', minHeight: '100vh' }}>
-      <StyledMasonry
-        columns={{ xs: 1, sm: 2, md: 3, lg: 4 }}
-        spacing={3}
-        defaultHeight={450}
-        defaultColumns={4}
-        defaultSpacing={3}
-      >
+    <Box sx={{ width: '100%', minHeight: '100vh', p: 3 }}>
+      <Grid container spacing={3}>
         {displayedMemories.map((memory, index) => (
-          <Box
+          <Grid
+            item
             key={memory._id}
-            sx={{
-              gridColumn: `span ${spans[memory._id] || 1}`,
-              width: '100%',
-            }}
+            xs={12}
+            sm={spans[memory._id] === 2 ? 12 : 6}
+            md={spans[memory._id] === 2 ? 8 : 4}
+            lg={spans[memory._id] === 2 ? 6 : 3}
           >
             <Fade in timeout={300} style={{ transitionDelay: `${index * 100}ms` }}>
               <StyledMemoryWrapper delay={index * 500 % 2000}>
                 <Memory memory={memory} />
               </StyledMemoryWrapper>
             </Fade>
-          </Box>
+          </Grid>
         ))}
-      </StyledMasonry>
+      </Grid>
     </Box>
   );
 };

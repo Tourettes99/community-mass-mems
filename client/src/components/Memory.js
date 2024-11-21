@@ -1,6 +1,11 @@
 import React from 'react';
-import { Card, CardContent, CardMedia, Typography, Box } from '@mui/material';
+import { Card, CardContent, CardMedia, Typography, Box, Chip, Stack } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import ImageIcon from '@mui/icons-material/Image';
+import GifIcon from '@mui/icons-material/Gif';
+import AudioFileIcon from '@mui/icons-material/AudioFile';
+import LinkIcon from '@mui/icons-material/Link';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import AudioPlayer from './memory-types/AudioPlayer';
 import ImageMemory from './memory-types/ImageMemory';
 import GifMemory from './memory-types/GifMemory';
@@ -62,7 +67,141 @@ const Overlay = styled(Box)({
   },
 });
 
+const MetadataChip = styled(Chip)(({ theme }) => ({
+  margin: '2px',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  '& .MuiChip-icon': {
+    color: theme.palette.primary.main,
+  },
+}));
+
 const Memory = ({ memory }) => {
+  const renderMetadata = () => {
+    const metadata = [];
+
+    switch (memory.type) {
+      case MEMORY_TYPES.IMAGE:
+        if (memory.metadata) {
+          metadata.push(
+            <MetadataChip
+              key="filename"
+              icon={<ImageIcon />}
+              label={memory.metadata.filename || 'Untitled'}
+              size="small"
+            />,
+            <MetadataChip
+              key="resolution"
+              icon={<ImageIcon />}
+              label={`${memory.metadata.width || 0}x${memory.metadata.height || 0}`}
+              size="small"
+            />,
+            <MetadataChip
+              key="format"
+              icon={<ImageIcon />}
+              label={memory.metadata.format || 'Unknown'}
+              size="small"
+            />
+          );
+        }
+        break;
+
+      case MEMORY_TYPES.GIF:
+        if (memory.metadata) {
+          metadata.push(
+            <MetadataChip
+              key="filename"
+              icon={<GifIcon />}
+              label={memory.metadata.filename || 'Untitled'}
+              size="small"
+            />,
+            <MetadataChip
+              key="resolution"
+              icon={<GifIcon />}
+              label={`${memory.metadata.width || 0}x${memory.metadata.height || 0}`}
+              size="small"
+            />,
+            <MetadataChip
+              key="fps"
+              icon={<GifIcon />}
+              label={`${memory.metadata.fps || 0} FPS`}
+              size="small"
+            />,
+            <MetadataChip
+              key="format"
+              icon={<GifIcon />}
+              label="GIF"
+              size="small"
+            />
+          );
+        }
+        break;
+
+      case MEMORY_TYPES.AUDIO:
+        if (memory.metadata) {
+          metadata.push(
+            <MetadataChip
+              key="filename"
+              icon={<AudioFileIcon />}
+              label={memory.metadata.filename || 'Untitled'}
+              size="small"
+            />,
+            <MetadataChip
+              key="duration"
+              icon={<AudioFileIcon />}
+              label={memory.metadata.duration || '0:00'}
+              size="small"
+            />,
+            <MetadataChip
+              key="format"
+              icon={<AudioFileIcon />}
+              label={memory.metadata.format || 'Unknown'}
+              size="small"
+            />
+          );
+        }
+        break;
+
+      case MEMORY_TYPES.URL:
+        if (memory.metadata) {
+          metadata.push(
+            <MetadataChip
+              key="title"
+              icon={<LinkIcon />}
+              label={memory.metadata.title || 'Untitled'}
+              size="small"
+            />
+          );
+          if (memory.metadata.description) {
+            metadata.push(
+              <MetadataChip
+                key="description"
+                icon={<LinkIcon />}
+                label={memory.metadata.description.substring(0, 50) + '...'}
+                size="small"
+              />
+            );
+          }
+        }
+        break;
+
+      case MEMORY_TYPES.TEXT:
+        metadata.push(
+          <MetadataChip
+            key="type"
+            icon={<TextSnippetIcon />}
+            label="Text Memory"
+            size="small"
+          />
+        );
+        break;
+
+      default:
+        break;
+    }
+
+    return metadata;
+  };
+
   const renderMemoryContent = () => {
     switch (memory.type) {
       case MEMORY_TYPES.IMAGE:
@@ -102,6 +241,9 @@ const Memory = ({ memory }) => {
                 {memory.description}
               </Typography>
             )}
+            <Stack direction="row" flexWrap="wrap" spacing={1} sx={{ mt: 2 }}>
+              {renderMetadata()}
+            </Stack>
           </Overlay>
         )}
       </ContentWrapper>
@@ -117,6 +259,9 @@ const Memory = ({ memory }) => {
               {memory.description}
             </Typography>
           )}
+          <Stack direction="row" flexWrap="wrap" spacing={1} sx={{ mt: 2 }}>
+            {renderMetadata()}
+          </Stack>
         </CardContent>
       )}
     </StyledCard>

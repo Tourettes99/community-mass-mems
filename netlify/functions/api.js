@@ -184,31 +184,33 @@ const uploadMiddleware = (req, res) => {
 // Utility function to get image metadata
 async function getImageMetadata(buffer, filename) {
   const sharp = require('sharp');
-  const image = sharp(buffer);
-  const metadata = await image.metadata();
-
+  const metadata = await sharp(buffer).metadata();
+  
   return {
-    filename,
-    format: metadata.format,
+    filename: filename,
     width: metadata.width,
     height: metadata.height,
-    fileSize: buffer.length
+    format: metadata.format.toUpperCase(),
+    fileSize: buffer.length,
+    aspectRatio: metadata.width / metadata.height
   };
 }
 
 // Utility function to get GIF metadata
 async function getGifMetadata(buffer, filename) {
   const gifInfo = require('gif-info');
-  const info = gifInfo(buffer);
-
+  const metadata = gifInfo(buffer);
+  
   return {
-    filename,
-    format: 'gif',
-    width: info.width,
-    height: info.height,
-    frameCount: info.images,
-    fps: Math.round(100 / info.duration * info.images) / 100,
-    fileSize: buffer.length
+    filename: filename,
+    width: metadata.width,
+    height: metadata.height,
+    format: 'GIF',
+    frames: metadata.images.length,
+    fps: Math.round(1000 / metadata.images[0].delay) || 0,
+    duration: formatDuration((metadata.images.length * metadata.images[0].delay) / 1000),
+    fileSize: buffer.length,
+    aspectRatio: metadata.width / metadata.height
   };
 }
 
@@ -216,14 +218,17 @@ async function getGifMetadata(buffer, filename) {
 async function getAudioMetadata(buffer, filename) {
   const musicMetadata = require('music-metadata');
   const metadata = await musicMetadata.parseBuffer(buffer);
-
+  
   return {
-    filename,
-    format: metadata.format.container,
+    filename: filename,
+    format: metadata.format.container.toUpperCase(),
     duration: formatDuration(metadata.format.duration),
     bitrate: metadata.format.bitrate,
     sampleRate: metadata.format.sampleRate,
-    fileSize: buffer.length
+    channels: metadata.format.numberOfChannels,
+    fileSize: buffer.length,
+    title: metadata.common.title,
+    artist: metadata.common.artist
   };
 }
 
@@ -231,12 +236,17 @@ async function getAudioMetadata(buffer, filename) {
 async function getUrlMetadata(url) {
   const urlMetadata = require('url-metadata');
   const metadata = await urlMetadata(url);
-
+  
   return {
+    title: metadata.title || new URL(url).hostname,
     siteName: metadata.siteName || new URL(url).hostname,
-    siteIcon: metadata.favicon,
+    description: metadata.description,
     previewImage: metadata.image,
-    urlDescription: metadata.description
+    siteIcon: metadata.favicon,
+    url: url,
+    type: metadata.type || 'website',
+    author: metadata.author,
+    publishedDate: metadata.publishedDate
   };
 }
 
