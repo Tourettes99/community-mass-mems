@@ -1,33 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton, CardHeader, Avatar, Link, Stack, Chip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import axios from 'axios';
+import { Memory } from '../types';
 
-interface Memory {
-  _id: string;
-  type: 'url' | 'image' | 'video' | 'audio' | 'text' | 'static';
-  url: string;
-  content?: string;
-  metadata?: {
-    title?: string;
-    description?: string;
-    siteName?: string;
-    favicon?: string;
-    mediaType?: 'url' | 'image' | 'video' | 'audio' | 'static';
-    previewUrl?: string;
-    playbackHtml?: string;
-    isPlayable?: boolean;
-    fileSize?: number;
-    contentType?: string;
-    resolution?: string;
-    duration?: string;
-    format?: string;
-    encoding?: string;
-    lastModified?: Date;
-    rawContent?: string;
-  };
-  tags?: string[];
+interface MemoryGridProps {
+  memories: Memory[];
+  loading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void;
 }
 
 const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
@@ -227,13 +208,6 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
       return null;
   }
 };
-
-interface MemoryGridProps {
-  memories: Memory[];
-  loading?: boolean;
-  error?: string | null;
-  onRefresh?: () => void;
-}
 
 const MemoryGrid: React.FC<MemoryGridProps> = ({ memories, loading = false, error = null, onRefresh }) => {
   if (loading) {
