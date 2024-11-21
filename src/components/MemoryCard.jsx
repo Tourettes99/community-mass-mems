@@ -33,6 +33,7 @@ const MemoryCard = ({ memory }) => {
     authorName,
     publishedTime,
     embedHtml,
+    previewType,
   } = memory;
 
   const getMediaIcon = () => {
@@ -49,6 +50,11 @@ const MemoryCard = ({ memory }) => {
   };
 
   const renderMedia = () => {
+    // Only render media if we have embedHtml or a valid preview type
+    if (!previewType || previewType === 'none') {
+      return null;
+    }
+
     if (embedHtml) {
       return (
         <Box
@@ -78,30 +84,7 @@ const MemoryCard = ({ memory }) => {
       );
     }
 
-    return (
-      <Box
-        sx={{
-          height: 0,
-          paddingTop: '56.25%',
-          bgcolor: 'background.default',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-        }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          {getMediaIcon()}
-        </Box>
-      </Box>
-    );
+    return null;
   };
 
   return (
@@ -149,12 +132,12 @@ const MemoryCard = ({ memory }) => {
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 lineHeight: 1.2,
-                minHeight: '2.4em',
+                mb: 1
               }}
             >
               {title || 'Untitled Memory'}
             </Typography>
-
+            
             {description && (
               <Typography
                 variant="body2"
@@ -171,27 +154,15 @@ const MemoryCard = ({ memory }) => {
               </Typography>
             )}
 
-            <Box
-              sx={{
-                mt: 'auto',
-                pt: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              {authorName && (
+            {(authorName || publishedTime) && (
+              <Box sx={{ mt: 'auto', pt: 1 }}>
                 <Typography variant="caption" color="text.secondary">
-                  By {authorName}
+                  {authorName && `By ${authorName}`}
+                  {authorName && publishedTime && ' · '}
+                  {publishedTime && new Date(publishedTime).toLocaleDateString()}
                 </Typography>
-              )}
-              
-              {publishedTime && (
-                <Typography variant="caption" color="text.secondary">
-                  {new Date(publishedTime).toLocaleDateString()}
-                </Typography>
-              )}
-            </Box>
+              </Box>
+            )}
           </Stack>
         </CardContent>
       </CardActionArea>
