@@ -11,6 +11,7 @@ import {
   Link,
   Collapse,
   Button,
+  Stack
 } from '@mui/material';
 import {
   Link as LinkIcon,
@@ -38,6 +39,7 @@ interface Memory {
     siteName?: string;
     image?: string;
     playbackHtml?: string;
+    favicon?: string;
     [key: string]: any;
   };
   tags: string[];
@@ -156,15 +158,28 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         </Box>
 
         {url && type === 'url' && (
-          <Link
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            color="primary"
-            sx={{ display: 'block', mb: 1 }}
-          >
-            {metadata?.siteName || url}
-          </Link>
+          <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+            {metadata?.favicon && (
+              <Box
+                component="img"
+                src={`/.netlify/functions/get-favicon?url=${encodeURIComponent(url)}`}
+                alt={metadata?.siteName || 'Website favicon'}
+                sx={{ width: 16, height: 16, objectFit: 'contain' }}
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            )}
+            <Link
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              color="primary"
+              underline="hover"
+            >
+              {metadata?.siteName || new URL(url).hostname}
+            </Link>
+          </Stack>
         )}
 
         <Typography variant="h6" component="div" gutterBottom noWrap>
