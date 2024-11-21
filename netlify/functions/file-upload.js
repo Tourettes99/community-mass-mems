@@ -1,42 +1,8 @@
 const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 const { extractUrlMetadata, extractFileMetadata } = require('./utils/metadata');
-const { MongoClient } = require('mongodb');
+const { connectToDatabase } = require('./mongodb');
 const logger = require('./utils/logger');
-
-const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
-const DB_NAME = 'memories';
-const COLLECTION_NAME = 'memories';
-
-let cachedDb = null;
-let cachedClient = null;
-
-async function connectToDatabase() {
-  if (cachedDb && cachedClient) {
-    logger.debug('Using cached database connection');
-    return { db: cachedDb, client: cachedClient };
-  }
-
-  try {
-    logger.info('Connecting to MongoDB...', { uri: MONGODB_URI.replace(/\/\/.*@/, '//***:***@') });
-    const client = await MongoClient.connect(MONGODB_URI);
-
-    const db = client.db(DB_NAME);
-    cachedDb = db;
-    cachedClient = client;
-    logger.info('MongoDB connected successfully', { 
-      database: DB_NAME,
-      collection: COLLECTION_NAME 
-    });
-    return { db, client };
-  } catch (error) {
-    logger.error('MongoDB connection error', error, {
-      database: DB_NAME,
-      collection: COLLECTION_NAME
-    });
-    throw error;
-  }
-}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -182,9 +148,9 @@ exports.handler = async (event, context) => {
     }
 
     logger.info('Connecting to database...');
-    const { db } = await connectToDatabase();
-    const memories = db.collection(COLLECTION_NAME);
-    logger.debug(`Using collection: ${COLLECTION_NAME}`);
+    const db = await connectToDatabase();
+    const memories = db.collection('memories');
+    logger.debug(`Using collection: memories`);
 
     const memory = {
       type,

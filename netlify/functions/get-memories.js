@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { connectToDatabase } = require('./mongodb');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -86,57 +87,76 @@ try {
   Memory = mongoose.model('Memory', memorySchema);
 }
 
-exports.handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json'
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS'
+};
 
+exports.handler = async (event, context) => {
+  // Handle preflight request
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers, body: '' };
+    return {
+      statusCode: 204,
+      headers: corsHeaders,
+      body: ''
+    };
   }
 
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
-      headers,
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
 
   try {
-    console.log('Connecting to MongoDB...');
-    if (!mongoose.connection.readyState) {
-      await mongoose.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        dbName: DB_NAME
-      });
-    }
-    console.log('Connected to MongoDB successfully');
+    const db = await connectToDatabase();
+    const memories = db.collection('memories');
 
-    // Fetch memories, sorted by creation date (newest first)
-    const memories = await Memory.find({})
+    // Parse query parameters
+    const { tags, type, limit = 20, skip = 0 } = event.queryStringParameters || {};
+
+    // Build query
+    const query = {};
+    if (tags) {
+      query.tags = { $in: tags.split(',') };
+    }
+    if (type) {
+      query.type = type;
+    }
+
+    // Get total count for pagination
+    const total = await memories.countDocuments(query);
+
+    // Fetch memories with pagination
+    const items = await memories
+      .find(query)
       .sort({ createdAt: -1 })
-      .limit(50) // Limit to 50 memories per page for now
-      .lean(); // Convert to plain JavaScript objects
+      .skip(parseInt(skip))
+      .limit(parseInt(limit))
+      .toArray();
 
     return {
       statusCode: 200,
-      headers,
-      body: JSON.stringify(memories)
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        items,
+        total,
+        limit: parseInt(limit),
+        skip: parseInt(skip)
+      })
     };
   } catch (error) {
     console.error('Error fetching memories:', error);
-    
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: 'Internal server error',
-        message: error.message
-      })
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Internal server error' })
     };
   }
 };
