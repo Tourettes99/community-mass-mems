@@ -58,14 +58,9 @@ function App() {
     }
   }, []);
 
-  // Initial fetch and set up polling
+  // Initial fetch only
   useEffect(() => {
     fetchMemories();
-
-    // Poll for updates every 5 seconds
-    const intervalId = setInterval(fetchMemories, 5000);
-
-    return () => clearInterval(intervalId);
   }, [fetchMemories]);
 
   useEffect(() => {
@@ -83,7 +78,7 @@ function App() {
     setMemories(prev => [newMemory, ...prev]);
     
     // Show notification
-    setNotification('Memory added successfully! Refreshing...');
+    setNotification('Memory added successfully!');
     
     // Fetch latest memories to ensure consistency
     await fetchMemories();
