@@ -99,34 +99,25 @@ export const getMemory = async (id) => {
 
 export const uploadMemory = async (formData) => {
   console.log('%c📤 Uploading Memory', 'font-size: 14px; font-weight: bold; color: #9C27B0');
+  console.log('FormData contents:', Object.fromEntries(formData.entries())); // Debug log
+  
   try {
+    // Always use multipart/form-data for consistency
     const config = {
       headers: {
-        'Content-Type': formData.get('type') === 'text' ? 'application/json' : 'multipart/form-data',
+        'Content-Type': 'multipart/form-data',
       },
     };
 
-    let response;
-    if (formData.get('type') === 'text') {
-      // For text memories, convert FormData to JSON
-      const data = {
-        type: 'text',
-        title: formData.get('title'),
-        description: formData.get('description'),
-        text: formData.get('content')
-      };
-      response = await api.post(endpoints.memories, data, config);
-    } else {
-      // For file uploads, use multipart/form-data
-      response = await api.post(endpoints.memories, formData, config);
-    }
+    console.log('Sending memory with type:', formData.get('type')); // Debug log
+    const response = await api.post(endpoints.memories, formData, config);
 
     console.log('%c✅ Memory Uploaded', 'font-size: 14px; font-weight: bold; color: #4CAF50');
     console.log('Response:', response.data);
     return response.data;
   } catch (error) {
     console.error('%c❌ Memory Upload Failed', 'font-size: 14px; font-weight: bold; color: #f44336');
-    console.error('Error:', error);
+    console.error('Error details:', error.response?.data || error);
     throw error;
   }
 };

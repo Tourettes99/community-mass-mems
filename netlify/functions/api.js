@@ -330,7 +330,10 @@ router.post('/memories', async (req, res) => {
   try {
     await uploadMiddleware(req, res);
     
-    console.log('Request body:', req.body); // Debug log
+    console.log('📦 Memory Upload Request');
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    console.log('File:', req.file);
     
     if (!req.body.type) {
       throw new Error('Memory type is required');
@@ -341,18 +344,19 @@ router.post('/memories', async (req, res) => {
 
     switch (type) {
       case MEMORY_TYPES.TEXT:
-        if (!req.body.content) {
+        console.log('Processing TEXT memory');
+        content = req.body.content;
+        if (!content) {
           throw new Error('Content is required for text memories');
         }
-        content = req.body.content;
         break;
       
       case MEMORY_TYPES.URL:
-        const urlContent = req.body.url || req.body.content;
-        if (!urlContent) {
+        console.log('Processing URL memory');
+        content = req.body.content;
+        if (!content) {
           throw new Error('URL is required for URL memories');
         }
-        content = urlContent;
         try {
           metadata = await getUrlMetadata(content);
         } catch (error) {
@@ -364,6 +368,7 @@ router.post('/memories', async (req, res) => {
       case MEMORY_TYPES.IMAGE:
       case MEMORY_TYPES.GIF:
       case MEMORY_TYPES.AUDIO:
+        console.log(`Processing ${type.toUpperCase()} memory`);
         if (!req.file) {
           throw new Error(`File is required for ${type} memories`);
         }
@@ -381,12 +386,29 @@ router.post('/memories', async (req, res) => {
         } catch (error) {
           console.error('Error getting file metadata:', error);
           // Continue even if metadata extraction fails
+          metadata = {
+            fileName: req.file.originalname,
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype
+          };
         }
         break;
       
       default:
         throw new Error(`Invalid memory type: ${type}`);
     }
+
+    if (!content) {
+      throw new Error('Content is required');
+    }
+
+    console.log('Creating memory with:', {
+      type,
+      title: title || '[empty]',
+      description: description || '[empty]',
+      hasContent: !!content,
+      metadata: Object.keys(metadata)
+    });
 
     const memory = new Memory({
       title,
@@ -397,6 +419,8 @@ router.post('/memories', async (req, res) => {
     });
 
     await memory.save();
+    
+    console.log('Memory saved successfully');
     
     res.status(201).json({
       status: 'success',
@@ -417,7 +441,8 @@ router.post('/memories', async (req, res) => {
     res.status(400).json({
       status: 'error',
       timestamp: new Date().toISOString(),
-      message: error.message || 'Failed to create memory'
+      message: error.message || 'Failed to create memory',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
