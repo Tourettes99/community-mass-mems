@@ -10,8 +10,15 @@ import PatreonBar from './components/PatreonBar';
 import { Memory } from './types';
 
 function App() {
-  // Initialize state with empty array
-  const [memories, setMemories] = useState<Memory[]>([]);
+  // Initialize state with persisted data or empty array
+  const [memories, setMemories] = useState<Memory[]>(() => {
+    try {
+      const savedMemories = localStorage.getItem('memories');
+      return savedMemories ? JSON.parse(savedMemories) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -32,11 +39,16 @@ function App() {
       const response = await fetch('/.netlify/functions/get-memories');
       if (!response.ok) throw new Error('Failed to fetch memories');
       const data = await response.json();
-      setMemories(Array.isArray(data) ? data : []);
+      const newMemories = Array.isArray(data) ? data : [];
+      setMemories(newMemories);
+      // Persist to localStorage
+      localStorage.setItem('memories', JSON.stringify(newMemories));
     } catch (error) {
       console.error('Error fetching memories:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch memories');
       setMemories([]);
+      // Clear localStorage on error
+      localStorage.removeItem('memories');
     } finally {
       setLoading(false);
     }
@@ -45,6 +57,15 @@ function App() {
   useEffect(() => {
     fetchMemories();
   }, []);
+
+  // Persist memories whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('memories', JSON.stringify(memories));
+    } catch (error) {
+      console.error('Failed to save memories:', error);
+    }
+  }, [memories]);
 
   useEffect(() => {
     if (!showIntro) {
@@ -57,7 +78,16 @@ function App() {
   }, [showIntro]);
 
   const handleMemoryCreated = (newMemory: Memory) => {
-    setMemories(prev => Array.isArray(prev) ? [newMemory, ...prev] : [newMemory]);
+    setMemories(prev => {
+      const newMemories = Array.isArray(prev) ? [newMemory, ...prev] : [newMemory];
+      // Persist immediately on memory creation
+      try {
+        localStorage.setItem('memories', JSON.stringify(newMemories));
+      } catch (error) {
+        console.error('Failed to save new memory:', error);
+      }
+      return newMemories;
+    });
   };
 
   const handleRefresh = () => {
