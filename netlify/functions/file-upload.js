@@ -9,10 +9,7 @@ const domino = require('domino');
 const fetch = require('node-fetch');
 const sizeOf = require('image-size');
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error('MONGODB_URI environment variable is required');
-}
+const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 
 let cachedDb = null;
 let cachedClient = null;
@@ -27,13 +24,14 @@ async function connectToDatabase() {
     const client = await MongoClient.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000
+      serverSelectionTimeoutMS: 10000,
+      maxPoolSize: 10
     });
 
-    const db = client.db('community-memories');
+    const db = client.db('memories');
     cachedDb = db;
     cachedClient = client;
-    console.log('MongoDB connected successfully');
+    console.log('MongoDB connected successfully to memories database');
     return { db, client };
   } catch (error) {
     console.error('MongoDB connection error:', error);
