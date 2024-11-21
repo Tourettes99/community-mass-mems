@@ -177,7 +177,7 @@ const UploadBar: React.FC = () => {
             Submit URL
           </Button>
         </Box>
-      </Paper>
+      </Box>
     </Paper>
   );
 };
