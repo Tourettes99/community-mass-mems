@@ -28,26 +28,7 @@ import {
   ThumbDown
 } from '@mui/icons-material';
 import EmbedPlayer from './EmbedPlayer';
-
-interface Memory {
-  _id: string;
-  type: string;
-  url?: string;
-  content?: string;
-  metadata?: {
-    title?: string;
-    description?: string;
-    mediaType?: string;
-    siteName?: string;
-    image?: string;
-    playbackHtml?: string;
-    favicon?: string;
-    [key: string]: any;
-  };
-  tags: string[];
-  createdAt: string;
-  votes?: number;
-}
+import { Memory } from '../types';
 
 interface MemoryCardProps {
   memory: Memory;
@@ -133,7 +114,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
   const [votes, setVotes] = useState(memory.votes || 0);
   const [userVote, setUserVote] = useState<1 | -1 | 0>(0);
   const [isVoting, setIsVoting] = useState(false);
-  const { type, metadata, tags, createdAt, url, content } = memory;
+  const { type, metadata, tags = [], createdAt, url, content } = memory;
 
   const handleExpandClick = () => {
     setExpanded(!expanded);
@@ -240,17 +221,19 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
           </Typography>
         )}
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-          {tags.map((tag, index) => (
-            <Chip
-              key={index}
-              label={tag}
-              size="small"
-              variant="outlined"
-              color="primary"
-            />
-          ))}
-        </Box>
+        {tags.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+            {tags.map((tag, index) => (
+              <Chip
+                key={index}
+                label={tag}
+                size="small"
+                variant="outlined"
+                color="primary"
+              />
+            ))}
+          </Box>
+        )}
       </CardContent>
 
       <CardActions disableSpacing>
