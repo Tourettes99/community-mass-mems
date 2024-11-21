@@ -320,18 +320,60 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
       twitterImage: result.twitter_card?.image?.url
     });
 
+    // Extract dimensions from various sources
+    const dimensions = {
+      width: result.open_graph?.video?.width || 
+             result.twitter_card?.player?.width ||
+             result.open_graph?.image?.width ||
+             result.twitter_card?.image?.width,
+      height: result.open_graph?.video?.height || 
+              result.twitter_card?.player?.height ||
+              result.open_graph?.image?.height ||
+              result.twitter_card?.image?.height
+    };
+
+    // Extract size information if available
+    const size = {
+      original: result.open_graph?.video?.size || 
+                result.twitter_card?.player?.size ||
+                result.open_graph?.image?.size ||
+                result.twitter_card?.image?.size,
+      compressed: null // Will be set after processing if applicable
+    };
+
     // Determine content type from metadata or user input
     let contentType = userMetadata.type || result.open_graph?.type || 'website';
     if (result.open_graph?.video) contentType = 'video';
     else if (result.open_graph?.audio) contentType = 'audio';
     else if (result.twitter_card?.card === 'player') contentType = 'media';
 
+    // Extract the most relevant title
+    const title = userMetadata.title || 
+                 result.open_graph?.title || 
+                 result.twitter_card?.title ||
+                 result.title ||
+                 new URL(url).pathname.split('/').pop() || 'Untitled';
+
+    // Extract the most relevant description
+    const description = userMetadata.description || 
+                       result.open_graph?.description || 
+                       result.twitter_card?.description ||
+                       result.description || '';
+
+    // Extract the site name
+    const siteName = userMetadata.siteName || 
+                    result.site_name || 
+                    result.open_graph?.site_name || 
+                    new URL(url).hostname;
+
     return {
       // Basic metadata - prioritize user input
-      title: userMetadata.title || result.title || result.open_graph?.title || result.twitter_card?.title,
-      description: userMetadata.description || result.description || result.open_graph?.description || result.twitter_card?.description,
-      siteName: userMetadata.siteName || result.site_name || result.open_graph?.site_name || new URL(url).hostname,
-      contentType: userMetadata.type || contentType,
+      title,
+      description,
+      siteName,
+      contentType,
+      dimensions,
+      size,
       
       // User-provided content takes precedence
       content: userMetadata.content,
@@ -372,11 +414,6 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
       // Structured data
       structuredData: result.json_ld || [],
       
-      // Additional media metadata
-      duration: result.open_graph?.video?.duration || result.twitter_card?.player?.duration,
-      width: result.open_graph?.video?.width || result.twitter_card?.player?.width,
-      height: result.open_graph?.video?.height || result.twitter_card?.player?.height,
-      
       // Raw metadata for debugging
       raw: {
         openGraph: result.open_graph,
@@ -387,10 +424,12 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
     };
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
-    // Return user metadata even if URL fetch fails
+    // Return basic metadata even if URL fetch fails
     return {
-      ...userMetadata,
+      title: userMetadata.title || new URL(url).pathname.split('/').pop() || 'Untitled',
+      description: userMetadata.description || '',
       siteName: userMetadata.siteName || new URL(url).hostname,
+      contentType: userMetadata.type || 'website',
       error: 'Failed to fetch URL metadata'
     };
   }
@@ -503,13 +542,56 @@ exports.handler = async (event, context) => {
     // Get media info including preview and playback HTML
     const mediaInfo = await getMediaInfo(url, urlMetadata);
     
+    // Prepare metadata with proper structure
+    const metadata = {
+      // Basic metadata
+      title: urlMetadata.title,
+      description: urlMetadata.description,
+      siteName: urlMetadata.siteName,
+      author: urlMetadata.author,
+      publishedDate: urlMetadata.publishedDate,
+      modifiedDate: urlMetadata.modifiedDate,
+      language: urlMetadata.language,
+
+      // Media metadata
+      contentType: urlMetadata.contentType,
+      size: urlMetadata.size,
+      dimensions: urlMetadata.dimensions,
+
+      // Open Graph metadata
+      ogTitle: urlMetadata.ogTitle,
+      ogDescription: urlMetadata.ogDescription,
+      ogImage: urlMetadata.ogImage,
+      ogType: urlMetadata.ogType,
+      ogUrl: urlMetadata.ogUrl,
+      ogAudio: urlMetadata.ogAudio,
+      ogVideo: urlMetadata.ogVideo,
+
+      // Twitter Card metadata
+      twitterCard: urlMetadata.twitterCard,
+      twitterTitle: urlMetadata.twitterTitle,
+      twitterDescription: urlMetadata.twitterDescription,
+      twitterImage: urlMetadata.twitterImage,
+      twitterCreator: urlMetadata.twitterCreator,
+      twitterPlayer: urlMetadata.twitterPlayer,
+
+      // Media and preview information
+      mediaType: mediaInfo.mediaType,
+      previewType: mediaInfo.previewType,
+      previewUrl: mediaInfo.previewUrl,
+      playbackHtml: mediaInfo.playbackHtml,
+      isPlayable: mediaInfo.isPlayable,
+
+      // Additional metadata
+      favicon: urlMetadata.favicon,
+      structuredData: urlMetadata.structuredData,
+      raw: urlMetadata.raw
+    };
+
     const memoryData = {
       type: type || mediaInfo.mediaType || 'url',
       url: url,
-      metadata: {
-        ...urlMetadata,
-        ...mediaInfo
-      }
+      metadata
     };
 
     console.log('Creating new URL memory:', JSON.stringify(memoryData, null, 2));
