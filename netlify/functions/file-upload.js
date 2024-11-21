@@ -130,22 +130,40 @@ exports.handler = async (event, context) => {
 
     const { type, url, content, tags, file, fileName, contentType } = data;
 
-    if (!type || (!url && !content && !file)) {
-      logger.warn('Missing required fields', { type, hasUrl: !!url, hasContent: !!content, hasFile: !!file });
+    if (!type) {
+      logger.warn('Missing type field');
       return {
         statusCode: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing required fields' })
+        body: JSON.stringify({ error: 'Type field is required' })
       };
     }
 
-    // Additional validation for URL type
-    if (type === 'url' && (!url || !url.trim())) {
-      logger.warn('Invalid URL provided', { url });
+    // Validate based on type
+    if (type === 'url') {
+      if (!url || !url.trim()) {
+        logger.warn('Invalid URL provided', { url });
+        return {
+          statusCode: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Invalid URL provided' })
+        };
+      }
+    } else if (type === 'text') {
+      if (!content) {
+        logger.warn('Missing content for text type');
+        return {
+          statusCode: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Content is required for text type' })
+        };
+      }
+    } else if (!file) {
+      logger.warn('Missing file for non-text/url type');
       return {
         statusCode: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Invalid URL provided' })
+        body: JSON.stringify({ error: 'File is required for this type' })
       };
     }
 
