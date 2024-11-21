@@ -2,10 +2,11 @@
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  width: 100%;
-  height: fit-content;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  height: 100%;
 }
 
 .memory-card:hover {
@@ -13,14 +14,17 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* Header */
+.memory-header {
+  padding: 16px 16px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
 .memory-title {
+  margin: 0 0 4px;
   font-size: 1.25rem;
-  margin: 0 0 16px 0;
+  line-height: 1.4;
   color: #1a1a1a;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .memory-title a {
@@ -29,183 +33,173 @@
 }
 
 .memory-title a:hover {
-  text-decoration: underline;
+  color: #0066cc;
+}
+
+.memory-site {
+  display: block;
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* Content */
+.memory-content {
+  flex: 1;
+  min-height: 0;
 }
 
 .memory-text-content {
-  font-size: 1.1rem;
+  padding: 16px;
+  font-size: 1rem;
   line-height: 1.6;
   color: #333;
-  margin: 16px 0;
+}
+
+.memory-text-content p {
+  margin: 0;
   white-space: pre-wrap;
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .memory-embed {
-  margin: 16px -20px;
   position: relative;
-  width: calc(100% + 40px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  width: 100%;
+  min-height: 200px;
 }
 
 .memory-embed iframe {
-  max-width: 100%;
-  border: none;
-}
-
-/* YouTube and Vimeo embeds */
-.memory-type-video .memory-embed {
-  aspect-ratio: 16/9;
-  margin-top: 0;
-}
-
-.memory-type-video .memory-embed iframe {
-  width: 100%;
-  height: 100%;
-}
-
-/* Spotify embeds */
-.memory-type-audio .memory-embed {
-  min-height: 80px;
-  margin: 16px 0;
-  width: 100%;
-}
-
-.memory-type-audio .memory-embed iframe {
-  width: 100%;
-  min-height: 80px;
-}
-
-/* Instagram embeds */
-.instagram-media {
-  margin: 0 auto !important;
-  min-width: unset !important;
   width: 100% !important;
-  background-color: white !important;
-}
-
-/* Twitter embeds */
-.twitter-tweet {
-  margin: 0 auto !important;
+  margin: 0 !important;
 }
 
 .memory-preview {
-  margin: 16px -20px;
-  overflow: hidden;
   position: relative;
-  width: calc(100% + 40px);
-}
-
-.memory-preview a {
-  display: block;
   width: 100%;
+  padding-top: 56.25%; /* 16:9 aspect ratio */
+  overflow: hidden;
 }
 
-.preview-image {
+.memory-preview img {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: auto;
-  display: block;
-  transition: transform 0.2s ease;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
 }
 
-.preview-image:hover {
-  transform: scale(1.02);
+.memory-preview:hover img {
+  transform: scale(1.05);
 }
 
 .memory-link {
-  margin: 16px 0;
+  padding: 16px;
+  font-size: 1rem;
 }
 
 .memory-link a {
   color: #0066cc;
   text-decoration: none;
-  font-weight: 500;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  word-break: break-word;
 }
 
 .memory-link a:hover {
   text-decoration: underline;
 }
 
+/* Description */
+.memory-description-container {
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
 .memory-description {
-  font-size: 0.95rem;
-  color: #666;
-  margin: 12px 0;
+  margin: 0;
+  font-size: 0.9375rem;
   line-height: 1.5;
+  color: #4a4a4a;
+  overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
-.memory-metadata {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0;
-  font-size: 0.85rem;
+/* Footer */
+.memory-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 0.875rem;
   color: #666;
 }
 
-.memory-site,
+.memory-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
 .memory-author,
 .memory-date {
-  display: inline-flex;
-  align-items: center;
-  background: #f5f5f5;
-  padding: 4px 8px;
-  border-radius: 4px;
+  color: #666;
 }
 
 .memory-tags {
   display: flex;
+  gap: 8px;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
 }
 
 .memory-tag {
-  background: #f0f0f0;
+  background: #f5f5f5;
+  color: #666;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 0.85rem;
-  color: #666;
+  font-size: 0.8125rem;
 }
 
-/* Memory type specific styles */
-.memory-type-text {
-  background: #f8f9fa;
+/* Media Types */
+.memory-type-image .memory-embed,
+.memory-type-video .memory-embed {
+  padding-top: 56.25%; /* 16:9 aspect ratio */
 }
 
-/* Responsive adjustments */
+.memory-type-image .memory-embed img,
+.memory-type-video .memory-embed video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.memory-type-audio .memory-embed {
+  min-height: 166px;
+}
+
+/* Responsive Design */
 @media (max-width: 640px) {
-  .memory-card {
-    padding: 16px;
-  }
-
   .memory-title {
-    font-size: 1.15rem;
+    font-size: 1.125rem;
   }
 
-  .memory-text-content {
-    font-size: 1rem;
+  .memory-header,
+  .memory-text-content,
+  .memory-link,
+  .memory-description-container,
+  .memory-footer {
+    padding: 12px;
   }
 
-  .memory-embed,
-  .memory-preview {
-    margin: 16px -16px;
-    width: calc(100% + 32px);
+  .memory-embed {
+    min-height: 160px;
   }
+}
 
-  .memory-embed iframe {
-    width: 100% !important;
-  }
+/* Platform-specific styles */
+.twitter-tweet,
+.instagram-media {
+  margin: 0 auto !important;
 }
