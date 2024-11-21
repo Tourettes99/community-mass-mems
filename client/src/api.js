@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? '/api'  // This will be proxied to the backend in production
+  ? '/.netlify/functions/api'  // Use Netlify Functions path in production
   : 'http://localhost:5000/api';
 
 // Create axios instance with base URL

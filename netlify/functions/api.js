@@ -481,8 +481,7 @@ router.get('/test', async (req, res) => {
 });
 
 // Mount routes
-app.use('/.netlify/functions/api', router);
-app.use('/api', router);
+app.use('/', router);
 
 // Export handler
 module.exports.handler = serverless(app);
