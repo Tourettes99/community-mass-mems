@@ -65,83 +65,115 @@ const mongooseOptions = {
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
   family: 4,
-  maxPoolSize: 10,
   keepAlive: true,
   keepAliveInitialDelay: 300000,
-  autoIndex: true,
-  authSource: 'admin'
+  retryWrites: true,
+  w: 'majority',
+  maxPoolSize: 10,
+  minPoolSize: 1
 };
 
-// Connect to MongoDB with retry logic
+// Connection state tracking
 let isConnecting = false;
-const connectWithRetry = async (retries = 5, delay = 5000) => {
-  if (isConnecting) {
-    console.log('Already attempting to connect to MongoDB...');
+let connectionAttempts = 0;
+const MAX_RETRIES = 5;
+
+async function connectWithRetry(retries = MAX_RETRIES) {
+  if (mongoose.connection.readyState === 1) {
+    console.log('MongoDB is already connected');
     return;
   }
 
-  isConnecting = true;
+  if (isConnecting) {
+    console.log('Connection attempt already in progress...');
+    return;
+  }
 
-  for (let i = 0; i < retries; i++) {
-    try {
-      console.log(`MongoDB connection attempt ${i + 1} of ${retries}`);
-      console.log('Connecting to:', MONGODB_URI.replace(/:([^:@]{8})[^:@]*@/, ':***@'));
-      
-      if (mongoose.connection.readyState === 1) {
-        console.log('Already connected to MongoDB');
-        isConnecting = false;
-        return;
-      }
+  try {
+    isConnecting = true;
+    connectionAttempts++;
+    
+    console.log(`MongoDB Connection Attempt ${connectionAttempts}/${MAX_RETRIES}`);
+    console.log('MongoDB URI format check:', MONGODB_URI.startsWith('mongodb+srv://'));
+    
+    const conn = await mongoose.connect(MONGODB_URI, mongooseOptions);
+    
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    console.log('Connection State:', mongoose.connection.readyState);
+    console.log('Database Name:', conn.connection.name);
+    
+    // Reset connection tracking on successful connection
+    isConnecting = false;
+    connectionAttempts = 0;
 
-      await mongoose.connect(MONGODB_URI, mongooseOptions);
-      console.log('Successfully connected to MongoDB Atlas');
-      isConnecting = false;
-      return;
-    } catch (err) {
-      console.error('MongoDB connection error:', {
-        attempt: i + 1,
-        name: err.name,
-        message: err.message,
-        code: err.code
-      });
-      
-      if (i === retries - 1) {
-        isConnecting = false;
-        throw err;
+    // Set up connection event handlers
+    mongoose.connection.on('connected', () => {
+      console.log('MongoDB connected event fired');
+    });
+
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.log('MongoDB disconnected event fired');
+      if (connectionAttempts < MAX_RETRIES) {
+        console.log('Attempting to reconnect...');
+        setTimeout(() => connectWithRetry(MAX_RETRIES), 5000);
       }
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
+    });
+
+  } catch (error) {
+    isConnecting = false;
+    console.error('MongoDB connection error:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+
+    if (retries > 0) {
+      console.log(`Retrying connection in 5 seconds... (${retries} attempts remaining)`);
+      setTimeout(() => connectWithRetry(retries - 1), 5000);
+    } else {
+      console.error('Max retries reached. Could not connect to MongoDB');
     }
   }
-};
+}
 
 // Initial connection
 connectWithRetry().catch(err => {
   console.error('Failed to connect to MongoDB after retries:', err);
 });
 
-// Add connection monitoring
-mongoose.connection.on('error', err => {
-  console.error('MongoDB connection error:', err);
-  if (!isConnecting) {
-    setTimeout(() => connectWithRetry(), 5000);
+// Middleware to check MongoDB connection
+async function checkMongoConnection(req, res, next) {
+  const state = mongoose.connection.readyState;
+  const stateText = ['disconnected', 'connected', 'connecting', 'disconnecting'][state];
+  
+  console.log(`MongoDB Connection State: ${stateText} (${state})`);
+  
+  if (state === 0) {
+    // If disconnected, try to reconnect
+    try {
+      await connectWithRetry();
+    } catch (error) {
+      console.error('Failed to reconnect:', error);
+    }
   }
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected, attempting to reconnect...');
-  if (!isConnecting) {
-    setTimeout(() => connectWithRetry(), 5000);
+  
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      error: 'Database connection unavailable',
+      state: mongoose.connection.readyState,
+      stateText,
+      attempts: connectionAttempts
+    });
   }
-});
-
-mongoose.connection.on('connected', () => {
-  console.log('MongoDB connected successfully');
-});
-
-mongoose.connection.on('connecting', () => {
-  console.log('Connecting to MongoDB...');
-});
+  
+  next();
+}
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
@@ -160,35 +192,6 @@ const memorySchema = new mongoose.Schema({
 });
 
 const Memory = mongoose.model('Memory', memorySchema);
-
-// Middleware to check MongoDB connection
-const checkMongoConnection = async (req, res, next) => {
-  console.log('Checking MongoDB connection state:', mongoose.connection.readyState);
-  
-  if (mongoose.connection.readyState === 0) {
-    try {
-      console.log('MongoDB disconnected, attempting to reconnect...');
-      await connectWithRetry(3, 2000);
-    } catch (error) {
-      console.error('Failed to reconnect to MongoDB:', error);
-      return res.status(503).json({
-        error: 'Database connection unavailable',
-        details: error.message,
-        state: mongoose.connection.readyState
-      });
-    }
-  }
-  
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      error: 'Database connection unavailable',
-      state: mongoose.connection.readyState,
-      stateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState]
-    });
-  }
-  
-  next();
-};
 
 // Routes
 router.use(checkMongoConnection);
@@ -289,32 +292,52 @@ router.get('/memories/:id/file', async (req, res) => {
   }
 });
 
-// Test route with detailed status
+// Test endpoint
 router.get('/test', async (req, res) => {
-  console.log('Test route called');
-  console.log('Current MongoDB state:', mongoose.connection.readyState);
+  const state = mongoose.connection.readyState;
+  const stateText = ['disconnected', 'connected', 'connecting', 'disconnecting'][state];
+  
+  console.log('Test endpoint called');
+  console.log('MongoDB URI present:', !!MONGODB_URI);
+  console.log('MongoDB URI format:', MONGODB_URI.startsWith('mongodb+srv://'));
+  console.log('Connection State:', state, `(${stateText})`);
+  console.log('Connection Attempts:', connectionAttempts);
   
   try {
-    if (mongoose.connection.readyState !== 1) {
-      console.log('MongoDB not connected, attempting to connect...');
-      await connectWithRetry(3, 2000);
+    if (state !== 1) {
+      await connectWithRetry();
     }
     
-    res.json({ 
-      message: 'API is working!',
-      mongoState: mongoose.connection.readyState,
-      mongoStateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
-      environment: process.env.NODE_ENV,
-      timestamp: new Date().toISOString(),
-      dbName: mongoose.connection.name,
-      dbHost: mongoose.connection.host
+    // Try to perform a simple database operation
+    const count = await Memory.estimatedDocumentCount();
+    
+    res.json({
+      status: 'success',
+      connection: {
+        state,
+        stateText,
+        attempts: connectionAttempts
+      },
+      database: {
+        name: mongoose.connection.name,
+        host: mongoose.connection.host,
+        memoryCount: count
+      }
     });
   } catch (error) {
-    console.error('Test route error:', error);
+    console.error('Test endpoint error:', error);
     res.status(500).json({
-      error: 'Failed to connect to database',
-      details: error.message,
-      state: mongoose.connection.readyState
+      status: 'error',
+      connection: {
+        state,
+        stateText,
+        attempts: connectionAttempts
+      },
+      error: {
+        message: error.message,
+        name: error.name,
+        code: error.code
+      }
     });
   }
 });
