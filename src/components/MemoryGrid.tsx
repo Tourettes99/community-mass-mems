@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { Memory } from '../types';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import EmbedPlayer from './EmbedPlayer';
 
 interface MemoryGridProps {
   memories: Memory[];
@@ -93,31 +94,112 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           </CardContent>
         );
       case 'url':
-      case 'image':
+        return (
+          <>
+            {memory.url && (
+              <Box sx={{ width: '100%' }}>
+                <EmbedPlayer
+                  type={memory.type}
+                  url={memory.url}
+                  title={memory.metadata?.title}
+                  metadata={memory.metadata}
+                />
+              </Box>
+            )}
+            <CardContent>
+              {memory.metadata?.description && (
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    display: expanded ? 'block' : '-webkit-box',
+                    WebkitLineClamp: expanded ? 'none' : 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word'
+                  }}
+                >
+                  {memory.metadata.description}
+                </Typography>
+              )}
+              {renderMetadataDetails(memory.metadata)}
+            </CardContent>
+          </>
+        );
       case 'video':
       case 'audio':
-      case 'static':
         return (
-          <CardContent>
-            {memory.metadata?.description && (
-              <Typography 
-                variant="body2" 
-                color="text.secondary"
-                sx={{
-                  display: expanded ? 'block' : '-webkit-box',
-                  WebkitLineClamp: expanded ? 'none' : 3,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  transition: 'all 0.3s ease',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word'
-                }}
-              >
-                {memory.metadata.description}
-              </Typography>
+          <>
+            {memory.url && (
+              <Box sx={{ width: '100%' }}>
+                <EmbedPlayer
+                  type={memory.type}
+                  url={memory.url}
+                  title={memory.metadata?.title}
+                  metadata={memory.metadata}
+                />
+              </Box>
             )}
-            {renderMetadataDetails(memory.metadata)}
-          </CardContent>
+            <CardContent>
+              {memory.metadata?.description && (
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    display: expanded ? 'block' : '-webkit-box',
+                    WebkitLineClamp: expanded ? 'none' : 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word'
+                  }}
+                >
+                  {memory.metadata.description}
+                </Typography>
+              )}
+              {renderMetadataDetails(memory.metadata)}
+            </CardContent>
+          </>
+        );
+      case 'image':
+        return (
+          <>
+            {memory.url && (
+              <CardMedia
+                component="img"
+                image={memory.url}
+                alt={memory.metadata?.title || 'Image'}
+                sx={{ 
+                  objectFit: 'contain',
+                  maxHeight: expanded ? 'none' : '200px',
+                  transition: 'max-height 0.3s ease'
+                }}
+              />
+            )}
+            <CardContent>
+              {memory.metadata?.description && (
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    display: expanded ? 'block' : '-webkit-box',
+                    WebkitLineClamp: expanded ? 'none' : 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word'
+                  }}
+                >
+                  {memory.metadata.description}
+                </Typography>
+              )}
+              {renderMetadataDetails(memory.metadata)}
+            </CardContent>
+          </>
         );
       default:
         return (
