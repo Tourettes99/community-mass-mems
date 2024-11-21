@@ -18,7 +18,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import UploadForm from './components/UploadForm';
 import MemoryGrid from './components/MemoryGrid';
-import { fetchMemories } from './api';
+import { getMemories } from './api';
 
 // RAL 2005 color (luminous orange)
 const theme = createTheme({
@@ -51,7 +51,7 @@ function App() {
 
   const loadMemories = async () => {
     try {
-      const data = await fetchMemories();
+      const data = await getMemories();
       setMemories(data);
     } catch (error) {
       console.error('Error loading memories:', error);
