@@ -24,7 +24,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
   const [isLoading, setIsLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string>('');
   const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurferRef = useRef<WaveSurfer>();
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
 
   const addDebugInfo = (info: string) => {
     const timestamp = new Date().toISOString();
@@ -65,11 +65,6 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
       addDebugInfo(`Content-Type: ${contentType}`);
       addDebugInfo(`Content-Length: ${contentLength} bytes`);
 
-      // Verify content type
-      if (!contentType?.includes('audio')) {
-        addDebugInfo(`Warning: Content-Type is not audio: ${contentType}`);
-      }
-
       // Try to get file metadata
       const blob = await response.blob();
       addDebugInfo(`File size: ${blob.size} bytes`);
@@ -98,7 +93,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
         // Create new instance
         addDebugInfo('Creating new WaveSurfer instance');
-        wavesurferRef.current = WaveSurfer.create({
+        const wavesurfer = WaveSurfer.create({
           container: waveformRef.current,
           waveColor: '#FF5F1F',
           progressColor: '#808080',
@@ -122,55 +117,63 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           }
         });
 
+        wavesurferRef.current = wavesurfer;
+
         // Configure audio path
         const fullPath = `/${audioPath}`;
         addDebugInfo(`Configured audio path: ${fullPath}`);
         addDebugInfo(`Full URL will be: ${window.location.origin}${fullPath}`);
 
         // Set up event handlers
-        wavesurferRef.current.on('error', () => {
+        wavesurfer.on('error', () => {
           addDebugInfo('WaveSurfer error occurred');
           setError('Failed to load audio file. Please try again.');
           setIsLoading(false);
         });
 
-        wavesurferRef.current.on('ready', () => {
+        wavesurfer.on('ready', () => {
           addDebugInfo('WaveSurfer ready - Audio loaded successfully');
-          const duration = wavesurferRef.current?.getDuration() || 0;
-          addDebugInfo(`Audio duration: ${duration} seconds`);
+          try {
+            const duration = wavesurfer.getDurationSeconds();
+            addDebugInfo(`Audio duration: ${duration} seconds`);
+          } catch (err) {
+            addDebugInfo('Could not get duration');
+          }
           setIsLoading(false);
           setError(null);
         });
 
-        wavesurferRef.current.on('loading', () => {
+        wavesurfer.on('loading', () => {
           addDebugInfo('Loading audio file...');
         });
 
-        wavesurferRef.current.on('finish', () => {
+        wavesurfer.on('finish', () => {
           addDebugInfo('Playback finished');
           setIsPlaying(false);
         });
 
-        wavesurferRef.current.on('play', () => {
+        // Add more event handlers for debugging
+        wavesurfer.on('play', () => {
           addDebugInfo('Playback started');
         });
 
-        wavesurferRef.current.on('pause', () => {
+        wavesurfer.on('pause', () => {
           addDebugInfo('Playback paused');
         });
 
-        wavesurferRef.current.on('decode', () => {
+        wavesurfer.on('decode', () => {
           addDebugInfo('Audio decoded successfully');
         });
 
         // Load the audio file
         addDebugInfo('Initiating audio file load');
-        wavesurferRef.current.load(fullPath);
+        wavesurfer.load(fullPath);
 
         return () => {
           if (wavesurferRef.current) {
             addDebugInfo('Cleanup: Destroying WaveSurfer instance');
             wavesurferRef.current.destroy();
+            wavesurferRef.current = null;
           }
         };
       } catch (err) {
@@ -182,16 +185,9 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
     }
   }, [open, audioPath]);
 
-  // Check audio file when dialog opens
-  useEffect(() => {
-    if (open) {
-      addDebugInfo('=== Starting Audio File Check ===');
-      checkAudioFile();
-    }
-  }, [open, audioPath]);
-
   const handlePlayPause = async () => {
-    if (!wavesurferRef.current) {
+    const wavesurfer = wavesurferRef.current;
+    if (!wavesurfer) {
       addDebugInfo('Error: WaveSurfer instance not found');
       return;
     }
@@ -200,18 +196,22 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
       addDebugInfo(`Attempting to ${isPlaying ? 'pause' : 'play'} audio`);
       
       if (isPlaying) {
-        wavesurferRef.current.pause();
+        wavesurfer.pause();
         addDebugInfo('Pause command sent');
       } else {
-        const duration = wavesurferRef.current.getDuration();
-        addDebugInfo(`Current duration: ${duration} seconds`);
-        
-        if (duration === 0) {
-          addDebugInfo('Warning: Audio duration is 0, attempting to reload');
-          await wavesurferRef.current.load(`/${audioPath}`);
+        try {
+          const duration = wavesurfer.getDurationSeconds();
+          addDebugInfo(`Current duration: ${duration} seconds`);
+          
+          if (duration === 0) {
+            addDebugInfo('Warning: Audio duration is 0, attempting to reload');
+            await wavesurfer.load(`/${audioPath}`);
+          }
+        } catch (err) {
+          addDebugInfo('Could not get duration, attempting to play anyway');
         }
         
-        await wavesurferRef.current.play();
+        await wavesurfer.play();
         addDebugInfo('Play command sent');
       }
       
@@ -222,7 +222,7 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
       addDebugInfo(`Error in playback control: ${errorMsg}`);
       try {
         addDebugInfo('Attempting to recover by reloading audio');
-        await wavesurferRef.current.load(`/${audioPath}`);
+        await wavesurfer.load(`/${audioPath}`);
       } catch (reloadErr) {
         addDebugInfo('Recovery attempt failed');
       }
