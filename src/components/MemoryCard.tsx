@@ -20,7 +20,6 @@ import {
   Share,
   Favorite,
 } from '@mui/icons-material';
-import { format } from 'date-fns';
 
 interface Memory {
   _id: string;
@@ -126,7 +125,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
           {getMemoryTypeIcon(type)}
           <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-            {format(new Date(createdAt), 'MMM d, yyyy')}
+            {new Date(createdAt).toLocaleDateString('en-US', { 
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            })}
           </Typography>
         </Box>
 
@@ -145,7 +148,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
             mb: 2
           }}
         >
-          {metadata?.description || content || 'No description available'}
+          {metadata?.description || memory.content || 'No description available'}
         </Typography>
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
