@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton, CardHeader, Avatar, Link, Stack, Chip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { Memory } from '../types';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import { Memory } from '../types';
 import EmbedPlayer from './EmbedPlayer';
 
 interface MemoryGridProps {
@@ -16,6 +16,7 @@ interface MemoryGridProps {
 
 const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   const [expanded, setExpanded] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
 
   const handleCardClick = (event: React.MouseEvent) => {
     if ((event.target as HTMLElement).closest('video, audio, iframe, a, button')) {
@@ -72,6 +73,52 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     ) : null;
   };
 
+  const renderMediaContent = () => {
+    if (!memory.url) return null;
+
+    const isImage = memory.type === 'image' || memory.metadata?.contentType?.startsWith('image/');
+    const isVideo = memory.type === 'video' || memory.metadata?.contentType?.startsWith('video/');
+    const isAudio = memory.type === 'audio' || memory.metadata?.contentType?.startsWith('audio/');
+
+    if (isImage && !mediaError) {
+      return (
+        <CardMedia
+          component="img"
+          image={memory.url}
+          alt={memory.metadata?.title || 'Memory image'}
+          onError={() => setMediaError(true)}
+          sx={{
+            height: 200,
+            objectFit: 'cover',
+          }}
+        />
+      );
+    }
+
+    if (isVideo || isAudio) {
+      return (
+        <EmbedPlayer
+          url={memory.url}
+          type={memory.type}
+          title={memory.metadata?.title}
+          metadata={memory.metadata}
+        />
+      );
+    }
+
+    // Fallback for other URL types or when media fails to load
+    return (
+      <Link
+        href={memory.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        sx={{ wordBreak: 'break-all' }}
+      >
+        {memory.metadata?.title || memory.url}
+      </Link>
+    );
+  };
+
   const renderCardContent = () => {
     switch (memory.type) {
       case 'text':
@@ -94,266 +141,124 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           </CardContent>
         );
       case 'url':
-        return (
-          <>
-            {memory.url && (
-              <Box sx={{ width: '100%' }}>
-                <EmbedPlayer
-                  type={memory.type}
-                  url={memory.url}
-                  title={memory.metadata?.title}
-                  metadata={memory.metadata}
-                />
-              </Box>
-            )}
-            <CardContent>
-              {memory.metadata?.description && (
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary"
-                  sx={{
-                    display: expanded ? 'block' : '-webkit-box',
-                    WebkitLineClamp: expanded ? 'none' : 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    transition: 'all 0.3s ease',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word'
-                  }}
-                >
-                  {memory.metadata.description}
-                </Typography>
-              )}
-              {renderMetadataDetails(memory.metadata)}
-            </CardContent>
-          </>
-        );
+      case 'image':
       case 'video':
       case 'audio':
-        return (
-          <>
-            {memory.url && (
-              <Box sx={{ width: '100%' }}>
-                <EmbedPlayer
-                  type={memory.type}
-                  url={memory.url}
-                  title={memory.metadata?.title}
-                  metadata={memory.metadata}
-                />
-              </Box>
-            )}
-            <CardContent>
-              {memory.metadata?.description && (
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary"
-                  sx={{
-                    display: expanded ? 'block' : '-webkit-box',
-                    WebkitLineClamp: expanded ? 'none' : 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    transition: 'all 0.3s ease',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word'
-                  }}
-                >
-                  {memory.metadata.description}
-                </Typography>
-              )}
-              {renderMetadataDetails(memory.metadata)}
-            </CardContent>
-          </>
-        );
-      case 'image':
-        return (
-          <>
-            {memory.url && (
-              <CardMedia
-                component="img"
-                image={memory.url}
-                alt={memory.metadata?.title || 'Image'}
-                sx={{ 
-                  objectFit: 'contain',
-                  maxHeight: expanded ? 'none' : '200px',
-                  transition: 'max-height 0.3s ease'
-                }}
-              />
-            )}
-            <CardContent>
-              {memory.metadata?.description && (
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary"
-                  sx={{
-                    display: expanded ? 'block' : '-webkit-box',
-                    WebkitLineClamp: expanded ? 'none' : 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    transition: 'all 0.3s ease',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word'
-                  }}
-                >
-                  {memory.metadata.description}
-                </Typography>
-              )}
-              {renderMetadataDetails(memory.metadata)}
-            </CardContent>
-          </>
-        );
-      default:
+      case 'static':
         return (
           <CardContent>
-            <Typography color="error">
-              Unsupported memory type: {memory.type}
-            </Typography>
-            <Typography variant="caption" component="pre" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
-              {JSON.stringify(memory, null, 2)}
-            </Typography>
+            {renderMediaContent()}
+            {memory.metadata?.description && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  mt: 1,
+                  display: expanded ? 'block' : '-webkit-box',
+                  WebkitLineClamp: expanded ? 'none' : 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}
+              >
+                {memory.metadata.description}
+              </Typography>
+            )}
+            {renderMetadataDetails(memory.metadata)}
           </CardContent>
         );
+      default:
+        return null;
     }
   };
 
   return (
-    <Card 
-      component={motion.div}
-      layout
+    <Card
       onClick={handleCardClick}
-      sx={{ 
+      sx={{
         cursor: 'pointer',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        position: 'relative',
         '&:hover': {
-          boxShadow: 6,
+          boxShadow: 3
         }
       }}
     >
       <CardHeader
         avatar={
-          <Avatar sx={{ bgcolor: '#FF4D06' }}>
-            {memory.type.charAt(0).toUpperCase()}
-          </Avatar>
+          memory.metadata?.favicon ? (
+            <Avatar src={memory.metadata.favicon} />
+          ) : (
+            <Avatar>{memory.type.charAt(0).toUpperCase()}</Avatar>
+          )
         }
-        title={memory.metadata?.title || 'Untitled Memory'}
-        subheader={formatDate(memory.createdAt)}
+        title={memory.metadata?.title || memory.type}
+        subheader={memory.metadata?.siteName}
       />
       {renderCardContent()}
-      <CardContent>
-        {memory.tags && memory.tags.length > 0 && (
-          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1, gap: 1 }}>
-            {memory.tags.map((tag, index) => (
+      {memory.tags && memory.tags.length > 0 && (
+        <Box sx={{ p: 2, pt: 0, mt: 'auto' }}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {memory.tags.map((tag) => (
               <Chip
-                key={index}
-                label={tag}
+                key={tag}
                 size="small"
+                label={tag}
                 icon={<LocalOfferIcon />}
-                sx={{
-                  bgcolor: 'rgba(255, 77, 6, 0.1)',
-                  color: '#FF4D06',
-                  '& .MuiChip-icon': {
-                    color: '#FF4D06'
-                  }
-                }}
+                sx={{ mt: 1 }}
               />
             ))}
           </Stack>
-        )}
-      </CardContent>
+        </Box>
+      )}
     </Card>
   );
 };
 
-const MemoryGrid: React.FC<MemoryGridProps> = ({ 
-  memories = [], 
-  loading = false, 
-  error = null, 
+const MemoryGrid: React.FC<MemoryGridProps> = ({
+  memories = [],
+  loading = false,
+  error = null,
   onRefresh,
-  isBackgroundRefresh = false 
+  isBackgroundRefresh = false
 }) => {
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
-
-  // Extract unique tags from memories
-  useEffect(() => {
-    const tags = new Set<string>();
-    memories.forEach(memory => {
-      memory.tags?.forEach(tag => tags.add(tag));
-    });
-    setAvailableTags(Array.from(tags));
-  }, [memories]);
-
-  // Filter memories based on selected tags
-  const filteredMemories = memories.filter(memory => {
-    if (selectedTags.length === 0) return true;
-    return memory.tags?.some(tag => selectedTags.includes(tag));
-  });
-
-  const handleTagClick = (tag: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tag) 
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
-  };
-
   return (
-    <Box sx={{ width: '100%' }}>
-      {availableTags.length > 0 && (
-        <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {availableTags.map((tag) => (
-            <Chip
-              key={tag}
-              label={tag}
-              icon={<LocalOfferIcon />}
-              onClick={() => handleTagClick(tag)}
-              color={selectedTags.includes(tag) ? 'primary' : 'default'}
-              sx={{
-                bgcolor: selectedTags.includes(tag) 
-                  ? '#FF4D06' 
-                  : 'rgba(255, 77, 6, 0.1)',
-                color: selectedTags.includes(tag) 
-                  ? 'white' 
-                  : '#FF4D06',
-                '& .MuiChip-icon': {
-                  color: selectedTags.includes(tag) 
-                    ? 'white' 
-                    : '#FF4D06'
-                }
-              }}
-            />
-          ))}
-        </Box>
-      )}
-      
+    <Box sx={{ width: '100%', position: 'relative' }}>
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>
           Error: {error}
         </Typography>
       )}
-
-      {loading && !isBackgroundRefresh && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-          <CircularProgress sx={{ color: '#FF4D06' }} />
+      {onRefresh && (
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <IconButton onClick={onRefresh} disabled={loading}>
+            <RefreshIcon />
+          </IconButton>
         </Box>
       )}
-
+      {loading && !isBackgroundRefresh && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      )}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'repeat(2, 1fr)',
-            md: 'repeat(3, 1fr)',
-            lg: 'repeat(4, 1fr)'
-          },
-          gap: 3
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: 2,
+          opacity: loading && !isBackgroundRefresh ? 0.5 : 1
         }}
       >
         <AnimatePresence>
-          {filteredMemories.map((memory) => (
+          {memories.map((memory) => (
             <motion.div
               key={memory._id}
               layout
@@ -367,34 +272,6 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
           ))}
         </AnimatePresence>
       </Box>
-
-      {onRefresh && (
-        <Box sx={{ position: 'fixed', bottom: 16, right: 16 }}>
-          <IconButton
-            onClick={onRefresh}
-            sx={{
-              bgcolor: '#FF4D06',
-              color: 'white',
-              '&:hover': {
-                bgcolor: '#FF6B06'
-              },
-              ...(isBackgroundRefresh && {
-                animation: 'spin 1s linear infinite',
-                '@keyframes spin': {
-                  '0%': {
-                    transform: 'rotate(0deg)',
-                  },
-                  '100%': {
-                    transform: 'rotate(360deg)',
-                  },
-                },
-              }),
-            }}
-          >
-            <RefreshIcon />
-          </IconButton>
-        </Box>
-      )}
     </Box>
   );
 };
