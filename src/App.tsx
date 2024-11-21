@@ -10,20 +10,35 @@ import PatreonBar from './components/PatreonBar';
 import { Memory } from './types';
 
 function App() {
+  // Initialize state with empty array
+  const [memories, setMemories] = useState<Memory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Initialize intro dialog state
   const [showIntro, setShowIntro] = useState(() => {
-    return localStorage.getItem('introShown') !== 'true';
+    try {
+      return localStorage.getItem('introShown') !== 'true';
+    } catch {
+      return true;
+    }
   });
 
-  const [memories, setMemories] = useState<Memory[]>([]);
-
   const fetchMemories = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
       const response = await fetch('/.netlify/functions/get-memories');
       if (!response.ok) throw new Error('Failed to fetch memories');
-      const data: Memory[] = await response.json();
-      setMemories(data);
+      const data = await response.json();
+      setMemories(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching memories:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch memories');
+      setMemories([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -33,12 +48,20 @@ function App() {
 
   useEffect(() => {
     if (!showIntro) {
-      localStorage.setItem('introShown', 'true');
+      try {
+        localStorage.setItem('introShown', 'true');
+      } catch (error) {
+        console.error('Failed to save intro state:', error);
+      }
     }
   }, [showIntro]);
 
   const handleMemoryCreated = (newMemory: Memory) => {
-    setMemories(prev => [newMemory, ...prev]);
+    setMemories(prev => Array.isArray(prev) ? [newMemory, ...prev] : [newMemory]);
+  };
+
+  const handleRefresh = () => {
+    fetchMemories();
   };
 
   return (
@@ -53,7 +76,12 @@ function App() {
         <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
           <InfoBar />
           <UploadBar onMemoryCreated={handleMemoryCreated} />
-          <MemoryGrid memories={memories} />
+          <MemoryGrid 
+            memories={memories} 
+            loading={loading}
+            error={error}
+            onRefresh={handleRefresh}
+          />
           <PatreonBar />
         </Container>
         <IntroDialog 
