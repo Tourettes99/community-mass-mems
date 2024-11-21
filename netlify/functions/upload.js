@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
-const formidable = require('formidable-serverless');
 
 const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 const DB_NAME = 'memories';
@@ -31,7 +30,7 @@ const memorySchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  collection: COLLECTION_NAME // Explicitly set collection name
+  collection: COLLECTION_NAME
 });
 
 let Memory;
@@ -41,22 +40,45 @@ try {
   Memory = mongoose.model('Memory', memorySchema);
 }
 
-const parseFormData = async (event) => {
-  return new Promise((resolve, reject) => {
-    const form = new formidable.IncomingForm();
-    
-    form.parse(event, (err, fields, files) => {
-      if (err) reject(err);
-      resolve({ fields, files });
-    });
-  });
-};
-
 const getFileType = (contentType) => {
   if (contentType.startsWith('image/gif')) return 'gif';
   if (contentType.startsWith('image/')) return 'image';
   if (contentType.startsWith('audio/')) return 'audio';
   return 'url';
+};
+
+const parseMultipartForm = event => {
+  const boundary = event.headers['content-type'].split('=')[1];
+  const body = Buffer.from(event.body, 'base64').toString();
+  
+  const parts = body.split(`--${boundary}`);
+  const result = {
+    fields: {},
+    files: {}
+  };
+
+  parts.forEach(part => {
+    if (part.includes('Content-Disposition: form-data;')) {
+      const [headers, ...contentParts] = part.split('\r\n\r\n');
+      const content = contentParts.join('\r\n\r\n').trim();
+      
+      const nameMatch = headers.match(/name="([^"]+)"/);
+      const filenameMatch = headers.match(/filename="([^"]+)"/);
+      
+      if (filenameMatch) {
+        const contentTypeMatch = headers.match(/Content-Type: (.+)/);
+        result.files.file = {
+          name: filenameMatch[1],
+          type: contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream',
+          content: content
+        };
+      } else if (nameMatch) {
+        result.fields[nameMatch[1]] = content;
+      }
+    }
+  });
+
+  return result;
 };
 
 exports.handler = async (event, context) => {
@@ -83,29 +105,27 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Connect to MongoDB with explicit database selection
     if (!mongoose.connection.readyState) {
       await mongoose.connect(MONGODB_URI, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
-        dbName: DB_NAME // Explicitly set database name
+        dbName: DB_NAME
       });
     }
 
-    // Log connection status and database info
     console.log('MongoDB Connection State:', mongoose.connection.readyState);
     console.log('Database Name:', mongoose.connection.db.databaseName);
-    console.log('Collections:', await mongoose.connection.db.listCollections().toArray());
+    console.log('Content-Type:', event.headers['content-type']);
 
     let memoryData;
     const contentType = event.headers['content-type'] || '';
 
     if (contentType.includes('multipart/form-data')) {
       // Handle file upload
-      const { files } = await parseFormData(event);
-      const file = files.file;
+      const formData = parseMultipartForm(event);
+      console.log('Parsed form data:', formData);
 
-      if (!file) {
+      if (!formData.files.file) {
         return {
           statusCode: 400,
           headers,
@@ -113,11 +133,16 @@ exports.handler = async (event, context) => {
         };
       }
 
-      // For demo, we'll just use the file path as the URL
-      // In production, you'd upload this to S3 or another storage service
+      const file = formData.files.file;
+      
+      // For now, we'll store the file content as a data URL
+      // In production, you'd want to upload this to S3 or another storage service
+      const base64Content = Buffer.from(file.content).toString('base64');
+      const dataUrl = `data:${file.type};base64,${base64Content}`;
+
       memoryData = {
         type: getFileType(file.type),
-        url: file.path,
+        url: dataUrl,
         metadata: {
           fileName: file.name,
           format: file.type.split('/')[1],
@@ -147,13 +172,15 @@ exports.handler = async (event, context) => {
       };
     }
 
+    console.log('Memory data to save:', memoryData);
     const memory = new Memory(memoryData);
-    await memory.save();
+    const savedMemory = await memory.save();
+    console.log('Saved memory:', savedMemory);
 
     return {
       statusCode: 201,
       headers,
-      body: JSON.stringify(memory)
+      body: JSON.stringify(savedMemory)
     };
   } catch (error) {
     console.error('Error processing upload:', error);
