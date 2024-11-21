@@ -1,7 +1,7 @@
 [build]
   base = "."
   publish = "client/build"
-  command = "cd client && npm install --legacy-peer-deps && CI=false npm run build"
+  command = "cd client && npm install && npm run build"
   functions = "netlify/functions"
 
 [build.environment]
@@ -12,7 +12,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["mongodb-client-encryption", "aws4"]
+  external_node_modules = ["sharp", "mongodb"]
 
 [context.production]
   command = "cd client && npm install --legacy-peer-deps && CI=false npm run build"
