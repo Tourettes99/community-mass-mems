@@ -19,21 +19,14 @@ app.use(express.urlencoded({ extended: true }));
 // Create router
 const router = express.Router();
 
-// MongoDB Connection
+// MongoDB Connection URL - ensure this is set in your Netlify environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
+  console.error('MONGODB_URI is not set in environment variables!');
   throw new Error('MONGODB_URI is required');
 }
 
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  dbName: 'memories'
-}).then(() => {
-  console.log('✅ MongoDB Connected');
-}).catch(err => {
-  console.error('❌ MongoDB connection error:', err);
-});
+console.log('MongoDB URI exists:', !!MONGODB_URI);
 
 // Memory types enum
 const MEMORY_TYPES = {
@@ -44,11 +37,38 @@ const MEMORY_TYPES = {
   URL: 'url'
 };
 
-// Configure multer for file uploads
+// Memory Schema
+const memorySchema = new mongoose.Schema({
+  title: String,
+  description: String,
+  type: {
+    type: String,
+    required: true,
+    enum: Object.values(MEMORY_TYPES)
+  },
+  content: {
+    type: String,
+    required: true
+  },
+  metadata: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: new Map()
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Memory Model
+const Memory = mongoose.model('Memory', memorySchema);
+
+// Multer configuration for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB
+    fileSize: 10 * 1024 * 1024 // 10MB limit
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = {
@@ -67,6 +87,27 @@ const upload = multer({
     }
   }
 }).single('file');
+
+// MongoDB Connection Function
+const connectDB = async () => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      console.log('MongoDB already connected');
+      return;
+    }
+
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      dbName: 'memories'
+    });
+    console.log('MongoDB Connected Successfully');
+  } catch (error) {
+    console.error('MongoDB Connection Error:', error);
+    throw error;
+  }
+};
 
 // Utility functions
 const formatDuration = (seconds) => {
@@ -111,69 +152,54 @@ const getAudioMetadata = async (buffer) => {
   };
 };
 
-// Memory Schema
-const memorySchema = new mongoose.Schema({
-  title: String,
-  description: String,
-  type: {
-    type: String,
-    required: true,
-    enum: Object.values(MEMORY_TYPES)
-  },
-  content: {
-    type: String,
-    required: true
-  },
-  metadata: {
-    type: Map,
-    of: mongoose.Schema.Types.Mixed,
-    default: new Map()
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const Memory = mongoose.model('Memory', memorySchema);
-
 // Routes
 router.get('/memories', async (req, res) => {
+  console.log('GET /memories endpoint hit');
+  
   try {
-    console.log('Fetching memories...');
+    // Ensure DB connection
+    await connectDB();
     
-    // Check MongoDB connection
-    if (mongoose.connection.readyState !== 1) {
-      console.log('MongoDB not connected. Attempting to connect...');
-      await mongoose.connect(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        dbName: 'memories'
-      });
-    }
-
-    // Fetch memories with proper sorting and field selection
+    console.log('Fetching memories from database...');
     const memories = await Memory.find()
-      .select('-__v')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
-
-    console.log(`Found ${memories.length} memories`);
     
-    // Transform metadata from Map to plain object for each memory
-    const transformedMemories = memories.map(memory => ({
-      ...memory,
-      metadata: Object.fromEntries(memory.metadata || new Map())
-    }));
+    console.log(`Found ${memories?.length || 0} memories`);
+    
+    if (!memories) {
+      console.log('No memories found, returning empty array');
+      return res.json([]);
+    }
 
+    // Transform metadata
+    const transformedMemories = memories.map(memory => {
+      try {
+        const plainMetadata = {};
+        if (memory.metadata) {
+          for (const [key, value] of Object.entries(memory.metadata)) {
+            plainMetadata[key] = value;
+          }
+        }
+        return {
+          ...memory,
+          metadata: plainMetadata
+        };
+      } catch (err) {
+        console.error('Error transforming memory:', err);
+        return memory;
+      }
+    });
+
+    console.log('Successfully transformed memories');
     res.json(transformedMemories);
   } catch (error) {
-    console.error('Error fetching memories:', error);
-    res.status(500).json({ 
+    console.error('Error in /memories endpoint:', error);
+    res.status(500).json({
       error: 'Failed to fetch memories',
       details: error.message,
-      timestamp: new Date().toISOString()
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

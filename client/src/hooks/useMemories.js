@@ -11,21 +11,41 @@ const useMemories = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Loading memories...');
+      console.log('Starting memory fetch...');
+      
       const data = await fetchMemories();
+      console.log('Received response:', data);
+      
+      // Validate response
+      if (!data) {
+        throw new Error('No data received from server');
+      }
       
       if (!Array.isArray(data)) {
-        throw new Error('Invalid response format: expected an array of memories');
+        console.error('Invalid data format:', data);
+        throw new Error('Invalid response format: expected an array');
       }
       
       setMemories(data);
       console.log(`Successfully loaded ${data.length} memories`);
     } catch (err) {
       console.error('Error in useMemories:', err);
-      setError(err.message || 'Failed to load memories');
+      let errorMessage = 'Failed to load memories';
       
-      // Retry logic for connection errors
-      if (retryCount < 3 && err.message?.includes('network')) {
+      if (err.response) {
+        // Server responded with error
+        errorMessage = err.response.data?.error || err.response.data?.message || 'Server error';
+        console.error('Server error details:', err.response.data);
+      } else if (err.request) {
+        // Request made but no response
+        errorMessage = 'No response from server. Please check your connection.';
+      }
+      
+      setError(errorMessage);
+      
+      // Retry for network errors
+      if (retryCount < 3 && (!err.response || err.response.status >= 500)) {
+        console.log(`Retrying... Attempt ${retryCount + 1}/3`);
         setRetryCount(prev => prev + 1);
         setTimeout(loadMemories, 1000 * (retryCount + 1));
       }
@@ -34,6 +54,7 @@ const useMemories = () => {
     }
   }, [retryCount]);
 
+  // Load memories on mount
   useEffect(() => {
     loadMemories();
   }, [loadMemories]);
@@ -44,7 +65,13 @@ const useMemories = () => {
     loadMemories();
   }, [loadMemories]);
 
-  return { memories, loading, error, reload };
+  return { 
+    memories, 
+    loading, 
+    error,
+    reload,
+    retryCount
+  };
 };
 
 export default useMemories;
