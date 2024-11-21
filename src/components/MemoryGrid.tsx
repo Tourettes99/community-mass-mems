@@ -150,32 +150,73 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
       if (!memory.url) return null;
       
       const domain = getUrlDomain(memory.url);
+      const url = memory.url;
       
       // Twitter/X embed
       if (domain.includes('twitter.com') || domain.includes('x.com')) {
-        return {
-          html: `<blockquote class="twitter-tweet"><a href="${memory.url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js"></script>`,
-          aspectRatio: '100%'
-        };
-      }
-      
-      // TikTok embed
-      if (domain.includes('tiktok.com')) {
-        return {
-          html: `<blockquote class="tiktok-embed"><a href="${memory.url}"></a></blockquote><script async src="https://www.tiktok.com/embed.js"></script>`,
-          aspectRatio: '100%'
-        };
-      }
-      
-      // Facebook video embed
-      if (domain.includes('facebook.com') && memory.url.includes('/videos/')) {
-        const videoId = memory.url.match(/\/videos\/(\d+)/)?.[1];
-        if (videoId) {
+        const tweetId = url.match(/status\/(\d+)/)?.[1];
+        if (tweetId) {
           return {
-            html: `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(memory.url)}&show_text=false" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>`,
-            aspectRatio: '56.25%' // 16:9 aspect ratio
+            html: `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js"></script>`,
+            aspectRatio: '100%'
           };
         }
+      }
+      
+      // TikTok embed - support both full and shortened URLs
+      if (domain.includes('tiktok.com') || domain.includes('vm.tiktok.com')) {
+        // Handle both URL formats
+        let tiktokUrl = url;
+        if (domain.includes('vm.tiktok.com')) {
+          // For shortened URLs, we'll use the URL as is
+          tiktokUrl = url;
+        }
+        return {
+          html: `<blockquote class="tiktok-embed" cite="${tiktokUrl}">
+            <section><a href="${tiktokUrl}"></a></section>
+          </blockquote>
+          <script async src="https://www.tiktok.com/embed.js"></script>`,
+          aspectRatio: '100%'
+        };
+      }
+      
+      // Facebook video embed - support both formats
+      if (
+        (domain.includes('facebook.com') && url.includes('/videos/')) ||
+        domain.includes('fb.watch')
+      ) {
+        return {
+          html: `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>`,
+          aspectRatio: '56.25%' // 16:9 aspect ratio
+        };
+      }
+
+      // Instagram embed (posts, reels, and videos)
+      if (domain.includes('instagram.com')) {
+        // Extract post ID from various Instagram URLs
+        const instagramId = url.match(/\/(p|reel|tv)\/([^\/\?]+)/)?.[2];
+        if (instagramId) {
+          return {
+            html: `<blockquote class="instagram-media" data-instgrm-permalink="${url}">
+              <a href="${url}"></a>
+            </blockquote>
+            <script async src="//www.instagram.com/embed.js"></script>`,
+            aspectRatio: '100%'
+          };
+        }
+      }
+
+      // Reddit videos
+      if (domain.includes('reddit.com')) {
+        // Handle both old and new Reddit URLs
+        const redditUrl = url.replace('old.reddit.com', 'reddit.com');
+        return {
+          html: `<iframe id="reddit-embed" src="https://www.redditmedia.com/r/${redditUrl}?ref_source=embed&amp;ref=share&amp;embed=true" 
+            sandbox="allow-scripts allow-same-origin allow-popups" 
+            style="border: none;" height="400" width="100%" 
+            scrolling="no"></iframe>`,
+          aspectRatio: '56.25%'
+        };
       }
 
       return null;
