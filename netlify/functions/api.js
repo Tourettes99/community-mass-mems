@@ -330,40 +330,62 @@ router.post('/memories', async (req, res) => {
   try {
     await uploadMiddleware(req, res);
     
+    console.log('Request body:', req.body); // Debug log
+    
+    if (!req.body.type) {
+      throw new Error('Memory type is required');
+    }
+
     const { title = '', description = '', type } = req.body;
-    let content, metadata;
+    let content, metadata = {};
 
     switch (type) {
       case MEMORY_TYPES.TEXT:
+        if (!req.body.content) {
+          throw new Error('Content is required for text memories');
+        }
         content = req.body.content;
-        metadata = {};
         break;
       
       case MEMORY_TYPES.URL:
-        content = req.body.url || req.body.content; // Support both url and content fields
-        metadata = await getUrlMetadata(content);
+        const urlContent = req.body.url || req.body.content;
+        if (!urlContent) {
+          throw new Error('URL is required for URL memories');
+        }
+        content = urlContent;
+        try {
+          metadata = await getUrlMetadata(content);
+        } catch (error) {
+          console.error('Error getting URL metadata:', error);
+          // Continue even if metadata extraction fails
+        }
         break;
       
       case MEMORY_TYPES.IMAGE:
       case MEMORY_TYPES.GIF:
       case MEMORY_TYPES.AUDIO:
         if (!req.file) {
-          throw new Error('No file uploaded');
+          throw new Error(`File is required for ${type} memories`);
         }
         
         content = req.file.buffer.toString('base64');
         
-        if (type === MEMORY_TYPES.IMAGE) {
-          metadata = await getImageMetadata(req.file.buffer, req.file.originalname);
-        } else if (type === MEMORY_TYPES.GIF) {
-          metadata = await getGifMetadata(req.file.buffer, req.file.originalname);
-        } else {
-          metadata = await getAudioMetadata(req.file.buffer, req.file.originalname);
+        try {
+          if (type === MEMORY_TYPES.IMAGE) {
+            metadata = await getImageMetadata(req.file.buffer, req.file.originalname);
+          } else if (type === MEMORY_TYPES.GIF) {
+            metadata = await getGifMetadata(req.file.buffer, req.file.originalname);
+          } else {
+            metadata = await getAudioMetadata(req.file.buffer, req.file.originalname);
+          }
+        } catch (error) {
+          console.error('Error getting file metadata:', error);
+          // Continue even if metadata extraction fails
         }
         break;
       
       default:
-        throw new Error('Invalid memory type');
+        throw new Error(`Invalid memory type: ${type}`);
     }
 
     const memory = new Memory({
@@ -395,7 +417,7 @@ router.post('/memories', async (req, res) => {
     res.status(400).json({
       status: 'error',
       timestamp: new Date().toISOString(),
-      message: error.message
+      message: error.message || 'Failed to create memory'
     });
   }
 });
