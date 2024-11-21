@@ -148,9 +148,8 @@ exports.handler = async (event, context) => {
     }
 
     logger.info('Connecting to database...');
-    const db = await connectToDatabase();
-    const memories = db.collection('memories');
-    logger.debug(`Using collection: memories`);
+    const collection = await connectToDatabase();
+    logger.debug('Connected to memories.memories collection');
 
     const memory = {
       type,
@@ -276,7 +275,7 @@ exports.handler = async (event, context) => {
 
     try {
       logger.info('Saving memory to database');
-      const result = await memories.insertOne(memory);
+      const result = await collection.insertOne(memory);
       logger.info('Memory saved successfully', { id: result.insertedId });
 
       return {
