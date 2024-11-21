@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton } from '@mui/material';
+import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconButton, CardHeader, Avatar, Link, Stack, Chip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
@@ -26,6 +26,7 @@ interface Memory {
     title?: string;
     playbackHtml?: string;
   };
+  tags?: string[];
 }
 
 const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
@@ -33,6 +34,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [expanded, setExpanded] = useState(false);
 
   const handleImageLoad = () => {
     setIsLoading(false);
@@ -49,6 +51,152 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     setError(null);
     setRetryCount(count => count + 1);
   }, []);
+
+  const handleCardClick = (event: React.MouseEvent) => {
+    // Don't trigger card expansion when clicking on media controls
+    if ((event.target as HTMLElement).closest('video, audio, iframe')) {
+      return;
+    }
+    setExpanded(!expanded);
+  };
+
+  const handleLinkClick = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent card expansion
+  };
+
+  const renderMediaContent = () => {
+    if (!memory.metadata) return null;
+
+    if (memory.metadata.isPlayable && memory.metadata.playbackHtml) {
+      // Render the media player using dangerouslySetInnerHTML
+      return (
+        <Box 
+          sx={{ 
+            width: '100%',
+            position: 'relative',
+            '& iframe': {
+              border: 'none',
+              borderRadius: 1,
+            },
+            '& video, & audio': {
+              width: '100%',
+              borderRadius: 1,
+            },
+            '& video': {
+              maxHeight: '400px',
+              objectFit: 'contain',
+              backgroundColor: 'black',
+            },
+          }}
+          dangerouslySetInnerHTML={{ __html: memory.metadata.playbackHtml }}
+        />
+      );
+    } else if (memory.metadata.previewUrl) {
+      return (
+        <Box
+          component="img"
+          src={memory.metadata.previewUrl}
+          alt={memory.metadata.title || 'Preview'}
+          sx={{
+            width: '100%',
+            height: 'auto',
+            maxHeight: '300px',
+            objectFit: 'cover',
+            borderRadius: 1,
+          }}
+        />
+      );
+    }
+    return null;
+  };
+
+  const renderUrlCard = () => {
+    const metadata = memory.metadata;
+    if (!metadata) return null;
+
+    return (
+      <Card 
+        sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          cursor: 'pointer',
+          '&:hover': {
+            boxShadow: 6,
+          },
+        }}
+        onClick={handleCardClick}
+      >
+        <CardHeader
+          avatar={
+            metadata.favicon ? (
+              <Avatar 
+                src={metadata.favicon} 
+                sx={{ width: 24, height: 24 }}
+                imgProps={{ style: { objectFit: 'contain' } }}
+              />
+            ) : null
+          }
+          title={
+            <Link
+              href={memory.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleLinkClick}
+              sx={{
+                color: 'inherit',
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline',
+                },
+              }}
+            >
+              {metadata.title || metadata.siteName || memory.url}
+            </Link>
+          }
+          subheader={metadata.siteName}
+          sx={{
+            pb: metadata.isPlayable || metadata.previewUrl ? 1 : 2,
+          }}
+        />
+
+        {renderMediaContent()}
+
+        <CardContent sx={{ flexGrow: 1, pt: 2 }}>
+          {metadata.description && (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                display: '-webkit-box',
+                WebkitLineClamp: expanded ? 'unset' : 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                cursor: 'pointer',
+              }}
+            >
+              {metadata.description}
+            </Typography>
+          )}
+        </CardContent>
+
+        {memory.tags && memory.tags.length > 0 && (
+          <CardContent sx={{ pt: 0 }}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+              {memory.tags.map((tag, index) => (
+                <Chip
+                  key={index}
+                  label={tag}
+                  size="small"
+                  sx={{ borderRadius: 1 }}
+                />
+              ))}
+            </Stack>
+          </CardContent>
+        )}
+      </Card>
+    );
+  };
 
   const renderContent = () => {
     switch (memory.type) {
@@ -137,96 +285,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           </Box>
         );
       case 'url':
-        return (
-          <Box sx={{ p: 2 }}>
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                mb: 2,
-                cursor: 'pointer',
-                '&:hover': {
-                  textDecoration: 'underline'
-                }
-              }}
-              component="a"
-              href={memory.url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Box
-                component="img"
-                src={memory.metadata?.favicon}
-                alt=""
-                sx={{
-                  width: 16,
-                  height: 16,
-                  mr: 1,
-                  borderRadius: '2px'
-                }}
-              />
-              <Typography 
-                variant="h6" 
-                noWrap 
-                sx={{ 
-                  flex: 1,
-                  fontSize: '1rem',
-                  fontWeight: 500,
-                  color: 'text.primary',
-                }}
-              >
-                {memory.metadata?.title || memory.metadata?.siteName || new URL(memory.url).hostname}
-              </Typography>
-            </Box>
-
-            {memory.metadata?.isPlayable ? (
-              <Box 
-                sx={{ 
-                  mb: 2,
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  bgcolor: 'background.paper'
-                }}
-                dangerouslySetInnerHTML={{ __html: memory.metadata.playbackHtml || '' }}
-              />
-            ) : memory.metadata?.previewUrl ? (
-              <Box 
-                sx={{ 
-                  mb: 2,
-                  borderRadius: 1,
-                  overflow: 'hidden'
-                }}
-              >
-                <CardMedia
-                  component="img"
-                  image={memory.metadata.previewUrl}
-                  alt={memory.metadata.title || "Preview"}
-                  sx={{
-                    width: '100%',
-                    aspectRatio: '16/9',
-                    objectFit: 'cover'
-                  }}
-                />
-              </Box>
-            ) : null}
-
-            {memory.metadata?.description && (
-              <Typography 
-                variant="body2" 
-                sx={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  color: 'text.secondary',
-                  mb: 1
-                }}
-              >
-                {memory.metadata.description}
-              </Typography>
-            )}
-          </Box>
-        );
+        return renderUrlCard();
       default:
         return null;
     }
