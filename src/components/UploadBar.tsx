@@ -129,10 +129,26 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         return;
       }
 
-      // Create a signed URL or handle file upload here
-      // For now, we'll just use a local URL
-      const objectUrl = URL.createObjectURL(file);
-      setUrl(objectUrl);
+      // Upload file to Netlify Function
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadResponse = await fetch('/.netlify/functions/file-upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Failed to upload file');
+      }
+
+      const { memory } = await uploadResponse.json();
+      if (!memory?.url) {
+        throw new Error('No URL received from server');
+      }
+
+      setUrl(memory.url);
       setType(fileType as MemoryType);
 
       // For static text files, read content
@@ -142,7 +158,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
       }
     } catch (error) {
       console.error('Error processing file:', error);
-      setError('Failed to process file');
+      setError(error instanceof Error ? error.message : 'Failed to process file');
     } finally {
       setLoading(false);
     }
@@ -154,19 +170,25 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('type', type);
-      formData.append('url', url);
-      formData.append('content', content);
-      formData.append('tags', JSON.stringify(tags));
+      // Create the request body as JSON
+      const requestBody = {
+        type,
+        url,
+        content,
+        tags
+      };
 
       const response = await fetch('/.netlify/functions/upload', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload memory');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload memory');
       }
 
       const data: Memory = await response.json();
