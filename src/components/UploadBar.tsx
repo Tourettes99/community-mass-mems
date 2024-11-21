@@ -186,12 +186,12 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         body: JSON.stringify(requestBody)
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload memory');
+        throw new Error(data.error || 'Failed to upload memory');
       }
 
-      const data: Memory = await response.json();
       onMemoryCreated(data);
       setSuccess(true);
       setUrl('');
