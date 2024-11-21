@@ -16,6 +16,7 @@ let cachedClient = null;
 
 async function connectToDatabase() {
   if (cachedDb && cachedClient) {
+    console.log('Using cached database connection');
     return { db: cachedDb, client: cachedClient };
   }
 
@@ -24,8 +25,10 @@ async function connectToDatabase() {
     const client = await MongoClient.connect(MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000,
-      maxPoolSize: 10
+      serverSelectionTimeoutMS: 30000, // Increased timeout
+      maxPoolSize: 10,
+      socketTimeoutMS: 45000, // Added socket timeout
+      connectTimeoutMS: 30000 // Added connect timeout
     });
 
     const db = client.db('memories');
@@ -34,10 +37,21 @@ async function connectToDatabase() {
     console.log('MongoDB connected successfully to memories database');
     return { db, client };
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('MongoDB connection error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
     throw error;
   }
 }
+
+// CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+};
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
@@ -139,113 +153,146 @@ async function extractFileMetadata(base64Data, contentType) {
 }
 
 exports.handler = async (event, context) => {
-  context.callbackWaitsForEmptyEventLoop = false;
-
-  console.log('Function invoked with event:', {
-    method: event.httpMethod,
-    headers: event.headers,
-    path: event.path
-  });
-
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json'
-  };
-
+  // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers, body: '' };
-  }
-
-  if (event.httpMethod !== 'POST') {
     return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' })
+      statusCode: 204,
+      headers: corsHeaders,
+      body: ''
     };
   }
 
+  // Important: this prevents function timeout from waiting for MongoDB connection to close
+  context.callbackWaitsForEmptyEventLoop = false;
+
   try {
-    await connectToDatabase();
-    
-    let body;
+    console.log('Request received:', {
+      method: event.httpMethod,
+      path: event.path,
+      headers: event.headers
+    });
+
+    if (event.httpMethod !== 'POST') {
+      return {
+        statusCode: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Method not allowed' })
+      };
+    }
+
+    let data;
     try {
-      console.log('Raw request body:', event.body);
-      body = JSON.parse(event.body);
-      console.log('Parsed body:', body);
+      data = JSON.parse(event.body);
+      console.log('Parsed request body:', {
+        type: data.type,
+        hasUrl: !!data.url,
+        hasContent: !!data.content,
+        hasFile: !!data.file,
+        fileName: data.fileName
+      });
     } catch (error) {
       console.error('Error parsing request body:', error);
       return {
         statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Invalid request body',
-          details: error.message 
-        })
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Invalid request body' })
       };
     }
 
-    if (!body.type || !['url', 'image', 'video', 'audio', 'text', 'static', 'social'].includes(body.type)) {
+    const { type, url, content, tags, file, fileName, contentType } = data;
+
+    if (!type || (!url && !content && !file)) {
       return {
         statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid memory type' })
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Missing required fields' })
       };
     }
 
-    // Extract metadata based on type
-    let metadata = {};
-    if (body.type === 'url' && body.url) {
-      metadata = await extractUrlMetadata(body.url);
-    } else if (body.type === 'text') {
-      metadata = {
-        title: body.content?.slice(0, 50),
-        description: body.content,
-        mediaType: 'text'
-      };
-    } else if (body.file) {
-      const buffer = Buffer.from(body.file, 'base64');
-      metadata = await extractFileMetadata(buffer, body.fileName || 'unknown');
-    }
+    // Connect to database
+    console.log('Connecting to database...');
+    const { db } = await connectToDatabase();
+    const memories = db.collection('memories');
 
-    // Create memory object with metadata
-    const memoryData = {
-      type: metadata.mediaType || body.type,
-      url: body.url || '',
-      content: body.content || '',
-      tags: body.tags || [],
-      metadata: {
-        ...metadata,
-        title: metadata.title || (body.type === 'text' ? body.content?.slice(0, 50) : body.url),
-        description: metadata.description || body.content || body.url
-      }
+    // Prepare memory document
+    const memory = {
+      type,
+      tags: tags || [],
+      createdAt: new Date(),
+      metadata: {},
+      userId: data.userId || 'anonymous'
     };
 
-    console.log('Creating memory with data:', memoryData);
+    console.log('Processing content type:', type);
+
+    // Handle different types of content
+    try {
+      if (type === 'url' && url) {
+        console.log('Processing URL:', url);
+        memory.url = url;
+        memory.metadata = await extractUrlMetadata(url);
+      } else if (type === 'text' && content) {
+        console.log('Processing text content');
+        memory.content = content;
+        memory.metadata = {
+          title: content.slice(0, 50),
+          description: content,
+          mediaType: 'text'
+        };
+      } else if (file) {
+        console.log('Processing file:', fileName);
+        const buffer = Buffer.from(file, 'base64');
+        memory.fileName = fileName;
+        memory.contentType = contentType;
+        memory.file = file;
+        memory.metadata = await extractFileMetadata(buffer, fileName);
+      }
+    } catch (error) {
+      console.error('Error processing content:', error);
+      memory.metadata = {
+        error: 'Failed to process content',
+        message: error.message
+      };
+    }
+
+    // Insert memory into database
+    console.log('Inserting memory into database...');
+    const result = await memories.insertOne(memory);
     
-    const memory = new Memory(memoryData);
-    await memory.validate();
-    const savedMemory = await memory.save();
-    console.log('Memory saved successfully:', savedMemory._id);
+    if (!result.acknowledged) {
+      throw new Error('Failed to insert memory');
+    }
+
+    console.log('Memory created successfully:', result.insertedId);
+
+    // Remove the file content from the response to reduce payload size
+    const responseMemory = { ...memory, _id: result.insertedId };
+    if (responseMemory.file) {
+      delete responseMemory.file;
+    }
 
     return {
-      statusCode: 201,
-      headers,
+      statusCode: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: 'Memory created successfully',
-        memory: savedMemory
+        memory: responseMemory
       })
     };
-
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error('Error creating memory:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
         error: 'Internal server error',
-        details: error.message
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }

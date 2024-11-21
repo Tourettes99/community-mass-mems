@@ -4,7 +4,8 @@ included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
 node_bundler = "esbuild"
 
 [functions."*"]
-timeout = 60
+timeout = 30
+memory = 1024
 
 [build]
 command = "GENERATE_SOURCEMAP=false CI=false npm run build"
@@ -40,7 +41,7 @@ Content-Security-Policy = """
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' data: blob: https:;
   media-src 'self' data: blob: https:;
-  connect-src 'self' https:;
+  connect-src 'self' https: http://localhost:* ws://localhost:*;
   object-src 'none';
   frame-src 'self' https://www.youtube.com https://platform.twitter.com https://www.instagram.com;
   frame-ancestors 'none';
