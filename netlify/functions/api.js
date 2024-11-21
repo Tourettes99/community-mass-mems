@@ -27,6 +27,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Configure multer for memory storage
 const upload = multer({
@@ -34,7 +35,27 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   }
-});
+}).single('file'); // Configure for single file upload
+
+// Custom error handling middleware
+const handleUpload = (req, res, next) => {
+  upload(req, res, function(err) {
+    if (err instanceof multer.MulterError) {
+      console.error('Multer error:', err);
+      return res.status(400).json({
+        error: 'File upload error',
+        details: err.message
+      });
+    } else if (err) {
+      console.error('Unknown upload error:', err);
+      return res.status(500).json({
+        error: 'Unknown upload error',
+        details: err.message
+      });
+    }
+    next();
+  });
+};
 
 // Connect to MongoDB with detailed error logging
 mongoose.connect(MONGODB_URI, {
@@ -42,9 +63,7 @@ mongoose.connect(MONGODB_URI, {
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000 // 5 second timeout
 })
-.then(() => {
-  console.log('Successfully connected to MongoDB Atlas');
-})
+.then(() => console.log('Successfully connected to MongoDB Atlas'))
 .catch(err => {
   console.error('MongoDB connection error details:', {
     name: err.name,
@@ -67,8 +86,8 @@ mongoose.connection.on('disconnected', () => {
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
-  title: String,
-  description: String,
+  title: { type: String, required: true },
+  description: { type: String, required: true },
   mediaUrl: String,
   mediaType: String,
   timestamp: { type: Date, default: Date.now },
@@ -103,9 +122,22 @@ router.get('/memories', async (req, res) => {
   }
 });
 
-router.post('/memories', upload.single('file'), async (req, res) => {
+// Updated upload endpoint
+router.post('/memories', handleUpload, async (req, res) => {
   console.log('POST /memories request received');
+  console.log('Request body:', req.body);
+  console.log('File:', req.file);
+  
   try {
+    // Check MongoDB connection
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error('MongoDB not connected. Current state: ' + mongoose.connection.readyState);
+    }
+
+    if (!req.body.title || !req.body.description) {
+      throw new Error('Title and description are required');
+    }
+
     const memoryData = {
       title: req.body.title,
       description: req.body.description,
@@ -114,31 +146,44 @@ router.post('/memories', upload.single('file'), async (req, res) => {
       timestamp: new Date()
     };
 
-    // If there's a file uploaded
+    // Handle file upload
     if (req.file) {
+      console.log('Processing file upload:', req.file.originalname);
       memoryData.fileData = req.file.buffer;
       memoryData.fileName = req.file.originalname;
       memoryData.fileType = req.file.mimetype;
     }
 
-    // If there's a mediaUrl
+    // Handle media URL
     if (req.body.mediaUrl) {
+      console.log('Processing media URL:', req.body.mediaUrl);
       memoryData.mediaUrl = req.body.mediaUrl;
       memoryData.mediaType = req.body.mediaType || 'url';
     }
 
+    console.log('Creating new memory with data:', {
+      ...memoryData,
+      fileData: req.file ? 'Buffer present' : 'No file data'
+    });
+
     const memory = new Memory(memoryData);
-    await memory.save();
+    const savedMemory = await memory.save();
     
-    // Don't send the file buffer in the response
-    const response = memory.toObject();
-    delete response.fileData;
-    
-    console.log('Memory saved:', response);
+    // Create a safe response object without the file buffer
+    const response = {
+      ...savedMemory.toObject(),
+      fileData: savedMemory.fileData ? 'File data present' : undefined
+    };
+
+    console.log('Memory saved successfully');
     res.status(201).json(response);
   } catch (error) {
     console.error('Error saving memory:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      error: error.message,
+      mongoState: mongoose.connection.readyState,
+      stack: error.stack
+    });
   }
 });
 
@@ -160,7 +205,10 @@ router.get('/memories/:id/file', async (req, res) => {
 
 // Test route
 router.get('/test', (req, res) => {
-  res.json({ message: 'API is working!' });
+  res.json({ 
+    message: 'API is working!',
+    mongoState: mongoose.connection.readyState
+  });
 });
 
 app.use('/.netlify/functions/api', router);
