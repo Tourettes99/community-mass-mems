@@ -23,6 +23,8 @@ interface Memory {
     isPlayable?: boolean;
     mediaType?: string;
     favicon?: string;
+    title?: string;
+    playbackHtml?: string;
   };
 }
 
@@ -135,19 +137,27 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           </Box>
         );
       case 'url':
-        const { metadata } = memory;
-        const hasEmbed = metadata?.embedHtml;
-        const hasPreviewImage = metadata?.previewUrl;
-        const hasPlayableMedia = metadata?.isPlayable;
-        const siteIcon = metadata?.favicon || `https://www.google.com/s2/favicons?domain=${new URL(memory.url).hostname}`;
-
         return (
           <Box sx={{ p: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                mb: 2,
+                cursor: 'pointer',
+                '&:hover': {
+                  textDecoration: 'underline'
+                }
+              }}
+              component="a"
+              href={memory.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <Box
                 component="img"
-                src={siteIcon}
-                alt="Site Icon"
+                src={memory.metadata?.favicon}
+                alt=""
                 sx={{
                   width: 16,
                   height: 16,
@@ -161,61 +171,25 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 sx={{ 
                   flex: 1,
                   fontSize: '1rem',
-                  fontWeight: 500
+                  fontWeight: 500,
+                  color: 'text.primary',
                 }}
               >
-                {metadata?.siteName || new URL(memory.url).hostname}
+                {memory.metadata?.title || memory.metadata?.siteName || new URL(memory.url).hostname}
               </Typography>
             </Box>
 
-            {hasEmbed ? (
+            {memory.metadata?.isPlayable ? (
               <Box 
-                component="div"
                 sx={{ 
-                  position: 'relative',
-                  paddingTop: '56.25%', // 16:9 aspect ratio
                   mb: 2,
+                  borderRadius: 1,
                   overflow: 'hidden',
-                  borderRadius: 1
+                  bgcolor: 'background.paper'
                 }}
-              >
-                <div 
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%'
-                  }}
-                  dangerouslySetInnerHTML={{ 
-                    __html: metadata.embedHtml || '' 
-                  }} 
-                />
-              </Box>
-            ) : hasPlayableMedia ? (
-              <Box sx={{ mb: 2 }}>
-                {metadata.mediaType === 'video' ? (
-                  <video 
-                    controls
-                    style={{ 
-                      width: '100%',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    <source src={memory.url} type={metadata.contentType} />
-                    Your browser does not support video playback.
-                  </video>
-                ) : metadata.mediaType === 'audio' ? (
-                  <audio 
-                    controls
-                    style={{ width: '100%' }}
-                  >
-                    <source src={memory.url} type={metadata.contentType} />
-                    Your browser does not support audio playback.
-                  </audio>
-                ) : null}
-              </Box>
-            ) : hasPreviewImage ? (
+                dangerouslySetInnerHTML={{ __html: memory.metadata.playbackHtml || '' }}
+              />
+            ) : memory.metadata?.previewUrl ? (
               <Box 
                 sx={{ 
                   mb: 2,
@@ -225,8 +199,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
               >
                 <CardMedia
                   component="img"
-                  image={metadata.previewUrl}
-                  alt={metadata.siteName || "Preview"}
+                  image={memory.metadata.previewUrl}
+                  alt={memory.metadata.title || "Preview"}
                   sx={{
                     width: '100%',
                     aspectRatio: '16/9',
@@ -234,40 +208,23 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                   }}
                 />
               </Box>
-            ) : metadata?.description ? (
+            ) : null}
+
+            {memory.metadata?.description && (
               <Typography 
                 variant="body2" 
                 sx={{
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
+                  WebkitLineClamp: 3,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
-                  mb: 2,
-                  color: 'text.secondary'
+                  color: 'text.secondary',
+                  mb: 1
                 }}
               >
-                {metadata.description}
+                {memory.metadata.description}
               </Typography>
-            ) : null}
-
-            <Typography 
-              variant="body2" 
-              component="a" 
-              href={memory.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{ 
-                display: 'flex',
-                alignItems: 'center',
-                color: 'primary.main',
-                textDecoration: 'none',
-                '&:hover': {
-                  textDecoration: 'underline'
-                }
-              }}
-            >
-              Visit Website
-            </Typography>
+            )}
           </Box>
         );
       default:
