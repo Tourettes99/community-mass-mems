@@ -7,17 +7,27 @@ import {
   CircularProgress,
   Typography,
   IconButton,
-  Container
+  Container,
+  Tabs,
+  Tab,
+  Stack
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CancelIcon from '@mui/icons-material/Cancel';
+import LinkIcon from '@mui/icons-material/Link';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
 import axios from 'axios';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
+type UploadType = 'file' | 'url' | 'text';
+
 const UploadBar: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [url, setUrl] = useState('');
+  const [text, setText] = useState('');
+  const [title, setTitle] = useState('');
+  const [uploadType, setUploadType] = useState<UploadType>('url');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -137,6 +147,40 @@ const UploadBar: React.FC = () => {
     }
   };
 
+  const handleTextSubmit = async () => {
+    if (!text.trim()) return;
+
+    setUploading(true);
+    setError(null);
+    try {
+      cancelTokenRef.current = axios.CancelToken.source();
+      
+      await axios.post('/api/upload', {
+        type: 'text',
+        content: text,
+        metadata: {
+          title: title || 'Text Note',
+          type: 'text',
+          description: text.substring(0, 200) + (text.length > 200 ? '...' : ''),
+          content: text,
+        }
+      }, {
+        cancelToken: cancelTokenRef.current.token
+      });
+      setText('');
+      setTitle('');
+    } catch (error: any) {
+      if (axios.isCancel(error)) {
+        setError('Upload cancelled');
+      } else {
+        handleError(error);
+      }
+    } finally {
+      setUploading(false);
+      cancelTokenRef.current = null;
+    }
+  };
+
   const handleCancel = () => {
     if (cancelTokenRef.current) {
       cancelTokenRef.current.cancel('Upload cancelled by user');
@@ -145,136 +189,176 @@ const UploadBar: React.FC = () => {
       fileInputRef.current.value = '';
     }
     setUrl('');
+    setText('');
+    setTitle('');
     setUploading(false);
     setUploadProgress(0);
     setError(null);
   };
 
   return (
-    <Container maxWidth="lg">
-      <Paper 
-        elevation={3}
-        sx={{
-          p: 3,
-          mb: 3,
-          bgcolor: 'background.paper',
-        }}
-      >
-        {error && (
-          <Box sx={{ mb: 2 }}>
-            <Typography 
-              variant="body2"
-              sx={{ 
-                textAlign: 'center',
-                bgcolor: 'error.light',
-                color: 'error.contrastText',
-                p: 1,
-                borderRadius: 1
-              }}
-            >
-              {error}
-            </Typography>
-          </Box>
-        )}
-        
-        <Box sx={{ 
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          gap: 2,
-          alignItems: { xs: 'stretch', sm: 'center' },
-        }}>
-          <Box sx={{ 
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: 'center',
-            gap: 2,
-            flex: 1,
-          }}>
-            <input
-              type="file"
-              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-              ref={fileInputRef}
-            />
-            <label htmlFor="file-upload">
-              <Button
-                component="span"
-                variant="contained"
-                startIcon={<CloudUploadIcon />}
-                disabled={uploading}
-                sx={{ width: { xs: '100%', sm: 'auto' } }}
-              >
-                Upload File
-              </Button>
-            </label>
-            
-            <Typography 
-              variant="body2" 
-              color="text.secondary"
-              sx={{
-                display: { xs: 'none', sm: 'block' }
-              }}
-            >
-              or
-            </Typography>
-            
-            <TextField
-              fullWidth
-              placeholder="Paste URL here"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={uploading}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !uploading) {
-                  handleUrlSubmit();
-                }
-              }}
-              size="small"
-              sx={{
-                flexGrow: 1,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2
-                }
-              }}
-            />
-          </Box>
+    <Paper 
+      elevation={2} 
+      sx={{ 
+        p: 3, 
+        mb: 4, 
+        borderRadius: 2,
+        bgcolor: 'background.paper' 
+      }}
+    >
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs 
+          value={uploadType} 
+          onChange={(_, newValue: UploadType) => setUploadType(newValue)}
+          aria-label="upload type tabs"
+          centered
+        >
+          <Tab 
+            icon={<LinkIcon />} 
+            label="Link" 
+            value="url"
+          />
+          <Tab 
+            icon={<TextFieldsIcon />} 
+            label="Text" 
+            value="text"
+          />
+          <Tab 
+            icon={<CloudUploadIcon />} 
+            label="File" 
+            value="file"
+          />
+        </Tabs>
+      </Box>
 
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: 1,
-            justifyContent: { xs: 'flex-end', sm: 'flex-start' }
-          }}>
-            {uploading ? (
-              <>
-                <CircularProgress 
-                  variant="determinate" 
-                  value={uploadProgress} 
-                  size={24} 
-                />
-                <IconButton 
-                  onClick={handleCancel} 
-                  color="secondary"
-                  size="small"
-                >
-                  <CancelIcon />
-                </IconButton>
-              </>
-            ) : url && (
+      {error && (
+        <Typography 
+          color="error" 
+          variant="body2" 
+          sx={{ mb: 2 }}
+        >
+          {error}
+        </Typography>
+      )}
+
+      {uploadType === 'url' && (
+        <Stack spacing={2}>
+          <TextField
+            fullWidth
+            label="Enter URL"
+            variant="outlined"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            disabled={uploading}
+            placeholder="https://"
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            {uploading && (
               <Button
-                onClick={handleUrlSubmit}
-                variant="contained"
-                disabled={uploading}
-                size="small"
+                color="secondary"
+                onClick={handleCancel}
+                startIcon={<CancelIcon />}
               >
-                Upload URL
+                Cancel
               </Button>
             )}
+            <Button
+              variant="contained"
+              onClick={handleUrlSubmit}
+              disabled={!url || uploading}
+            >
+              {uploading ? 'Adding...' : 'Add Link'}
+            </Button>
           </Box>
+        </Stack>
+      )}
+
+      {uploadType === 'text' && (
+        <Stack spacing={2}>
+          <TextField
+            label="Title (Optional)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            fullWidth
+            variant="outlined"
+            size="small"
+            disabled={uploading}
+          />
+          <TextField
+            label="Your Text"
+            multiline
+            rows={4}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            fullWidth
+            variant="outlined"
+            required
+            disabled={uploading}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            {uploading && (
+              <Button
+                color="secondary"
+                onClick={handleCancel}
+                startIcon={<CancelIcon />}
+              >
+                Cancel
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              onClick={handleTextSubmit}
+              disabled={!text.trim() || uploading}
+            >
+              {uploading ? 'Adding...' : 'Add Text'}
+            </Button>
+          </Box>
+        </Stack>
+      )}
+
+      {uploadType === 'file' && (
+        <Box>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            style={{ display: 'none' }}
+          />
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Button
+              variant="outlined"
+              component="span"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              startIcon={<CloudUploadIcon />}
+            >
+              Choose File
+            </Button>
+          </Box>
+          {uploading && (
+            <Box sx={{ textAlign: 'center' }}>
+              <CircularProgress 
+                variant="determinate" 
+                value={uploadProgress} 
+                sx={{ mb: 1 }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                Uploading... {uploadProgress}%
+              </Typography>
+              <Button
+                color="secondary"
+                onClick={handleCancel}
+                startIcon={<CancelIcon />}
+                sx={{ mt: 1 }}
+              >
+                Cancel Upload
+              </Button>
+            </Box>
+          )}
         </Box>
-      </Paper>
-    </Container>
+      )}
+    </Paper>
   );
 };
 
