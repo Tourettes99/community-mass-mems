@@ -1,6 +1,7 @@
 [functions]
-external_node_modules = ["sharp", "fluent-ffmpeg"]
+external_node_modules = ["sharp", "fluent-ffmpeg", "mongodb-client-encryption", "bson", "aws4"]
 included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
+node_bundler = "esbuild"
 
 [build]
 command = "CI=false GENERATE_SOURCEMAP=false npm run build"
@@ -11,10 +12,6 @@ functions = "netlify/functions"
 NODE_VERSION = "18.16.0"
 NODE_ENV = "production"
 MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
-
-[functions]
-node_bundler = "esbuild"
-external_node_modules = ["mongodb-client-encryption", "bson", "aws4"]
 
 [[redirects]]
 from = "/api/*"
