@@ -123,8 +123,20 @@ const getVideoId = (url) => {
   return { videoId, platform };
 };
 
+// Function to check if URL is an image
+const isImageUrl = async (url) => {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    const contentType = response.headers.get('content-type');
+    return contentType.startsWith('image/');
+  } catch (error) {
+    console.error('Error checking image URL:', error);
+    return false;
+  }
+};
+
 // Function to determine media type and preview
-const getMediaInfo = (url, metadata) => {
+const getMediaInfo = async (url, metadata) => {
   // Image extensions
   const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
   // Video extensions
@@ -142,8 +154,9 @@ const getMediaInfo = (url, metadata) => {
   let playbackHtml = null;
   let isPlayable = false;
 
-  // Check if it's a direct media file
-  if (imageExts.some(ext => path.endsWith(ext))) {
+  // First check if it's a direct image URL
+  const isImage = await isImageUrl(url);
+  if (isImage || imageExts.some(ext => path.endsWith(ext))) {
     mediaType = 'image';
     previewType = 'image';
     previewUrl = url;
@@ -169,32 +182,38 @@ const getMediaInfo = (url, metadata) => {
     previewType = 'youtube';
     const videoId = getVideoId(url).videoId;
     previewUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    playbackHtml = generateEmbedHtml(url, 'youtube', videoId);
     isPlayable = true;
   } else if (hostname.includes('vimeo.com')) {
     mediaType = 'video';
     previewType = 'vimeo';
-    // Vimeo preview URL will be extracted from metadata
+    const videoId = getVideoId(url).videoId;
     previewUrl = metadata?.ogImage;
+    playbackHtml = generateEmbedHtml(url, 'vimeo', videoId);
     isPlayable = true;
   } else if (hostname.includes('spotify.com')) {
     mediaType = 'audio';
     previewType = 'spotify';
     previewUrl = metadata?.ogImage;
+    playbackHtml = generateEmbedHtml(url, 'spotify');
     isPlayable = true;
   } else if (hostname.includes('soundcloud.com')) {
     mediaType = 'audio';
     previewType = 'soundcloud';
     previewUrl = metadata?.ogImage;
+    playbackHtml = generateEmbedHtml(url, 'soundcloud');
     isPlayable = true;
   } else if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
     mediaType = 'social';
     previewType = 'twitter';
     previewUrl = metadata?.twitterImage || metadata?.ogImage;
+    playbackHtml = generateEmbedHtml(url, 'twitter');
     isPlayable = true;
   } else if (hostname.includes('instagram.com')) {
     mediaType = 'social';
     previewType = 'instagram';
     previewUrl = metadata?.ogImage;
+    playbackHtml = generateEmbedHtml(url, 'instagram');
     isPlayable = true;
   }
 
@@ -203,6 +222,7 @@ const getMediaInfo = (url, metadata) => {
     previewUrl = metadata.ogImage;
     if (!previewType || previewType === 'none') {
       previewType = 'image';
+      isPlayable = true;
     }
   }
 
@@ -211,6 +231,21 @@ const getMediaInfo = (url, metadata) => {
     previewUrl = metadata.twitterImage;
     if (!previewType || previewType === 'none') {
       previewType = 'image';
+      isPlayable = true;
+    }
+  }
+
+  // For URLs that we couldn't determine a preview for, try to fetch OpenGraph data
+  if (!previewUrl && !playbackHtml) {
+    try {
+      const ogData = await unfurl(url);
+      if (ogData.open_graph?.image?.url) {
+        previewUrl = ogData.open_graph.image.url;
+        previewType = 'image';
+        isPlayable = true;
+      }
+    } catch (error) {
+      console.error('Error fetching OpenGraph data:', error);
     }
   }
 
@@ -257,11 +292,9 @@ const generateEmbedHtml = (url, platform, videoId) => {
 const fetchUrlMetadata = async (url) => {
   try {
     const result = await unfurl(url);
-    const { videoId, platform } = getVideoId(url);
-    const embedHtml = generateEmbedHtml(url, platform, videoId);
     
     // Get media info after we have metadata
-    const mediaInfo = getMediaInfo(url, {
+    const mediaInfo = await getMediaInfo(url, {
       ogImage: result.open_graph?.image?.url,
       twitterImage: result.twitter_card?.image?.url
     });
@@ -292,11 +325,7 @@ const fetchUrlMetadata = async (url) => {
       articlePublisher: result.open_graph?.article?.publisher,
       
       // Media and preview information
-      mediaType: mediaInfo.mediaType,
-      previewType: mediaInfo.previewType,
-      previewUrl: mediaInfo.previewUrl,
-      playbackHtml: mediaInfo.playbackHtml || embedHtml,
-      isPlayable: mediaInfo.isPlayable,
+      ...mediaInfo,
       
       // Additional metadata
       language: result.language,
@@ -307,15 +336,11 @@ const fetchUrlMetadata = async (url) => {
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
     // Try to get basic media info even if metadata fetch fails
-    const mediaInfo = getMediaInfo(url, {});
+    const mediaInfo = await getMediaInfo(url, {});
     return {
       siteName: new URL(url).hostname,
       error: 'Failed to fetch metadata',
-      mediaType: mediaInfo.mediaType,
-      previewType: mediaInfo.previewType,
-      previewUrl: mediaInfo.previewUrl,
-      playbackHtml: mediaInfo.playbackHtml,
-      isPlayable: mediaInfo.isPlayable
+      ...mediaInfo
     };
   }
 };
