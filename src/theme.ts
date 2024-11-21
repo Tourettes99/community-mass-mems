@@ -17,6 +17,9 @@ export const getTheme = (mode: PaletteMode) => createTheme({
           secondary: {
             main: '#808080', // Gray
           },
+          accent: {
+            main: '#FF4D2A', // RAL 2005 Orange
+          },
           text: {
             primary: '#666666', // Gray text
             secondary: '#808080',
@@ -33,6 +36,9 @@ export const getTheme = (mode: PaletteMode) => createTheme({
           },
           secondary: {
             main: '#808080', // Gray
+          },
+          accent: {
+            main: '#FF4D2A', // RAL 2005 Orange
           },
           text: {
             primary: '#FFFFFF', // White text
