@@ -60,14 +60,6 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           setIsPlaying(false);
         });
 
-        wavesurferRef.current.on('loading', (progress) => {
-          console.log('Loading progress:', progress);
-        });
-
-        wavesurferRef.current.on('load', () => {
-          console.log('Audio file loaded');
-        });
-
         // Load the audio file
         wavesurferRef.current.load(fullPath);
 
