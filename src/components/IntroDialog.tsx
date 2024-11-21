@@ -108,8 +108,18 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           responsive: true,
           height: 100,
           normalize: true,
-          backend: 'WebAudio',
-          autoplay: false
+          backend: 'MediaElement',
+          mediaControls: false,
+          autoplay: false,
+          xhr: {
+            cache: 'default',
+            mode: 'cors',
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: [
+              { key: 'Cache-Control', value: 'no-cache' },
+            ]
+          }
         });
 
         // Configure audio path
@@ -126,6 +136,8 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
         wavesurferRef.current.on('ready', () => {
           addDebugInfo('WaveSurfer ready - Audio loaded successfully');
+          const duration = wavesurferRef.current?.getDuration() || 0;
+          addDebugInfo(`Audio duration: ${duration} seconds`);
           setIsLoading(false);
           setError(null);
         });
@@ -137,6 +149,18 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         wavesurferRef.current.on('finish', () => {
           addDebugInfo('Playback finished');
           setIsPlaying(false);
+        });
+
+        wavesurferRef.current.on('play', () => {
+          addDebugInfo('Playback started');
+        });
+
+        wavesurferRef.current.on('pause', () => {
+          addDebugInfo('Playback paused');
+        });
+
+        wavesurferRef.current.on('decode', () => {
+          addDebugInfo('Audio decoded successfully');
         });
 
         // Load the audio file
@@ -174,16 +198,34 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
 
     try {
       addDebugInfo(`Attempting to ${isPlaying ? 'pause' : 'play'} audio`);
+      
       if (isPlaying) {
         wavesurferRef.current.pause();
+        addDebugInfo('Pause command sent');
       } else {
+        const duration = wavesurferRef.current.getDuration();
+        addDebugInfo(`Current duration: ${duration} seconds`);
+        
+        if (duration === 0) {
+          addDebugInfo('Warning: Audio duration is 0, attempting to reload');
+          await wavesurferRef.current.load(`/${audioPath}`);
+        }
+        
         await wavesurferRef.current.play();
+        addDebugInfo('Play command sent');
       }
+      
       setIsPlaying(!isPlaying);
       addDebugInfo(`Successfully ${isPlaying ? 'paused' : 'started'} playback`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       addDebugInfo(`Error in playback control: ${errorMsg}`);
+      try {
+        addDebugInfo('Attempting to recover by reloading audio');
+        await wavesurferRef.current.load(`/${audioPath}`);
+      } catch (reloadErr) {
+        addDebugInfo('Recovery attempt failed');
+      }
       setError('Failed to control audio playback. Please try again.');
     }
   };
