@@ -27,21 +27,77 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
   const wavesurferRef = useRef<WaveSurfer>();
 
   const addDebugInfo = (info: string) => {
-    setDebugInfo(prev => `${prev}\n${new Date().toISOString()}: ${info}`);
+    const timestamp = new Date().toISOString();
+    console.log(`[IntroDialog ${timestamp}] ${info}`);
+    setDebugInfo(prev => `${prev}\n[${timestamp}] ${info}`);
+  };
+
+  // Function to check audio file existence and metadata
+  const checkAudioFile = async () => {
+    addDebugInfo('Starting audio file check...');
+    addDebugInfo(`Audio path provided: ${audioPath}`);
+
+    // Check public URL
+    const publicUrl = `/${audioPath}`;
+    addDebugInfo(`Checking public URL: ${publicUrl}`);
+
+    // Check window location
+    addDebugInfo(`Current window.location.origin: ${window.location.origin}`);
+    addDebugInfo(`Current window.location.pathname: ${window.location.pathname}`);
+    
+    // Check process.env
+    addDebugInfo(`process.env.PUBLIC_URL: ${process.env.PUBLIC_URL || 'not set'}`);
+    addDebugInfo(`process.env.NODE_ENV: ${process.env.NODE_ENV}`);
+
+    try {
+      // Try to fetch the file
+      addDebugInfo('Attempting to fetch audio file...');
+      const response = await fetch(publicUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Log response details
+      const contentType = response.headers.get('content-type');
+      const contentLength = response.headers.get('content-length');
+      addDebugInfo(`File fetch successful!`);
+      addDebugInfo(`Content-Type: ${contentType}`);
+      addDebugInfo(`Content-Length: ${contentLength} bytes`);
+
+      // Verify content type
+      if (!contentType?.includes('audio')) {
+        addDebugInfo(`Warning: Content-Type is not audio: ${contentType}`);
+      }
+
+      // Try to get file metadata
+      const blob = await response.blob();
+      addDebugInfo(`File size: ${blob.size} bytes`);
+      addDebugInfo(`File type: ${blob.type}`);
+
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      addDebugInfo(`Error checking audio file: ${errorMsg}`);
+      setError('Audio file not found or inaccessible.');
+    }
   };
 
   useEffect(() => {
     if (waveformRef.current && open) {
       setIsLoading(true);
       setError(null);
-      addDebugInfo('Initializing WaveSurfer...');
+      addDebugInfo('=== Starting WaveSurfer Initialization ===');
+      addDebugInfo(`Initializing WaveSurfer for audio: ${audioPath}`);
 
       try {
-        // Destroy previous instance if it exists
+        // Cleanup previous instance
         if (wavesurferRef.current) {
+          addDebugInfo('Cleaning up previous WaveSurfer instance');
           wavesurferRef.current.destroy();
         }
 
+        // Create new instance
+        addDebugInfo('Creating new WaveSurfer instance');
         wavesurferRef.current = WaveSurfer.create({
           container: waveformRef.current,
           waveColor: '#FF5F1F',
@@ -56,22 +112,27 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
           autoplay: false
         });
 
-        // Use absolute path from root
+        // Configure audio path
         const fullPath = `/${audioPath}`;
-        addDebugInfo(`Loading audio from: ${fullPath}`);
+        addDebugInfo(`Configured audio path: ${fullPath}`);
+        addDebugInfo(`Full URL will be: ${window.location.origin}${fullPath}`);
 
-        // Type-safe event handlers
-        wavesurferRef.current.on('error', () => {
-          const errorMsg = 'Failed to load audio file. Please try again.';
-          addDebugInfo(`Error: ${errorMsg}`);
-          setError(errorMsg);
+        // Set up event handlers
+        wavesurferRef.current.on('error', (err) => {
+          const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+          addDebugInfo(`WaveSurfer error: ${errorMsg}`);
+          setError('Failed to load audio file. Please try again.');
           setIsLoading(false);
         });
 
         wavesurferRef.current.on('ready', () => {
-          addDebugInfo('WaveSurfer ready');
+          addDebugInfo('WaveSurfer ready - Audio loaded successfully');
           setIsLoading(false);
           setError(null);
+        });
+
+        wavesurferRef.current.on('loading', (progress) => {
+          addDebugInfo(`Loading progress: ${progress}%`);
         });
 
         wavesurferRef.current.on('finish', () => {
@@ -80,26 +141,35 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         });
 
         // Load the audio file
+        addDebugInfo('Initiating audio file load');
         wavesurferRef.current.load(fullPath);
 
         return () => {
           if (wavesurferRef.current) {
-            addDebugInfo('Destroying WaveSurfer instance');
+            addDebugInfo('Cleanup: Destroying WaveSurfer instance');
             wavesurferRef.current.destroy();
           }
         };
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-        addDebugInfo(`Error initializing WaveSurfer: ${errorMsg}`);
+        addDebugInfo(`Error in WaveSurfer initialization: ${errorMsg}`);
         setError('Failed to initialize audio player.');
         setIsLoading(false);
       }
     }
   }, [open, audioPath]);
 
+  // Check audio file when dialog opens
+  useEffect(() => {
+    if (open) {
+      addDebugInfo('=== Starting Audio File Check ===');
+      checkAudioFile();
+    }
+  }, [open, audioPath]);
+
   const handlePlayPause = async () => {
     if (!wavesurferRef.current) {
-      addDebugInfo('WaveSurfer instance not found');
+      addDebugInfo('Error: WaveSurfer instance not found');
       return;
     }
 
@@ -111,49 +181,22 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
         await wavesurferRef.current.play();
       }
       setIsPlaying(!isPlaying);
-      addDebugInfo(`Successfully ${isPlaying ? 'paused' : 'played'} audio`);
+      addDebugInfo(`Successfully ${isPlaying ? 'paused' : 'started'} playback`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      addDebugInfo(`Error playing/pausing audio: ${errorMsg}`);
-      setError('Failed to play audio. Please try again.');
+      addDebugInfo(`Error in playback control: ${errorMsg}`);
+      setError('Failed to control audio playback. Please try again.');
     }
   };
 
   const handleSkip = () => {
-    addDebugInfo('Skipping intro');
+    addDebugInfo('User clicked Skip');
     if (wavesurferRef.current) {
       wavesurferRef.current.stop();
+      addDebugInfo('Stopped audio playback');
     }
     onClose();
   };
-
-  // Function to check if audio file exists
-  const checkAudioFile = async () => {
-    const fullPath = `/${audioPath}`;
-    try {
-      addDebugInfo(`Checking audio file at: ${fullPath}`);
-      const response = await fetch(fullPath);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const contentType = response.headers.get('content-type');
-      addDebugInfo(`Audio file content type: ${contentType}`);
-      if (!contentType?.includes('audio')) {
-        addDebugInfo(`Warning: Content-Type is not audio: ${contentType}`);
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      addDebugInfo(`Error checking audio file: ${errorMsg}`);
-      setError('Audio file not found or inaccessible.');
-    }
-  };
-
-  // Check audio file when dialog opens
-  useEffect(() => {
-    if (open) {
-      checkAudioFile();
-    }
-  }, [open, audioPath]);
 
   return (
     <Dialog 
@@ -180,13 +223,11 @@ const IntroDialog: React.FC<IntroDialogProps> = ({ open, onClose, audioPath }) =
             <CircularProgress />
           </Box>
         )}
-        {process.env.NODE_ENV === 'development' && (
-          <Box mt={2} p={1} bgcolor="grey.100" borderRadius={1}>
-            <Typography variant="caption" component="pre" style={{ whiteSpace: 'pre-wrap' }}>
-              {debugInfo}
-            </Typography>
-          </Box>
-        )}
+        <Box mt={2} p={1} bgcolor="grey.100" borderRadius={1}>
+          <Typography variant="caption" component="pre" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {debugInfo}
+          </Typography>
+        </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
         <Button 
