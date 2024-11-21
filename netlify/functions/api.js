@@ -102,10 +102,16 @@ const connectDB = async () => {
     console.log('Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
-      useUnifiedTopology: true,
-      dbName: 'memories'
+      useUnifiedTopology: true
     });
-    console.log('MongoDB Connected Successfully');
+
+    // Explicitly set the database
+    mongoose.connection.useDb('memories');
+    
+    console.log('Connected to database:', mongoose.connection.db.databaseName);
+    console.log('Available collections:', await mongoose.connection.db.listCollections().toArray());
+    
+    return mongoose.connection;
   } catch (error) {
     console.error('MongoDB Connection Error:', error);
     throw error;
