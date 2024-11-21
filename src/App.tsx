@@ -7,19 +7,20 @@ import UploadBar from './components/UploadBar';
 import IntroDialog from './components/IntroDialog';
 import InfoBar from './components/InfoBar';
 import PatreonBar from './components/PatreonBar';
+import { Memory } from './types';
 
 function App() {
   const [showIntro, setShowIntro] = useState(() => {
     return localStorage.getItem('introShown') !== 'true';
   });
 
-  const [memories, setMemories] = useState([]);
+  const [memories, setMemories] = useState<Memory[]>([]);
 
   const fetchMemories = async () => {
     try {
       const response = await fetch('/.netlify/functions/get-memories');
       if (!response.ok) throw new Error('Failed to fetch memories');
-      const data = await response.json();
+      const data: Memory[] = await response.json();
       setMemories(data);
     } catch (error) {
       console.error('Error fetching memories:', error);
@@ -36,7 +37,7 @@ function App() {
     }
   }, [showIntro]);
 
-  const handleMemoryCreated = (newMemory) => {
+  const handleMemoryCreated = (newMemory: Memory) => {
     setMemories(prev => [newMemory, ...prev]);
   };
 
