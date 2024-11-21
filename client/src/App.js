@@ -53,10 +53,13 @@ function App() {
 
   const loadMemories = async () => {
     try {
-      const data = await getMemories();
-      setMemories(data);
+      const response = await getMemories();
+      // Extract memories array from the response data
+      const memoriesData = response.data?.memories || [];
+      setMemories(memoriesData);
     } catch (error) {
       console.error('Error loading memories:', error);
+      setMemories([]); // Set empty array on error
     }
   };
 

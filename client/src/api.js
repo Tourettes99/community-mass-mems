@@ -80,7 +80,7 @@ export const createMemory = async (memoryData) => {
 export const getMemories = async () => {
   try {
     const response = await api.get(endpoints.memories);
-    return response.data;
+    return response; // Return the full response object
   } catch (error) {
     console.error('Failed to fetch memories:', error);
     throw error;
