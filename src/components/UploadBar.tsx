@@ -178,7 +178,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         tags
       };
 
-      const response = await fetch('/.netlify/functions/upload', {
+      const response = await fetch('/.netlify/functions/file-upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,12 +186,12 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         body: JSON.stringify(requestBody)
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to upload memory');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload memory');
       }
 
+      const data = await response.json();
       onMemoryCreated(data);
       setSuccess(true);
       setUrl('');
