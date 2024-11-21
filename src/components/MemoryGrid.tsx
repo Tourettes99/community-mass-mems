@@ -6,107 +6,30 @@ import axios from 'axios';
 
 interface Memory {
   _id: string;
-  type: 'image' | 'gif' | 'audio' | 'url';
+  type: 'url' | 'image' | 'video' | 'audio' | 'text';
   url: string;
-  metadata: {
-    fileName?: string;
-    resolution?: string;
-    format?: string;
-    fps?: number;
-    duration?: string;
-    siteName?: string;
-    description?: string;
-    size?: number;
-    contentType?: string;
-    embedHtml?: string;
-    previewUrl?: string;
-    isPlayable?: boolean;
-    mediaType?: string;
-    favicon?: string;
+  content?: string;
+  metadata?: {
     title?: string;
+    description?: string;
+    siteName?: string;
+    favicon?: string;
+    mediaType?: 'url' | 'image' | 'video' | 'audio';
+    previewUrl?: string;
     playbackHtml?: string;
+    isPlayable?: boolean;
   };
   tags?: string[];
 }
 
 const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
-  const handleImageLoad = () => {
-    setIsLoading(false);
-    setError(null);
-  };
-
-  const handleImageError = () => {
-    setIsLoading(false);
-    setError('Failed to load image');
-  };
-
-  const handleRetry = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    setRetryCount(count => count + 1);
-  }, []);
-
   const handleCardClick = (event: React.MouseEvent) => {
-    if ((event.target as HTMLElement).closest('video, audio, iframe, a')) {
+    if ((event.target as HTMLElement).closest('video, audio, iframe, a, button')) {
       return;
     }
     setExpanded(!expanded);
-  };
-
-  const handleLinkClick = (event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent card expansion
-  };
-
-  const renderMediaContent = () => {
-    if (!memory.metadata) return null;
-
-    if (memory.metadata.isPlayable && memory.metadata.playbackHtml) {
-      // Render the media player using dangerouslySetInnerHTML
-      return (
-        <Box 
-          sx={{ 
-            width: '100%',
-            position: 'relative',
-            '& iframe': {
-              border: 'none',
-              borderRadius: 1,
-            },
-            '& video, & audio': {
-              width: '100%',
-              borderRadius: 1,
-            },
-            '& video': {
-              maxHeight: '400px',
-              objectFit: 'contain',
-              backgroundColor: 'black',
-            },
-          }}
-          dangerouslySetInnerHTML={{ __html: memory.metadata.playbackHtml }}
-        />
-      );
-    } else if (memory.metadata.previewUrl) {
-      return (
-        <Box
-          component="img"
-          src={memory.metadata.previewUrl}
-          alt={memory.metadata.title || 'Preview'}
-          sx={{
-            width: '100%',
-            height: 'auto',
-            maxHeight: '300px',
-            objectFit: 'cover',
-            borderRadius: 1,
-          }}
-        />
-      );
-    }
-    return null;
   };
 
   const renderUrlCard = () => {
@@ -126,46 +49,55 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         }}
         onClick={handleCardClick}
       >
-        {(metadata.favicon || metadata.title || metadata.siteName) && (
-          <CardHeader
-            avatar={
-              metadata.favicon ? (
-                <Avatar 
-                  src={metadata.favicon} 
-                  sx={{ width: 24, height: 24 }}
-                  imgProps={{ style: { objectFit: 'contain' } }}
-                />
-              ) : null
-            }
-            title={
-              metadata.title ? (
-                <Link
-                  href={memory.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  sx={{
-                    color: 'inherit',
-                    textDecoration: 'none',
-                    '&:hover': {
-                      textDecoration: 'underline',
-                    },
-                  }}
-                >
-                  {metadata.title}
-                </Link>
-              ) : null
-            }
-            subheader={metadata.siteName}
-          />
-        )}
+        {/* Header with favicon, title, and site name */}
+        <CardHeader
+          avatar={
+            metadata.favicon ? (
+              <Avatar 
+                src={metadata.favicon} 
+                sx={{ width: 24, height: 24 }}
+                imgProps={{ style: { objectFit: 'contain' } }}
+              />
+            ) : null
+          }
+          title={
+            <Link
+              href={memory.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                color: 'inherit',
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline',
+                },
+              }}
+            >
+              {metadata.title || memory.url}
+            </Link>
+          }
+          subheader={metadata.siteName}
+        />
 
+        {/* Media Content */}
         {metadata.isPlayable && metadata.playbackHtml ? (
           <Box 
             sx={{ 
               width: '100%',
+              position: 'relative',
+              paddingTop: metadata.mediaType === 'video' ? '56.25%' : 'auto', // 16:9 aspect ratio for videos
               '& iframe': {
+                position: metadata.mediaType === 'video' ? 'absolute' : 'relative',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: metadata.mediaType === 'video' ? '100%' : 'auto',
                 border: 'none',
+                borderRadius: 1,
+              },
+              '& video, & audio': {
+                width: '100%',
                 borderRadius: 1,
               },
             }}
@@ -175,7 +107,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           <CardMedia
             component="img"
             image={metadata.previewUrl}
-            alt={metadata.title || ""}
+            alt={metadata.title || "Preview"}
             sx={{
               width: '100%',
               height: 'auto',
@@ -185,6 +117,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           />
         ) : null}
 
+        {/* Description */}
         {metadata.description && (
           <CardContent>
             <Typography
@@ -195,6 +128,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 WebkitLineClamp: expanded ? 'unset' : 3,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
+                transition: 'all 0.3s ease',
               }}
             >
               {metadata.description}
@@ -202,6 +136,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           </CardContent>
         )}
 
+        {/* Tags */}
         {memory.tags && memory.tags.length > 0 && (
           <CardContent sx={{ pt: 0 }}>
             <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
@@ -211,197 +146,24 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                   label={tag}
                   size="small"
                   sx={{ borderRadius: 1 }}
+                  onClick={(e) => e.stopPropagation()}
                 />
               ))}
             </Stack>
           </CardContent>
         )}
-
-        {!metadata.title && !metadata.description && !metadata.previewUrl && !metadata.playbackHtml && (
-          <CardContent>
-            <Link
-              href={memory.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{
-                color: 'inherit',
-                wordBreak: 'break-all',
-              }}
-            >
-              {memory.url}
-            </Link>
-          </CardContent>
-        )}
       </Card>
     );
   };
 
-  const renderContent = () => {
-    switch (memory.type) {
-      case 'image':
-      case 'gif':
-        return (
-          <Box sx={{ position: 'relative', height: 200 }}>
-            {isLoading && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: 'background.default',
-                }}
-              >
-                <CircularProgress size={24} />
-              </Box>
-            )}
-            {error ? (
-              <Box
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: 'error.light',
-                  color: 'error.contrastText',
-                  gap: 1,
-                  p: 2,
-                }}
-              >
-                <Typography variant="body2" align="center">
-                  {error}
-                </Typography>
-                <IconButton 
-                  onClick={handleRetry}
-                  size="small"
-                  sx={{ 
-                    color: 'inherit',
-                    '&:hover': {
-                      bgcolor: 'error.dark',
-                    }
-                  }}
-                >
-                  <RefreshIcon />
-                </IconButton>
-              </Box>
-            ) : (
-              <CardMedia
-                component="img"
-                image={`${memory.url}${retryCount > 0 ? '?retry=' + retryCount : ''}`}
-                alt={memory.metadata?.fileName || 'Memory image'}
-                sx={{
-                  height: '100%',
-                  objectFit: 'cover',
-                  opacity: isLoading ? 0 : 1,
-                  transition: 'opacity 0.3s ease-in-out',
-                }}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            )}
-          </Box>
-        );
-      case 'audio':
-        return (
-          <Box sx={{ p: 2 }}>
-            <audio 
-              controls 
-              style={{ width: '100%' }}
-              onError={() => setError('Failed to load audio')}
-            >
-              <source 
-                src={memory.url} 
-                type={memory.metadata?.contentType || memory.metadata?.format ? `audio/${memory.metadata.format}` : 'audio/mpeg'} 
-              />
-              Your browser does not support the audio element.
-            </audio>
-          </Box>
-        );
-      case 'url':
-        return renderUrlCard();
-      default:
-        return null;
-    }
-  };
-
-  const renderMetadata = () => {
-    const { metadata } = memory;
-    if (!metadata) return null;
-    
-    return (
-      <Box sx={{ mt: 1 }}>
-        {metadata.fileName && (
-          <Typography variant="body2" noWrap>
-            Name: {metadata.fileName}
-          </Typography>
-        )}
-        {metadata.format && (
-          <Typography variant="body2">
-            Format: {metadata.format}
-          </Typography>
-        )}
-        {metadata.size && (
-          <Typography variant="body2">
-            Size: {(metadata.size / 1024).toFixed(1)} KB
-          </Typography>
-        )}
-        {metadata.resolution && (
-          <Typography variant="body2">
-            Resolution: {metadata.resolution}
-          </Typography>
-        )}
-        {metadata.fps && (
-          <Typography variant="body2">
-            FPS: {metadata.fps}
-          </Typography>
-        )}
-        {metadata.duration && (
-          <Typography variant="body2">
-            Duration: {metadata.duration}
-          </Typography>
-        )}
-      </Box>
-    );
-  };
-
-  return (
-    <motion.div
-      layout
-      whileHover={{ scale: 1.05 }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-    >
-      <Card 
-        sx={{ 
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          bgcolor: 'background.paper',
-          overflow: 'hidden',
-        }}
-      >
-        {renderContent()}
-        <CardContent sx={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
-          <AnimatePresence>
-            {isHovered && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                {renderMetadata()}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
+  // Render different card types based on memory type
+  switch (memory.type) {
+    case 'url':
+      return renderUrlCard();
+    // Add other memory type renderers here
+    default:
+      return null;
+  }
 };
 
 const MemoryGrid: React.FC = () => {

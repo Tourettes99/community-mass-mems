@@ -23,13 +23,19 @@ const memorySchema = new mongoose.Schema({
     description: String,
     siteName: String,
     favicon: String,
-    mediaType: String,
+    mediaType: {
+      type: String,
+      enum: ['url', 'image', 'video', 'audio']
+    },
     previewUrl: String,
     playbackHtml: String,
     isPlayable: Boolean
   },
   tags: [String]
-}, { timestamps: true });
+}, { 
+  timestamps: true,
+  strict: true // Prevent adding fields not in schema
+});
 
 // Create the Memory model
 let Memory;
@@ -50,11 +56,14 @@ const fetchUrlMetadata = async (url) => {
       }
     });
 
-    const metadata = {};
+    // Start with minimal metadata object
+    const metadata = {
+      mediaType: 'url' // Default type for URLs
+    };
 
-    // Only add fields if they exist in OpenGraph or Twitter Cards
-    if (result.open_graph?.title || result.twitter_card?.title) {
-      metadata.title = result.open_graph?.title || result.twitter_card?.title;
+    // Title is important - try multiple sources
+    if (result.open_graph?.title || result.twitter_card?.title || result.title) {
+      metadata.title = result.open_graph?.title || result.twitter_card?.title || result.title;
     }
 
     if (result.open_graph?.description || result.twitter_card?.description) {
@@ -69,31 +78,56 @@ const fetchUrlMetadata = async (url) => {
       metadata.favicon = result.favicon;
     }
 
-    // Handle media content
-    if (result.open_graph?.video?.url || result.twitter_card?.player?.url) {
+    // Handle embedded media content
+    // Check for video players first
+    if (result.twitter_card?.player?.url || result.open_graph?.video?.url) {
       metadata.mediaType = 'video';
       metadata.isPlayable = true;
-      metadata.playbackHtml = `<iframe 
+      const playerUrl = result.twitter_card?.player?.url || result.open_graph?.video?.url;
+      metadata.playbackHtml = playerUrl ? `<iframe 
         width="100%" 
         style="aspect-ratio: 16/9;" 
-        src="${result.open_graph?.video?.url || result.twitter_card?.player?.url}"
+        src="${playerUrl}"
         frameborder="0" 
         allowfullscreen
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
-      </iframe>`;
-    } else {
-      metadata.mediaType = 'url';
+      </iframe>` : null;
+    }
+    // Check for oEmbed support
+    else if (result.oEmbed?.html) {
+      metadata.mediaType = result.oEmbed.type || 'url';
+      metadata.isPlayable = true;
+      metadata.playbackHtml = result.oEmbed.html;
+      // If oEmbed provides better metadata, use it
+      if (result.oEmbed.title && !metadata.title) {
+        metadata.title = result.oEmbed.title;
+      }
     }
 
-    // Only add preview URL if explicitly provided
+    // Handle preview images
     if (result.open_graph?.image?.url || result.twitter_card?.image?.url) {
       metadata.previewUrl = result.open_graph?.image?.url || result.twitter_card?.image?.url;
     }
+    // Fallback to oEmbed thumbnail if no OG/Twitter image
+    else if (result.oEmbed?.thumbnail_url) {
+      metadata.previewUrl = result.oEmbed.thumbnail_url;
+    }
+
+    // Remove any null/undefined values
+    Object.keys(metadata).forEach(key => {
+      if (metadata[key] === null || metadata[key] === undefined) {
+        delete metadata[key];
+      }
+    });
 
     return metadata;
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
-    return {};
+    // Return URL with original URL as title if nothing else works
+    return { 
+      mediaType: 'url',
+      title: url
+    };
   }
 };
 
@@ -129,16 +163,17 @@ exports.handler = async (event, context) => {
       };
     }
 
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(MONGODB_URI);
     
+    // Start with minimal memory data
     let memoryData = {
       type,
-      tags: tags || []
+      tags: Array.isArray(tags) ? tags : [] // Ensure tags is always an array
     };
 
     switch (type) {
       case 'url':
-        if (!url) {
+        if (!url?.trim()) {
           return {
             statusCode: 400,
             headers,
@@ -156,8 +191,8 @@ exports.handler = async (event, context) => {
           };
         }
 
+        memoryData.url = url.trim();
         const metadata = await fetchUrlMetadata(url);
-        memoryData.url = url;
         if (Object.keys(metadata).length > 0) {
           memoryData.metadata = metadata;
         }
@@ -177,20 +212,33 @@ exports.handler = async (event, context) => {
       case 'image':
       case 'video':
       case 'audio':
-        if (!file?.url) {
+        if (!file?.url?.trim()) {
           return {
             statusCode: 400,
             headers,
-            body: JSON.stringify({ error: `File is required for ${type} type memories` })
+            body: JSON.stringify({ error: `File URL is required for ${type} type memories` })
           };
         }
         
-        memoryData.url = file.url;
+        if (!file.contentType?.includes(type)) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: `Invalid content type for ${type} file` })
+          };
+        }
+
+        memoryData.url = file.url.trim();
         memoryData.metadata = {
           mediaType: type,
-          ...(type === 'image' ? { previewUrl: file.url } : {
+          title: file.name || file.url.split('/').pop(), // Use filename or last part of URL
+          ...(type === 'image' ? {
+            previewUrl: file.url.trim()
+          } : {
             isPlayable: true,
-            playbackHtml: `<${type} controls><source src="${file.url}" type="${file.contentType}"></${type}>`
+            playbackHtml: `<${type} controls>
+              <source src="${file.url.trim()}" type="${file.contentType}">
+            </${type}>`
           })
         };
         break;
@@ -215,7 +263,7 @@ exports.handler = async (event, context) => {
       headers,
       body: JSON.stringify({ 
         error: 'Failed to create memory',
-        message: error.message 
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };
   }
