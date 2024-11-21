@@ -14,6 +14,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
   
   // Initialize intro dialog state
   const [showIntro, setShowIntro] = useState(() => {
@@ -24,8 +25,11 @@ function App() {
     }
   });
 
-  const fetchMemories = useCallback(async () => {
-    setLoading(true);
+  const fetchMemories = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true);
+    }
+    setIsBackgroundRefresh(isBackground);
     setError(null);
     
     try {
@@ -48,19 +52,39 @@ function App() {
         return dateB - dateA;
       });
 
-      setMemories(sortedData);
-      console.log(`Loaded ${data.length} memories from database`);
+      // Only update if there are changes
+      const hasChanges = JSON.stringify(sortedData) !== JSON.stringify(memories);
+      if (hasChanges) {
+        setMemories(sortedData);
+        if (isBackground) {
+          console.log(`Silently updated with ${data.length} memories`);
+        } else {
+          console.log(`Loaded ${data.length} memories from database`);
+        }
+      }
     } catch (error) {
       console.error('Error fetching memories:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch memories');
+      if (!isBackground) {
+        setError(error instanceof Error ? error.message : 'Failed to fetch memories');
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
+      setIsBackgroundRefresh(false);
     }
-  }, []);
+  }, [memories]);
 
-  // Initial fetch only
+  // Initial fetch and set up polling
   useEffect(() => {
-    fetchMemories();
+    fetchMemories(false);
+
+    // Poll for updates every 10 seconds
+    const intervalId = setInterval(() => {
+      fetchMemories(true);
+    }, 10000);
+
+    return () => clearInterval(intervalId);
   }, [fetchMemories]);
 
   useEffect(() => {
@@ -81,12 +105,12 @@ function App() {
     setNotification('Memory added successfully!');
     
     // Fetch latest memories to ensure consistency
-    await fetchMemories();
+    await fetchMemories(true);
   };
 
   const handleRefresh = () => {
     setNotification('Refreshing memories...');
-    fetchMemories();
+    fetchMemories(false);
   };
 
   return (
@@ -106,6 +130,7 @@ function App() {
             loading={loading}
             error={error}
             onRefresh={handleRefresh}
+            isBackgroundRefresh={isBackgroundRefresh}
           />
           <PatreonBar />
         </Container>

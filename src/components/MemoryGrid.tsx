@@ -9,6 +9,7 @@ interface MemoryGridProps {
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  isBackgroundRefresh?: boolean;
 }
 
 const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
@@ -288,7 +289,13 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   }
 };
 
-const MemoryGrid: React.FC<MemoryGridProps> = ({ memories = [], loading = false, error = null, onRefresh }) => {
+const MemoryGrid: React.FC<MemoryGridProps> = ({ 
+  memories = [], 
+  loading = false, 
+  error = null, 
+  onRefresh,
+  isBackgroundRefresh = false 
+}) => {
   const [sortedMemories, setSortedMemories] = useState<Memory[]>([]);
 
   useEffect(() => {
@@ -302,7 +309,8 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({ memories = [], loading = false,
     setSortedMemories(sorted);
   }, [memories]);
 
-  if (loading) {
+  // Only show loading state for manual refreshes
+  if (loading && !isBackgroundRefresh) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -337,14 +345,15 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({ memories = [], loading = false,
 
   return (
     <Box sx={{ mt: 4 }}>
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {sortedMemories.map((memory, index) => (
           <motion.div
             key={memory._id || index}
-            initial={{ opacity: 0, y: 20 }}
+            initial={!isBackgroundRefresh ? { opacity: 0, y: 20 } : false}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3, delay: index * 0.1 }}
+            layout
           >
             <Box sx={{ mb: 2 }}>
               <MemoryCard memory={memory} />
