@@ -3,8 +3,8 @@ import axios from 'axios';
 
 // API Base URL configuration
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? '/.netlify/functions/api'  // Netlify Functions path
-  : 'http://localhost:8888/.netlify/functions/api';  // Local Netlify dev server
+  ? 'https://shiny-jalebi-9ccb2b.netlify.app/.netlify/functions/api'  // Production URL
+  : 'http://localhost:8888/.netlify/functions/api';  // Local development URL
 
 // Log environment configuration
 console.log('%c🌐 API Configuration', 'font-size: 14px; font-weight: bold; color: #2196F3');

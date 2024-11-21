@@ -41,7 +41,7 @@ const mongooseOptions = {
   retryWrites: true,
   w: 'majority',
   authSource: 'admin',
-  dbName: 'memories'  // Specify the database name explicitly
+  dbName: 'memories'
 };
 
 // MongoDB connection with retry logic
@@ -93,10 +93,15 @@ async function connectWithRetry(retries = MAX_RETRIES) {
   }
 }
 
-// Test connection endpoint
+// Test connection endpoint - Direct route on app
 app.get('/test-connection', async (req, res) => {
   console.log('🔌 Test connection endpoint hit');
   try {
+    // Ensure MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      await connectWithRetry();
+    }
+
     const state = mongoose.connection.readyState;
     let stateText;
     switch (state) {
@@ -107,14 +112,9 @@ app.get('/test-connection', async (req, res) => {
       default: stateText = 'Unknown';
     }
 
-    // Try to connect if not connected
-    if (state !== 1) {
-      await connectWithRetry();
-    }
-
     // Get database stats if connected
     let stats = null;
-    if (mongoose.connection.readyState === 1) {
+    if (state === 1) {
       try {
         stats = await mongoose.connection.db.stats();
         console.log('📈 Database Stats Retrieved');
@@ -582,36 +582,44 @@ router.get('/test-db', async (req, res) => {
   }
 });
 
-// Mount routes at the root level for Netlify Functions
-app.use('/', router);
-
-// Export the serverless handler
-const handler = serverless(app, {
-  binary: ['image/*', 'audio/*'],
-  request: (req, event, context) => {
-    // Log incoming requests
-    console.log('📝 Request:', {
-      method: req.method,
-      path: req.path,
-      headers: req.headers
-    });
-  },
-  response: (response, event, context) => {
-    // Log outgoing responses
-    console.log('📤 Response:', {
-      statusCode: response.statusCode,
-      headers: response.headers
-    });
-  }
-});
+// Create handler
+const handler = serverless(app);
 
 // Export the handler function
 exports.handler = async (event, context) => {
-  // Connect to MongoDB before handling the request
+  // Log the incoming request
+  console.log('🌐 Incoming request:', {
+    path: event.path,
+    httpMethod: event.httpMethod,
+    headers: event.headers
+  });
+
+  // Ensure MongoDB is connected before handling the request
   if (mongoose.connection.readyState !== 1) {
+    console.log('📡 Connecting to MongoDB before handling request...');
     await connectWithRetry();
   }
-  
-  // Handle the request
-  return handler(event, context);
+
+  try {
+    // Handle the request
+    const result = await handler(event, context);
+    
+    // Log the response
+    console.log('📤 Response:', {
+      statusCode: result.statusCode,
+      headers: result.headers
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error handling request:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        status: 'error',
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      })
+    };
+  }
 };
