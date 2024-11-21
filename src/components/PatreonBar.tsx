@@ -29,18 +29,19 @@ const PatreonBar: React.FC = () => {
             }
           }}
         >
-          <Box
-            component="img"
-            src="https://c5.patreon.com/external/logo/downloads_wordmark_white_on_coral.png"
-            alt="Patreon"
-            sx={{ height: 30, mr: 2 }}
-          />
-          <Typography variant="h6">
-            Support us on Patreon!
-          </Typography>
-        </Box>
-      </Paper>
-    </Link>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box
+              component="img"
+              src="https://c5.patreon.com/external/logo/downloads_wordmark_white_on_coral.png"
+              alt="Patreon"
+              sx={{ height: 30 }}
+            />
+            <Typography variant="h6">
+              Support us on Patreon!
+            </Typography>
+          </Box>
+        </Paper>
+      </Link>
     </motion.div>
   );
 };
