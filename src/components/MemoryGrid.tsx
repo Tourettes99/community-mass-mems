@@ -3,6 +3,7 @@ import { Box, Card, CardContent, Typography, CardMedia, CircularProgress, IconBu
 import { motion, AnimatePresence } from 'framer-motion';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { Memory } from '../types';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 
 interface MemoryGridProps {
   memories: Memory[];
@@ -59,515 +60,67 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
     if (metadata.format) {
       details.push(`Format: ${metadata.format}`);
     }
-    if (metadata.lastModified) {
-      details.push(`Modified: ${new Date(metadata.lastModified).toLocaleString()}`);
+    if (metadata.encoding) {
+      details.push(`Encoding: ${metadata.encoding}`);
     }
 
-    if (details.length === 0) return null;
-
-    return (
-      <Box sx={{ mt: 1, mb: 1 }}>
-        <Typography variant="caption" color="text.secondary" component="div">
-          {details.join(' • ')}
-        </Typography>
-      </Box>
-    );
+    return details.length > 0 ? (
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        {details.join(' • ')}
+      </Typography>
+    ) : null;
   };
 
-  const renderTextCard = () => {
-    return (
-      <Card 
-        sx={{ 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column',
-          cursor: 'pointer',
-          '&:hover': {
-            boxShadow: 3,
-          },
-        }}
-        onClick={handleCardClick}
-      >
-        <CardContent>
-          <Typography
-            variant="body1"
-            sx={{
-              display: '-webkit-box',
-              WebkitLineClamp: expanded ? 'unset' : 3,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word'
-            }}
-          >
-            {memory.content}
-          </Typography>
-          
-          {/* Metadata */}
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              Posted on {formatDate(memory.createdAt)}
-            </Typography>
-          </Box>
-
-          {/* Tags */}
-          {memory.tags && memory.tags.length > 0 && (
-            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
-              {memory.tags.map((tag, index) => (
-                <Chip
-                  key={index}
-                  label={tag}
-                  size="small"
-                  sx={{ borderRadius: 1 }}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ))}
-            </Stack>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const renderUrlCard = () => {
-    const metadata = memory.metadata;
-    if (!metadata) return null;
-
-    // Extract domain from URL
-    const getUrlDomain = (url: string | undefined) => {
-      if (!url) return '';
-      try {
-        const domain = new URL(url).hostname.toLowerCase();
-        return domain;
-      } catch {
-        return '';
-      }
-    };
-
-    // Handle all types of URL embeds
-    const getUrlEmbed = () => {
-      if (!memory.url) return null;
-      
-      const url = memory.url;
-      const domain = getUrlDomain(url);
-      
-      // Discord messages/channels
-      if (domain.includes('discord.com')) {
-        // Handle Discord message links
-        const messageMatch = url.match(/channels\/(\d+)\/(\d+)\/(\d+)/);
-        if (messageMatch) {
-          return {
-            html: `<iframe 
-              src="https://discord.com/embed?messageId=${messageMatch[3]}&channelId=${messageMatch[2]}&guildId=${messageMatch[1]}"
-              allowtransparency="true"
-              frameborder="0"
-              sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>`,
-            aspectRatio: '400px'
-          };
-        }
-        // Handle Discord server/channel invites
-        const inviteMatch = url.match(/invite\/([a-zA-Z0-9-]+)/);
-        if (inviteMatch) {
-          return {
-            html: `<iframe 
-              src="https://discord.com/widget?id=${inviteMatch[1]}&theme=dark"
-              allowtransparency="true"
-              frameborder="0"
-              sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>`,
-            aspectRatio: '500px'
-          };
-        }
-      }
-
-      // R1 Prompts
-      if (domain.includes('r1prompts.com')) {
-        // Extract prompt ID from URL
-        const promptId = url.split('/').pop();
-        if (promptId) {
-          return {
-            html: `<iframe 
-              src="https://r1prompts.com/embed/${promptId}"
-              style="border: none; border-radius: 8px;"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-              loading="lazy"></iframe>`,
-            aspectRatio: '400px'
-          };
-        }
-      }
-
-      // Suno.ai
-      if (domain.includes('suno.ai')) {
-        // Extract song ID from URL
-        const songId = url.split('/').pop();
-        if (songId) {
-          return {
-            html: `<iframe 
-              src="https://app.suno.ai/embed/${songId}"
-              style="border: none; border-radius: 12px;"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-              allow="autoplay; encrypted-media"></iframe>`,
-            aspectRatio: '160px'
-          };
-        }
-      }
-
-      // Rabbit Community
-      if (domain.includes('community.rabbit.tech')) {
-        // Extract post ID from URL
-        const postId = url.match(/\/posts\/([^\/]+)/)?.[1];
-        if (postId) {
-          return {
-            html: `<iframe 
-              src="https://community.rabbit.tech/embed/posts/${postId}"
-              style="border: none; border-radius: 8px; width: 100%;"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-              loading="lazy"></iframe>`,
-            aspectRatio: '400px'
-          };
-        }
-        // Handle discussion threads
-        const threadId = url.match(/\/discussions\/([^\/]+)/)?.[1];
-        if (threadId) {
-          return {
-            html: `<iframe 
-              src="https://community.rabbit.tech/embed/discussions/${threadId}"
-              style="border: none; border-radius: 8px; width: 100%;"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-              loading="lazy"></iframe>`,
-            aspectRatio: '600px'
-          };
-        }
-      }
-
-      // YouTube videos
-      if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-        const videoId = url.includes('youtu.be') 
-          ? url.split('/').pop() 
-          : new URLSearchParams(new URL(url).search).get('v');
-        if (videoId) {
-          return {
-            html: `<iframe 
-              src="https://www.youtube.com/embed/${videoId}"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen></iframe>`,
-            aspectRatio: '56.25%'
-          };
-        }
-      }
-
-      // Vimeo videos
-      if (domain.includes('vimeo.com')) {
-        const videoId = url.split('/').pop();
-        if (videoId) {
-          return {
-            html: `<iframe 
-              src="https://player.vimeo.com/video/${videoId}"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowfullscreen></iframe>`,
-            aspectRatio: '56.25%'
-          };
-        }
-      }
-
-      // SoundCloud tracks
-      if (domain.includes('soundcloud.com')) {
-        return {
-          html: `<iframe 
-            src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500"
-            allow="autoplay"></iframe>`,
-          aspectRatio: '166px' // SoundCloud's standard height
-        };
-      }
-
-      // Spotify tracks/playlists
-      if (domain.includes('spotify.com')) {
-        const spotifyUrl = url.replace('open.spotify.com', 'open.spotify.com/embed');
-        return {
-          html: `<iframe 
-            src="${spotifyUrl}"
-            allow="encrypted-media; autoplay; clipboard-write; picture-in-picture"
-            allowfullscreen></iframe>`,
-          aspectRatio: '152px' // Spotify's standard height
-        };
-      }
-
-      // Twitch streams/clips
-      if (domain.includes('twitch.tv')) {
-        const isClip = url.includes('/clip/');
-        const channelName = isClip 
-          ? url.split('/clip/')[1]
-          : url.split('twitch.tv/')[1];
-        return {
-          html: `<iframe 
-            src="https://player.twitch.tv/${isClip ? 'clip' : 'embed'}/${channelName}"
-            allowfullscreen></iframe>`,
-          aspectRatio: '56.25%'
-        };
-      }
-
-      // Google Drive files
-      if (domain.includes('drive.google.com')) {
-        const fileId = url.match(/[-\w]{25,}/);
-        if (fileId) {
-          return {
-            html: `<iframe 
-              src="https://drive.google.com/file/d/${fileId[0]}/preview"
-              allow="autoplay"></iframe>`,
-            aspectRatio: '75%'
-          };
-        }
-      }
-
-      // Dropbox files
-      if (domain.includes('dropbox.com')) {
-        const embedUrl = url.replace('?dl=0', '?raw=1');
-        return {
-          html: `<iframe 
-            src="${embedUrl}"
-            allow="autoplay"></iframe>`,
-          aspectRatio: '75%'
-        };
-      }
-
-      // Twitter/X embed
-      if (domain.includes('twitter.com') || domain.includes('x.com')) {
-        const tweetId = url.match(/status\/(\d+)/)?.[1];
-        if (tweetId) {
-          return {
-            html: `<blockquote class="twitter-tweet" data-dnt="true"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js"></script>`,
-            aspectRatio: '100%'
-          };
-        }
-      }
-      
-      // TikTok embed
-      if (domain.includes('tiktok.com') || domain.includes('vm.tiktok.com')) {
-        return {
-          html: `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${url.split('/').pop()?.split('?')[0]}">
-            <section><a target="_blank" href="${url}"></a></section>
-          </blockquote>
-          <script async src="https://www.tiktok.com/embed.js"></script>`,
-          aspectRatio: '100%'
-        };
-      }
-      
-      // Facebook video embed
-      if ((domain.includes('facebook.com') && url.includes('/videos/')) || domain.includes('fb.watch')) {
-        return {
-          html: `<div class="fb-video" data-href="${url}" data-width="auto" data-show-text="false">
-            <blockquote cite="${url}" class="fb-xfbml-parse-ignore"></blockquote>
-          </div>
-          <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0"></script>`,
-          aspectRatio: '56.25%'
-        };
-      }
-
-      // Instagram embed
-      if (domain.includes('instagram.com')) {
-        const instagramId = url.match(/\/(p|reel|tv)\/([^\/\?]+)/)?.[2];
-        if (instagramId) {
-          return {
-            html: `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${url}">
-              <a href="${url}" target="_blank"></a>
-            </blockquote>
-            <script async src="//www.instagram.com/embed.js"></script>`,
-            aspectRatio: '100%'
-          };
-        }
-      }
-
-      // Reddit embed
-      if (domain.includes('reddit.com')) {
-        const redditUrl = url
-          .replace('old.reddit.com', 'reddit.com')
-          .replace('www.reddit.com', 'reddit.com')
-          .replace('reddit.com', 'redditmedia.com');
-          
-        const embedUrl = redditUrl.includes('/comments/') 
-          ? `https://www.redditmedia.com${new URL(url).pathname}?ref_source=embed&ref=share&embed=true`
-          : `${redditUrl}?ref_source=embed&ref=share&embed=true`;
-
-        return {
-          html: `<iframe id="reddit-embed" 
-            src="${embedUrl}"
-            sandbox="allow-scripts allow-same-origin allow-popups"
-            style="border: none;" 
-            scrolling="no"
-            width="100%"
-            height="400"></iframe>`,
-          aspectRatio: '56.25%'
-        };
-      }
-
-      return null;
-    };
-
-    const embedContent = getUrlEmbed();
-
-    return (
-      <Card 
-        sx={{ 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column',
-          cursor: 'pointer',
-          '&:hover': {
-            boxShadow: 3,
-          },
-        }}
-        onClick={handleCardClick}
-      >
-        {/* Header with favicon and title */}
-        <CardHeader
-          avatar={
-            metadata.favicon ? (
-              <Avatar 
-                src={metadata.favicon} 
-                sx={{ width: 24, height: 24 }}
-                imgProps={{ style: { objectFit: 'contain' } }}
-              />
-            ) : null
-          }
-          title={
-            <Link
-              href={memory.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              sx={{
-                color: 'inherit',
-                textDecoration: 'none',
-                '&:hover': {
-                  textDecoration: 'underline',
-                },
-              }}
-            >
-              {metadata.title || memory.url}
-            </Link>
-          }
-          subheader={metadata.siteName}
-        />
-
-        {/* File Metadata */}
-        {renderMetadataDetails(metadata)}
-
-        {/* URL Embed */}
-        {embedContent ? (
-          <Box 
-            sx={{ 
-              width: '100%',
-              position: 'relative',
-              paddingTop: embedContent.aspectRatio,
-              '& iframe': {
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                borderRadius: 1,
-              },
-            }}
-            dangerouslySetInnerHTML={{ __html: embedContent.html }}
-          />
-        ) : (
-          // Regular Media Content
-          metadata.isPlayable && metadata.playbackHtml ? (
-            <Box 
-              sx={{ 
-                width: '100%',
-                position: 'relative',
-                paddingTop: metadata.mediaType === 'video' ? '56.25%' : 'auto',
-                '& iframe': {
-                  position: metadata.mediaType === 'video' ? 'absolute' : 'relative',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: metadata.mediaType === 'video' ? '100%' : 'auto',
-                  border: 'none',
-                  borderRadius: 1,
-                },
-                '& video, & audio': {
-                  width: '100%',
-                  borderRadius: 1,
-                },
-              }}
-              dangerouslySetInnerHTML={{ __html: metadata.playbackHtml }}
-            />
-          ) : metadata.previewUrl ? (
-            <CardMedia
-              component="img"
-              image={metadata.previewUrl}
-              alt={metadata.title || "Preview"}
-              sx={{
-                width: '100%',
-                height: 'auto',
-                maxHeight: '300px',
-                objectFit: 'cover',
-              }}
-            />
-          ) : null
-        )}
-        
-        {/* Description or Raw Content */}
-        {(metadata.description || metadata.rawContent) && (
+  const renderCardContent = () => {
+    switch (memory.type) {
+      case 'text':
+        return (
           <CardContent>
             <Typography
-              variant="body2"
-              color="text.secondary"
+              variant="body1"
               sx={{
-                display: '-webkit-box',
-                WebkitLineClamp: expanded ? 'unset' : 3,
+                display: expanded ? 'block' : '-webkit-box',
+                WebkitLineClamp: expanded ? 'none' : 3,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
                 transition: 'all 0.3s ease',
-                ...(metadata.rawContent && {
-                  fontFamily: 'monospace',
-                  whiteSpace: 'pre-wrap',
-                  fontSize: '0.75rem'
-                })
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
               }}
             >
-              {metadata.rawContent || metadata.description}
+              {memory.content}
             </Typography>
           </CardContent>
-        )}
-
-        {/* Tags */}
-        {memory.tags && memory.tags.length > 0 && (
-          <CardContent sx={{ pt: 0 }}>
-            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-              {memory.tags.map((tag, index) => (
-                <Chip
-                  key={index}
-                  label={tag}
-                  size="small"
-                  sx={{ borderRadius: 1 }}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ))}
-            </Stack>
+        );
+      case 'url':
+      case 'image':
+      case 'video':
+      case 'audio':
+      case 'static':
+        return (
+          <CardContent>
+            {memory.metadata?.description && (
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                sx={{
+                  display: expanded ? 'block' : '-webkit-box',
+                  WebkitLineClamp: expanded ? 'none' : 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  transition: 'all 0.3s ease',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}
+              >
+                {memory.metadata.description}
+              </Typography>
+            )}
+            {renderMetadataDetails(memory.metadata)}
           </CardContent>
-        )}
-      </Card>
-    );
-  };
-
-  // Render different card types based on memory type
-  switch (memory.type) {
-    case 'text':
-      return renderTextCard();
-    case 'url':
-    case 'image':
-    case 'video':
-    case 'audio':
-    case 'static':
-      return renderUrlCard();
-    default:
-      console.warn(`Unknown memory type: ${memory.type}`, memory);
-      return (
-        <Card>
+        );
+      default:
+        return (
           <CardContent>
             <Typography color="error">
               Unsupported memory type: {memory.type}
@@ -576,9 +129,59 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
               {JSON.stringify(memory, null, 2)}
             </Typography>
           </CardContent>
-        </Card>
-      );
-  }
+        );
+    }
+  };
+
+  return (
+    <Card 
+      component={motion.div}
+      layout
+      onClick={handleCardClick}
+      sx={{ 
+        cursor: 'pointer',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        '&:hover': {
+          boxShadow: 6,
+        }
+      }}
+    >
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: '#FF4D06' }}>
+            {memory.type.charAt(0).toUpperCase()}
+          </Avatar>
+        }
+        title={memory.metadata?.title || 'Untitled Memory'}
+        subheader={formatDate(memory.createdAt)}
+      />
+      {renderCardContent()}
+      <CardContent>
+        {memory.tags && memory.tags.length > 0 && (
+          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1, gap: 1 }}>
+            {memory.tags.map((tag, index) => (
+              <Chip
+                key={index}
+                label={tag}
+                size="small"
+                icon={<LocalOfferIcon />}
+                sx={{
+                  bgcolor: 'rgba(255, 77, 6, 0.1)',
+                  color: '#FF4D06',
+                  '& .MuiChip-icon': {
+                    color: '#FF4D06'
+                  }
+                }}
+              />
+            ))}
+          </Stack>
+        )}
+      </CardContent>
+    </Card>
+  );
 };
 
 const MemoryGrid: React.FC<MemoryGridProps> = ({ 
@@ -588,71 +191,128 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
   onRefresh,
   isBackgroundRefresh = false 
 }) => {
-  const [sortedMemories, setSortedMemories] = useState<Memory[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
+  // Extract unique tags from memories
   useEffect(() => {
-    // Ensure memories is an array and sort by creation date
-    const validMemories = Array.isArray(memories) ? memories : [];
-    const sorted = [...validMemories].sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
+    const tags = new Set<string>();
+    memories.forEach(memory => {
+      memory.tags?.forEach(tag => tags.add(tag));
     });
-    setSortedMemories(sorted);
+    setAvailableTags(Array.from(tags));
   }, [memories]);
 
-  // Only show loading state for manual refreshes
-  if (loading && !isBackgroundRefresh) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // Filter memories based on selected tags
+  const filteredMemories = memories.filter(memory => {
+    if (selectedTags.length === 0) return true;
+    return memory.tags?.some(tag => selectedTags.includes(tag));
+  });
 
-  if (error) {
-    return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography color="error" gutterBottom>
-          {error}
-        </Typography>
-        {onRefresh && (
-          <IconButton onClick={onRefresh} color="primary">
-            <RefreshIcon />
-          </IconButton>
-        )}
-      </Box>
+  const handleTagClick = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
     );
-  }
-
-  if (!sortedMemories.length) {
-    return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography color="textSecondary">
-          No memories found. Create one by using the upload bar above!
-        </Typography>
-      </Box>
-    );
-  }
+  };
 
   return (
-    <Box sx={{ mt: 4 }}>
-      <AnimatePresence mode="popLayout">
-        {sortedMemories.map((memory, index) => (
-          <motion.div
-            key={memory._id || index}
-            initial={!isBackgroundRefresh ? { opacity: 0, y: 20 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-            layout
-          >
-            <Box sx={{ mb: 2 }}>
+    <Box sx={{ width: '100%' }}>
+      {availableTags.length > 0 && (
+        <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {availableTags.map((tag) => (
+            <Chip
+              key={tag}
+              label={tag}
+              icon={<LocalOfferIcon />}
+              onClick={() => handleTagClick(tag)}
+              color={selectedTags.includes(tag) ? 'primary' : 'default'}
+              sx={{
+                bgcolor: selectedTags.includes(tag) 
+                  ? '#FF4D06' 
+                  : 'rgba(255, 77, 6, 0.1)',
+                color: selectedTags.includes(tag) 
+                  ? 'white' 
+                  : '#FF4D06',
+                '& .MuiChip-icon': {
+                  color: selectedTags.includes(tag) 
+                    ? 'white' 
+                    : '#FF4D06'
+                }
+              }}
+            />
+          ))}
+        </Box>
+      )}
+      
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>
+          Error: {error}
+        </Typography>
+      )}
+
+      {loading && !isBackgroundRefresh && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress sx={{ color: '#FF4D06' }} />
+        </Box>
+      )}
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, 1fr)',
+            md: 'repeat(3, 1fr)',
+            lg: 'repeat(4, 1fr)'
+          },
+          gap: 3
+        }}
+      >
+        <AnimatePresence>
+          {filteredMemories.map((memory) => (
+            <motion.div
+              key={memory._id}
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+            >
               <MemoryCard memory={memory} />
-            </Box>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </Box>
+
+      {onRefresh && (
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16 }}>
+          <IconButton
+            onClick={onRefresh}
+            sx={{
+              bgcolor: '#FF4D06',
+              color: 'white',
+              '&:hover': {
+                bgcolor: '#FF6B06'
+              },
+              ...(isBackgroundRefresh && {
+                animation: 'spin 1s linear infinite',
+                '@keyframes spin': {
+                  '0%': {
+                    transform: 'rotate(0deg)',
+                  },
+                  '100%': {
+                    transform: 'rotate(360deg)',
+                  },
+                },
+              }),
+            }}
+          >
+            <RefreshIcon />
+          </IconButton>
+        </Box>
+      )}
     </Box>
   );
 };
