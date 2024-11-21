@@ -36,14 +36,14 @@ X-Content-Type-Options = "nosniff"
 Referrer-Policy = "strict-origin-when-cross-origin"
 Content-Security-Policy = """
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://platform.twitter.com https://www.instagram.com;
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://platform.twitter.com https://www.instagram.com https://www.tiktok.com https://www.facebook.com https://connect.facebook.net https://www.redditmedia.com;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
   font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
   img-src 'self' data: blob: https:;
   media-src 'self' blob: https: http://localhost:*;
   connect-src 'self' https: http://localhost:* ws://localhost:*;
   object-src 'none';
-  frame-src 'self' https://www.youtube.com https://platform.twitter.com https://www.instagram.com;
+  frame-src 'self' https://www.youtube.com https://platform.twitter.com https://www.instagram.com https://www.tiktok.com https://www.facebook.com https://www.redditmedia.com;
   frame-ancestors 'none';
   form-action 'self';
   base-uri 'self';
