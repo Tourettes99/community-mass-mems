@@ -49,81 +49,76 @@ Content-Security-Policy = """
     https://platform.twitter.com
     https://www.youtube.com
     https://player.vimeo.com
-    https://w.soundcloud.com
-    https://open.spotify.com
-    https://player.twitch.tv
-    https://drive.google.com
-    https://*.dropbox.com
-    https://*.discord.com
-    https://*.r1prompts.com
-    https://*.suno.ai
-    https://*.rabbit.tech;
+    https://app.suno.ai
+    https://r1prompts.com
+    https://discord.com;
   style-src 'self' 'unsafe-inline' 
-    https://fonts.googleapis.com 
-    https://cdnjs.cloudflare.com 
-    https://*.twitter.com 
-    https://*.instagram.com 
-    https://*.tiktok.com 
-    https://*.facebook.com 
-    https://*.redditmedia.com
-    https://w.soundcloud.com
-    https://open.spotify.com
-    https://*.discord.com
-    https://*.r1prompts.com
-    https://*.suno.ai
-    https://*.rabbit.tech;
-  font-src 'self' 
-    https://fonts.gstatic.com 
-    https://cdnjs.cloudflare.com 
-    data:
-    https://*.twitter.com 
-    https://*.instagram.com 
-    https://*.tiktok.com 
+    https://*.twitter.com
+    https://*.instagram.com
+    https://*.tiktok.com
     https://*.facebook.com
-    https://*.discord.com;
-  img-src 'self' data: blob: https: http:;
-  media-src 'self' blob: https: http:;
-  connect-src 'self' https: http: ws: wss:;
-  object-src 'none';
-  frame-src 'self' 
-    https://*.youtube.com 
-    https://*.twitter.com 
-    https://*.instagram.com 
-    https://*.tiktok.com 
-    https://*.facebook.com 
-    https://*.redditmedia.com 
-    https://*.reddit.com
-    https://player.vimeo.com
-    https://w.soundcloud.com
-    https://open.spotify.com
-    https://player.twitch.tv
-    https://drive.google.com
-    https://*.dropboxusercontent.com
-    https://*.dropbox.com
-    https://*.discord.com
-    https://*.r1prompts.com
-    https://*.suno.ai
-    https://*.rabbit.tech;
-  child-src 'self' 
-    blob: 
-    https://*.youtube.com 
-    https://*.twitter.com 
-    https://*.instagram.com 
-    https://*.tiktok.com 
-    https://*.facebook.com 
+    https://*.redditmedia.com;
+  img-src 'self' data: blob: 
+    https://*.twitter.com
+    https://*.twimg.com
+    https://*.instagram.com
+    https://*.fbcdn.net
+    https://*.tiktokcdn.com
     https://*.redditmedia.com
-    https://player.vimeo.com
+    https://*.redditstatic.com
+    https://*.vimeocdn.com
+    https://*.ytimg.com
+    https://*.soundcloud.com
+    https://*.sndcdn.com
+    https://*.spotify.com
+    https://*.discordapp.com
+    https://*.r1prompts.com
+    https://*.suno.ai;
+  font-src 'self' data:;
+  frame-src
+    https://*.twitter.com
+    https://*.instagram.com
+    https://*.tiktok.com
+    https://*.facebook.com
+    https://*.reddit.com
+    https://*.redditmedia.com
     https://w.soundcloud.com
     https://open.spotify.com
-    https://player.twitch.tv
-    https://*.discord.com
-    https://*.r1prompts.com
-    https://*.suno.ai
-    https://*.rabbit.tech;
-  worker-src 'self' blob:;
-  form-action 'self';
-  base-uri 'self';
-  frame-ancestors 'self';
+    https://www.youtube.com
+    https://player.vimeo.com
+    https://discord.com
+    https://r1prompts.com
+    https://app.suno.ai;
+  connect-src 'self'
+    https://*.twitter.com
+    https://*.instagram.com
+    https://*.tiktok.com
+    https://*.facebook.com
+    https://*.reddit.com
+    https://*.redditmedia.com
+    https://w.soundcloud.com
+    https://api.spotify.com
+    https://www.youtube.com
+    https://player.vimeo.com
+    https://discord.com
+    https://r1prompts.com
+    https://app.suno.ai;
+  media-src 'self'
+    blob:
+    https://*.twitter.com
+    https://*.instagram.com
+    https://*.tiktok.com
+    https://*.facebook.com
+    https://*.reddit.com
+    https://*.redditmedia.com
+    https://*.soundcloud.com
+    https://*.sndcdn.com
+    https://*.spotify.com
+    https://*.youtube.com
+    https://*.vimeocdn.com
+    https://discord.com
+    https://r1prompts.com
+    https://app.suno.ai;
 """
 
 [[headers]]
