@@ -104,203 +104,37 @@ try {
   Memory = mongoose.model('Memory', memorySchema);
 }
 
-// Function to extract video ID from various platforms
-const getVideoId = (url) => {
-  let videoId = null;
-  let platform = 'none';
-
-  // YouTube
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    platform = 'youtube';
-    const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    if (match) videoId = match[1];
-  }
-  // Vimeo
-  else if (url.includes('vimeo.com')) {
-    platform = 'vimeo';
-    const match = url.match(/vimeo.com\/(?:.*\/)?([0-9]+)/);
-    if (match) videoId = match[1];
-  }
-  // Twitter
-  else if (url.includes('twitter.com') || url.includes('x.com')) {
-    platform = 'twitter';
-    const match = url.match(/twitter\.com\/\w+\/status\/(\d+)/);
-    if (match) videoId = match[1];
-  }
-
-  return { videoId, platform };
-};
-
-// Function to check if URL is an image
-const isImageUrl = async (url) => {
-  try {
-    const response = await fetch(url, { method: 'HEAD' });
-    const contentType = response.headers.get('content-type');
-    return contentType.startsWith('image/');
-  } catch (error) {
-    console.error('Error checking image URL:', error);
-    return false;
-  }
-};
-
 // Function to determine media type and preview
 const getMediaInfo = async (url, metadata) => {
-  // Image extensions
-  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
-  // Video extensions
+  // Media extensions
   const videoExts = ['.mp4', '.webm', '.ogg', '.mov', '.avi'];
-  // Audio extensions
   const audioExts = ['.mp3', '.wav', '.ogg', '.m4a'];
 
   const urlObj = new URL(url);
   const path = urlObj.pathname.toLowerCase();
-  const hostname = urlObj.hostname.toLowerCase();
 
   let mediaType = 'url';
-  let previewType = 'none';
-  let previewUrl = null;
+  let previewUrl = metadata?.ogImage || metadata?.twitterImage;
   let playbackHtml = null;
   let isPlayable = false;
 
-  // First check if it's a direct media file
-  const isImage = await isImageUrl(url);
-  if (isImage || imageExts.some(ext => path.endsWith(ext))) {
-    mediaType = 'image';
-    previewType = 'image';
-    previewUrl = url;
-    playbackHtml = `<img src="${url}" alt="Direct image" style="max-width: 100%; height: auto;">`;
-    isPlayable = true;
-  } else if (videoExts.some(ext => path.endsWith(ext))) {
+  // Check if it's a direct media file
+  if (videoExts.some(ext => path.endsWith(ext))) {
     mediaType = 'video';
-    previewType = 'video';
-    previewUrl = url;
-    playbackHtml = `<video controls style="max-width: 100%;"><source src="${url}" type="video/${path.split('.').pop()}">Your browser does not support the video tag.</video>`;
+    playbackHtml = `<video controls style="width: 100%; max-height: 400px;"><source src="${url}" type="video/${path.split('.').pop()}">Your browser does not support video playback.</video>`;
     isPlayable = true;
   } else if (audioExts.some(ext => path.endsWith(ext))) {
     mediaType = 'audio';
-    previewType = 'audio';
-    previewUrl = url;
-    playbackHtml = `<audio controls><source src="${url}" type="audio/${path.split('.').pop()}">Your browser does not support the audio tag.</audio>`;
-    isPlayable = true;
-  }
-
-  // Check for special platforms
-  if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
-    mediaType = 'video';
-    previewType = 'youtube';
-    const videoId = getVideoId(url).videoId;
-    previewUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-    playbackHtml = generateEmbedHtml(url, 'youtube', videoId);
-    isPlayable = true;
-  } else if (hostname.includes('vimeo.com')) {
-    mediaType = 'video';
-    previewType = 'vimeo';
-    const videoId = getVideoId(url).videoId;
-    // Use the provided metadata image from Vimeo
-    previewUrl = metadata?.ogImage;
-    playbackHtml = generateEmbedHtml(url, 'vimeo', videoId);
-    isPlayable = true;
-  } else if (hostname.includes('spotify.com')) {
-    mediaType = 'audio';
-    previewType = 'spotify';
-    // Use Spotify's provided preview image
-    previewUrl = metadata?.ogImage;
-    playbackHtml = generateEmbedHtml(url, 'spotify');
-    isPlayable = true;
-  } else if (hostname.includes('soundcloud.com')) {
-    mediaType = 'audio';
-    previewType = 'soundcloud';
-    // Use SoundCloud's provided preview image
-    previewUrl = metadata?.ogImage;
-    playbackHtml = generateEmbedHtml(url, 'soundcloud');
-    isPlayable = true;
-  } else if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
-    mediaType = 'social';
-    previewType = 'twitter';
-    // Use Twitter's provided preview image
-    previewUrl = metadata?.twitterImage;
-    playbackHtml = generateEmbedHtml(url, 'twitter');
-    isPlayable = true;
-  } else if (hostname.includes('instagram.com')) {
-    mediaType = 'social';
-    previewType = 'instagram';
-    // Use Instagram's provided preview image
-    previewUrl = metadata?.ogImage;
-    playbackHtml = generateEmbedHtml(url, 'instagram');
-    isPlayable = true;
-  } else if (hostname.includes('tiktok.com')) {
-    mediaType = 'social';
-    previewType = 'tiktok';
-    // Use TikTok's provided preview image
-    previewUrl = metadata?.ogImage;
-    playbackHtml = generateEmbedHtml(url, 'tiktok');
+    playbackHtml = `<audio controls style="width: 100%;"><source src="${url}" type="audio/${path.split('.').pop()}">Your browser does not support audio playback.</audio>`;
     isPlayable = true;
   }
 
   return {
     mediaType,
-    previewType,
     previewUrl,
     playbackHtml,
     isPlayable
   };
-};
-
-// Function to generate embed HTML
-const generateEmbedHtml = (url, platform, videoId) => {
-  switch (platform) {
-    case 'youtube':
-      return `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="max-width: 100%;"></iframe>`;
-    case 'vimeo':
-      return `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="max-width: 100%;"></iframe>`;
-    case 'twitter':
-      return `<blockquote class="twitter-tweet" data-dnt="true" data-theme="light"><a href="${url}"></a></blockquote>`;
-    case 'spotify':
-      const spotifyMatch = url.match(/spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
-      if (spotifyMatch) {
-        const [, type, id] = spotifyMatch;
-        const height = type === 'track' ? 152 : type === 'episode' ? 232 : 380;
-        return `<iframe src="https://open.spotify.com/embed/${type}/${id}" width="100%" height="${height}" frameborder="0" allowtransparency="true" allow="encrypted-media" style="max-width: 100%;"></iframe>`;
-      }
-      return null;
-    case 'soundcloud':
-      return `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"></iframe>`;
-    case 'instagram':
-      const instagramMatch = url.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
-      if (instagramMatch) {
-        const postId = instagramMatch[1];
-        return `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="https://www.instagram.com/p/${postId}/" style="max-width:540px; min-width:326px; margin: 0 auto;"><a href="https://www.instagram.com/p/${postId}/" target="_blank">View on Instagram</a></blockquote>`;
-      }
-      return null;
-    case 'facebook':
-      const fbMatch = url.match(/facebook\.com\/([^\/]+)\/(?:posts|videos)\/(\d+)/);
-      if (fbMatch) {
-        return `<div class="fb-post" data-href="${url}" data-width="500" data-show-text="true"></div>`;
-      }
-      return null;
-    case 'tiktok':
-      const tiktokMatch = url.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/);
-      if (tiktokMatch) {
-        const videoId = tiktokMatch[1];
-        return `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${videoId}" style="max-width: 605px;min-width: 325px;"><section></section></blockquote>`;
-      }
-      return null;
-    case 'reddit':
-      return `<iframe id="reddit-embed" src="https://www.redditmedia.com/r/${encodeURIComponent(url)}?ref_source=embed&amp;ref=share&amp;embed=true" sandbox="allow-scripts allow-same-origin allow-popups" style="border: none;" height="400" width="100%" scrolling="yes"></iframe>`;
-    case 'pinterest':
-      return `<a data-pin-do="embedPin" href="${url}"></a>`;
-    case 'general':
-      // For general HTML5 video/audio files
-      const ext = url.split('.').pop().toLowerCase();
-      if (['mp4', 'webm', 'ogg'].includes(ext)) {
-        return `<video controls playsinline style="max-width: 100%;"><source src="${url}" type="video/${ext}">Your browser does not support the video tag.</video>`;
-      } else if (['mp3', 'wav'].includes(ext)) {
-        return `<audio controls style="width: 100%;"><source src="${url}" type="audio/${ext}">Your browser does not support the audio tag.</audio>`;
-      }
-      return null;
-    default:
-      return null;
-  }
 };
 
 // Function to fetch URL metadata
@@ -310,89 +144,53 @@ const fetchUrlMetadata = async (url, userMetadata = {}) => {
       follow: 5,
       timeout: 10000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CommunityMassMems/1.0; +https://communitymems.example.com)'
+        'User-Agent': 'Mozilla/5.0 (compatible; CommunityMassMems/1.0)'
       }
     });
     
-    // Get media info after we have metadata
     const mediaInfo = await getMediaInfo(url, {
       ogImage: result.open_graph?.image?.url,
       twitterImage: result.twitter_card?.image?.url
     });
 
-    // Extract the most relevant title
+    // Get favicon
+    const favicon = result.favicon || `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`;
+
+    // Get title
     const title = userMetadata.title || 
                  result.open_graph?.title || 
                  result.twitter_card?.title ||
                  result.title ||
                  '';
 
-    // Extract the most relevant description
+    // Get description
     const description = userMetadata.description || 
                        result.open_graph?.description || 
                        result.twitter_card?.description ||
                        result.description || '';
 
-    // Extract the site name
+    // Get site name
     const siteName = userMetadata.siteName || 
                     result.open_graph?.site_name || 
-                    result.site_name || 
                     new URL(url).hostname;
 
-    // Extract author information
-    const author = userMetadata.author || 
-                  result.open_graph?.article?.author || 
-                  result.author;
-
-    // Extract dates
-    const publishedDate = userMetadata.publishedDate || 
-                         result.open_graph?.article?.published_time || 
-                         result.published;
-                         
-    const modifiedDate = userMetadata.modifiedDate || 
-                        result.open_graph?.article?.modified_time || 
-                        result.modified;
-
-    // Extract preview image
-    const previewUrl = mediaInfo.previewUrl || 
-                      result.open_graph?.image?.url || 
-                      result.twitter_card?.image?.url;
-
     return {
-      // Core metadata
       title,
       description,
       siteName,
-      author,
-      publishedDate,
-      modifiedDate,
-      
-      // Media info
+      favicon,
       mediaType: mediaInfo.mediaType,
-      previewType: mediaInfo.previewType,
-      previewUrl,
-      embedHtml: mediaInfo.playbackHtml,
-      isPlayable: mediaInfo.isPlayable,
-      
-      // Additional metadata
-      language: userMetadata.language || result.language,
-      tags: userMetadata.tags || [],
-      
-      // Raw metadata (for debugging)
-      raw: {
-        openGraph: result.open_graph,
-        twitterCard: result.twitter_card,
-        jsonLd: result.json_ld,
-        userProvided: userMetadata
-      }
+      previewUrl: mediaInfo.previewUrl,
+      playbackHtml: mediaInfo.playbackHtml,
+      isPlayable: mediaInfo.isPlayable
     };
   } catch (error) {
     console.error('Error fetching URL metadata:', error);
-    // Return basic metadata even if URL fetch fails
     return {
-      title: userMetadata.title || '',
-      description: userMetadata.description || '',
+      title: '',
+      description: '',
       siteName: new URL(url).hostname,
+      favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`,
       mediaType: 'url'
     };
   }
@@ -502,59 +300,19 @@ exports.handler = async (event, context) => {
     console.log('Fetching metadata for URL:', url);
     const urlMetadata = await fetchUrlMetadata(url, userMetadata);
     
-    // Get media info including preview and playback HTML
-    const mediaInfo = await getMediaInfo(url, urlMetadata);
-    
-    // Prepare metadata with proper structure
-    const metadata = {
-      // Basic metadata
-      title: urlMetadata.title,
-      description: urlMetadata.description,
-      siteName: urlMetadata.siteName,
-      author: urlMetadata.author,
-      publishedDate: urlMetadata.publishedDate,
-      modifiedDate: urlMetadata.modifiedDate,
-      language: urlMetadata.language,
-
-      // Media metadata
-      contentType: urlMetadata.contentType,
-      size: urlMetadata.size,
-      dimensions: urlMetadata.dimensions,
-
-      // Open Graph metadata
-      ogTitle: urlMetadata.ogTitle,
-      ogDescription: urlMetadata.ogDescription,
-      ogImage: urlMetadata.ogImage,
-      ogType: urlMetadata.ogType,
-      ogUrl: urlMetadata.ogUrl,
-      ogAudio: urlMetadata.ogAudio,
-      ogVideo: urlMetadata.ogVideo,
-
-      // Twitter Card metadata
-      twitterCard: urlMetadata.twitterCard,
-      twitterTitle: urlMetadata.twitterTitle,
-      twitterDescription: urlMetadata.twitterDescription,
-      twitterImage: urlMetadata.twitterImage,
-      twitterCreator: urlMetadata.twitterCreator,
-      twitterPlayer: urlMetadata.twitterPlayer,
-
-      // Media and preview information
-      mediaType: mediaInfo.mediaType,
-      previewType: mediaInfo.previewType,
-      previewUrl: mediaInfo.previewUrl,
-      playbackHtml: mediaInfo.playbackHtml,
-      isPlayable: mediaInfo.isPlayable,
-
-      // Additional metadata
-      favicon: urlMetadata.favicon,
-      structuredData: urlMetadata.structuredData,
-      raw: urlMetadata.raw
-    };
-
     const memoryData = {
-      type: type || mediaInfo.mediaType || 'url',
+      type: type || urlMetadata.mediaType || 'url',
       url: url,
-      metadata
+      metadata: {
+        title: urlMetadata.title,
+        description: urlMetadata.description,
+        siteName: urlMetadata.siteName,
+        favicon: urlMetadata.favicon,
+        mediaType: urlMetadata.mediaType,
+        previewUrl: urlMetadata.previewUrl,
+        playbackHtml: urlMetadata.playbackHtml,
+        isPlayable: urlMetadata.isPlayable
+      }
     };
 
     console.log('Creating new URL memory:', JSON.stringify(memoryData, null, 2));
