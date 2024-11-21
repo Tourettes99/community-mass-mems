@@ -29,7 +29,8 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { styled } from '@mui/material/styles';
 import { Memory } from '../types';
 
-type MemoryType = 'text' | 'audio' | 'video' | 'image' | 'url' | 'static';
+type FileType = keyof FileTypes;
+type MemoryType = FileType | 'text' | 'url';
 
 interface FileTypes {
   image: string[];
@@ -43,6 +44,10 @@ const SUPPORTED_FILE_TYPES: FileTypes = {
   video: ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'],
   audio: ['.mp3', '.wav', '.aac', '.ogg', '.m4a', '.flac', '.wma'],
   static: ['.txt', '.html', '.json', '.xml', '.md', '.csv']
+};
+
+const isFileType = (type: MemoryType): type is FileType => {
+  return type in SUPPORTED_FILE_TYPES;
 };
 
 const Input = styled('input')({
@@ -239,7 +244,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
                   ref={fileInputRef}
                   type="file"
                   onChange={handleFileChange}
-                  accept={type !== 'text' && type !== 'url' ? SUPPORTED_FILE_TYPES[type as keyof typeof SUPPORTED_FILE_TYPES]?.join(',') : undefined}
+                  accept={isFileType(type) ? SUPPORTED_FILE_TYPES[type].join(',') : undefined}
                 />
               </Button>
             </Tooltip>
