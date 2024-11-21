@@ -1,15 +1,28 @@
 const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
+const Sharp = require('sharp');
+const ffmpeg = require('fluent-ffmpeg');
+const { PassThrough } = require('stream');
+const zlib = require('zlib');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  throw new Error('MONGODB_URI environment variable is required');
+}
+
 const DB_NAME = 'memories';
 const COLLECTION_NAME = 'memories';
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const COMPRESSION_QUALITY = 80; // 0-100, higher means better quality
+const MAX_IMAGE_DIMENSION = 2048; // Max width/height in pixels
+const MAX_VIDEO_DIMENSION = 1280; // 720p
+const MAX_AUDIO_BITRATE = '128k'; // 128kbps for audio
 
 // Memory Schema
 const memorySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['image', 'gif', 'audio', 'url'],
+    enum: ['image', 'gif', 'video', 'audio', 'document', 'url'],
     required: true
   },
   url: {
@@ -22,10 +35,19 @@ const memorySchema = new mongoose.Schema({
     format: String,
     fps: Number,
     duration: String,
+    bitrate: String,
+    codec: String,
     siteName: String,
     description: String,
-    size: Number,
-    contentType: String
+    size: {
+      original: Number,
+      compressed: Number
+    },
+    contentType: String,
+    dimensions: {
+      width: Number,
+      height: Number
+    }
   },
   createdAt: {
     type: Date,
@@ -45,27 +67,188 @@ try {
 const getFileType = (contentType) => {
   if (contentType.startsWith('image/gif')) return 'gif';
   if (contentType.startsWith('image/')) return 'image';
+  if (contentType.startsWith('video/')) return 'video';
   if (contentType.startsWith('audio/')) return 'audio';
+  if (contentType.startsWith('application/') || contentType.startsWith('text/')) return 'document';
   return 'url';
+};
+
+const compressImage = async (buffer, contentType, originalName) => {
+  try {
+    let sharpInstance = Sharp(buffer);
+    const metadata = await sharpInstance.metadata();
+    
+    // Calculate new dimensions while maintaining aspect ratio
+    let width = metadata.width;
+    let height = metadata.height;
+    
+    if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+      const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+      sharpInstance = sharpInstance.resize(width, height);
+    }
+
+    // Determine output format and compression options
+    let outputFormat;
+    let outputOptions = {};
+
+    if (contentType === 'image/gif') {
+      outputFormat = 'gif';
+      outputOptions = {
+        colours: 128
+      };
+    } else if (contentType === 'image/png' || contentType.includes('png')) {
+      outputFormat = 'png';
+      outputOptions = {
+        compressionLevel: 8,
+        palette: true
+      };
+    } else if (contentType === 'image/webp' || contentType.includes('webp')) {
+      outputFormat = 'webp';
+      outputOptions = {
+        quality: COMPRESSION_QUALITY,
+        effort: 6
+      };
+    } else {
+      outputFormat = 'jpeg';
+      outputOptions = {
+        quality: COMPRESSION_QUALITY,
+        mozjpeg: true
+      };
+    }
+
+    const compressedBuffer = await sharpInstance[outputFormat](outputOptions).toBuffer();
+
+    return {
+      buffer: compressedBuffer,
+      contentType: `image/${outputFormat}`,
+      dimensions: { width, height }
+    };
+  } catch (error) {
+    console.error('Error compressing image:', error);
+    throw new Error('Failed to compress image: ' + error.message);
+  }
+};
+
+const compressVideo = (buffer, contentType) => {
+  return new Promise((resolve, reject) => {
+    const inputStream = new PassThrough();
+    const outputStream = new PassThrough();
+    let outputBuffer = Buffer.alloc(0);
+
+    ffmpeg(inputStream)
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .audioBitrate(MAX_AUDIO_BITRATE)
+      .size(`${MAX_VIDEO_DIMENSION}x?`) // Set width, maintain aspect ratio
+      .outputOptions([
+        '-preset faster',
+        '-crf 23', // Constant Rate Factor (18-28 is good, lower means better quality)
+        '-movflags +faststart',
+        '-profile:v main',
+        '-level 3.1',
+        '-pix_fmt yuv420p'
+      ])
+      .toFormat('mp4')
+      .on('error', reject)
+      .on('end', () => {
+        resolve({
+          buffer: outputBuffer,
+          contentType: 'video/mp4'
+        });
+      })
+      .pipe(outputStream);
+
+    outputStream.on('data', chunk => {
+      outputBuffer = Buffer.concat([outputBuffer, chunk]);
+    });
+
+    inputStream.end(buffer);
+  });
+};
+
+const compressAudio = (buffer, contentType) => {
+  return new Promise((resolve, reject) => {
+    const inputStream = new PassThrough();
+    const outputStream = new PassThrough();
+    let outputBuffer = Buffer.alloc(0);
+
+    ffmpeg(inputStream)
+      .audioCodec('libmp3lame')
+      .audioBitrate(MAX_AUDIO_BITRATE)
+      .toFormat('mp3')
+      .on('error', reject)
+      .on('end', () => {
+        resolve({
+          buffer: outputBuffer,
+          contentType: 'audio/mpeg'
+        });
+      })
+      .pipe(outputStream);
+
+    outputStream.on('data', chunk => {
+      outputBuffer = Buffer.concat([outputBuffer, chunk]);
+    });
+
+    inputStream.end(buffer);
+  });
+};
+
+const compressDocument = async (buffer, contentType) => {
+  // For text-based documents, use GZIP compression
+  if (contentType.startsWith('text/') || 
+      contentType === 'application/json' || 
+      contentType === 'application/xml' ||
+      contentType === 'application/javascript') {
+    return new Promise((resolve, reject) => {
+      zlib.gzip(buffer, { level: 9 }, (error, compressedBuffer) => {
+        if (error) reject(error);
+        else resolve({
+          buffer: compressedBuffer,
+          contentType: contentType + ';encoding=gzip'
+        });
+      });
+    });
+  }
+  
+  // For other documents, return as-is
+  return {
+    buffer,
+    contentType
+  };
+};
+
+const compressFile = async (buffer, contentType, fileName) => {
+  const fileType = getFileType(contentType);
+  
+  switch (fileType) {
+    case 'image':
+    case 'gif':
+      return compressImage(buffer, contentType, fileName);
+    case 'video':
+      return compressVideo(buffer, contentType);
+    case 'audio':
+      return compressAudio(buffer, contentType);
+    case 'document':
+      return compressDocument(buffer, contentType);
+    default:
+      return { buffer, contentType };
+  }
 };
 
 const parseMultipartForm = async (event) => {
   try {
-    // Extract boundary from content type
     const boundary = event.headers['content-type'].split('boundary=')[1];
     if (!boundary) {
       throw new Error('No boundary found in content-type');
     }
 
-    // Convert base64 body to buffer
     const rawBody = Buffer.from(event.body, 'base64');
-    
-    // Split body into parts using boundary
     const boundaryBuffer = Buffer.from('--' + boundary);
     const parts = [];
     let start = 0;
 
-    // Find all boundary positions
     while (true) {
       const boundaryPos = rawBody.indexOf(boundaryBuffer, start);
       if (boundaryPos === -1) break;
@@ -81,23 +264,18 @@ const parseMultipartForm = async (event) => {
       files: {}
     };
 
-    // Process each part
     for (const part of parts) {
-      // Find the end of headers (double CRLF)
       const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
       if (headerEnd === -1) continue;
 
-      // Parse headers
       const headers = part.slice(0, headerEnd).toString();
       const nameMatch = headers.match(/name="([^"]+)"/);
       const filenameMatch = headers.match(/filename="([^"]+)"/);
       const contentTypeMatch = headers.match(/Content-Type: (.+?)(\r\n|\$)/);
 
-      // Get content (skip the double CRLF)
       const content = part.slice(headerEnd + 4);
 
       if (filenameMatch && contentTypeMatch) {
-        // This is a file
         result.files.file = {
           name: filenameMatch[1],
           type: contentTypeMatch[1].trim(),
@@ -105,7 +283,6 @@ const parseMultipartForm = async (event) => {
           size: content.length
         };
       } else if (nameMatch) {
-        // This is a field
         result.fields[nameMatch[1]] = content.toString().trim();
       }
     }
@@ -126,11 +303,7 @@ exports.handler = async (event, context) => {
   };
 
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers,
-      body: ''
-    };
+    return { statusCode: 204, headers, body: '' };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -150,24 +323,12 @@ exports.handler = async (event, context) => {
       });
     }
 
-    console.log('MongoDB Connection State:', mongoose.connection.readyState);
-    console.log('Database Name:', mongoose.connection.db.databaseName);
-
     let memoryData;
     const contentType = event.headers['content-type'] || '';
 
     if (contentType.includes('multipart/form-data')) {
-      // Handle file upload
       const formData = await parseMultipartForm(event);
-      console.log('Parsed form data:', {
-        fields: formData.fields,
-        fileInfo: formData.files.file ? {
-          name: formData.files.file.name,
-          type: formData.files.file.type,
-          size: formData.files.file.size
-        } : null
-      });
-
+      
       if (!formData.files.file) {
         return {
           statusCode: 400,
@@ -178,8 +339,6 @@ exports.handler = async (event, context) => {
 
       const file = formData.files.file;
 
-      // Validate file size (e.g., 10MB limit)
-      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
       if (file.size > MAX_FILE_SIZE) {
         return {
           statusCode: 413,
@@ -188,42 +347,37 @@ exports.handler = async (event, context) => {
         };
       }
 
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.type)) {
-        return {
-          statusCode: 415,
-          headers,
-          body: JSON.stringify({ error: 'Unsupported file type. Allowed types: JPEG, PNG, GIF, WebP' })
-        };
-      }
+      // Compress the file based on its type
+      const { buffer: compressedBuffer, contentType: outputContentType, dimensions } = 
+        await compressFile(file.content, file.type, file.name);
 
       // Convert to base64 and create data URL
-      const base64Content = file.content.toString('base64');
-      const dataUrl = `data:${file.type};base64,${base64Content}`;
-
-      // Get image dimensions if possible
-      let dimensions = '';
-      try {
-        // You might want to add image-size or similar package to get dimensions
-        // For now, we'll skip this
-      } catch (error) {
-        console.warn('Could not get image dimensions:', error);
-      }
+      const base64Content = compressedBuffer.toString('base64');
+      const dataUrl = `data:${outputContentType};base64,${base64Content}`;
 
       memoryData = {
-        type: getFileType(file.type),
+        type: getFileType(outputContentType),
         url: dataUrl,
         metadata: {
           fileName: file.name,
-          format: file.type.split('/')[1],
-          size: file.size,
-          contentType: file.type,
-          resolution: dimensions
+          format: outputContentType.split('/')[1],
+          size: {
+            original: file.size,
+            compressed: compressedBuffer.length
+          },
+          contentType: outputContentType,
+          dimensions
         }
       };
+
+      console.log('Compression results:', {
+        originalSize: Math.round(file.size / 1024) + 'KB',
+        compressedSize: Math.round(compressedBuffer.length / 1024) + 'KB',
+        compressionRatio: Math.round((1 - compressedBuffer.length / file.size) * 100) + '%',
+        type: getFileType(outputContentType)
+      });
+
     } else {
-      // Handle URL upload
       const body = JSON.parse(event.body);
       const { url, type } = body;
 
@@ -232,6 +386,16 @@ exports.handler = async (event, context) => {
           statusCode: 400,
           headers,
           body: JSON.stringify({ error: 'URL is required' })
+        };
+      }
+
+      try {
+        new URL(url);
+      } catch {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Invalid URL format' })
         };
       }
 
@@ -245,34 +409,32 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log('Saving memory data:', {
-      ...memoryData,
-      url: memoryData.url.substring(0, 50) + '...' // Truncate URL for logging
-    });
-
     const memory = new Memory(memoryData);
     const savedMemory = await memory.save();
-
-    console.log('Memory saved successfully');
 
     return {
       statusCode: 201,
       headers,
       body: JSON.stringify({
-        ...savedMemory.toObject(),
-        url: memoryData.url // Include the full URL in the response
+        message: 'Upload successful',
+        memory: {
+          _id: savedMemory._id,
+          type: savedMemory.type,
+          url: savedMemory.url,
+          metadata: savedMemory.metadata,
+          createdAt: savedMemory.createdAt
+        }
       })
     };
   } catch (error) {
     console.error('Error processing upload:', error);
-    console.error('Stack:', error.stack);
+    
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',
-        details: error.message,
-        stack: error.stack
+        message: error.message
       })
     };
   }

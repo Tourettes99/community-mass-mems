@@ -1,32 +1,36 @@
+[functions]
+external_node_modules = ["sharp", "fluent-ffmpeg"]
+included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
+
 [build]
-  command = "CI=false GENERATE_SOURCEMAP=false npm run build"
-  publish = "build"
-  functions = "netlify/functions"
+command = "CI=false GENERATE_SOURCEMAP=false npm run build"
+publish = "build"
+functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18.16.0"
-  NODE_ENV = "production"
-  MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
+NODE_VERSION = "18.16.0"
+NODE_ENV = "production"
+MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
 
 [functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["mongodb-client-encryption", "bson", "aws4"]
+node_bundler = "esbuild"
+external_node_modules = ["mongodb-client-encryption", "bson", "aws4"]
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+from = "/*"
+to = "/index.html"
+status = 200
 
 [[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Access-Control-Allow-Origin = "*"
+for = "/*"
+[headers.values]
+X-Frame-Options = "DENY"
+X-XSS-Protection = "1; mode=block"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Access-Control-Allow-Origin = "*"
