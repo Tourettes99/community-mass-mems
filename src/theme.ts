@@ -1,128 +1,154 @@
-import { createTheme } from '@mui/material/styles';
+import { createTheme, Theme } from '@mui/material/styles';
 import { PaletteMode } from '@mui/material';
 
-export const getTheme = (mode: PaletteMode) => createTheme({
+// RAL 2005 Luminous Orange
+export const RAL_2005 = '#FF4D2A';
+
+// Extend the Theme type to include our custom colors
+declare module '@mui/material/styles' {
+  interface Palette {
+    accent: Palette['primary'];
+  }
+  interface PaletteOptions {
+    accent?: PaletteOptions['primary'];
+  }
+}
+
+export const getTheme = (mode: PaletteMode): Theme => createTheme({
   palette: {
     mode,
     ...(mode === 'light'
       ? {
           // Light mode colors
           primary: {
-            main: '#1976d2',
+            main: RAL_2005,
+            light: '#FF6B4D',
+            dark: '#E63A1A',
           },
           background: {
             default: '#f5f5f5',
             paper: '#ffffff',
           },
           secondary: {
-            main: '#808080', // Gray
+            main: '#808080',
           },
           accent: {
-            main: '#FF4D2A', // RAL 2005 Orange
+            main: RAL_2005,
+            light: '#FF6B4D',
+            dark: '#E63A1A',
           },
           text: {
-            primary: '#666666', // Gray text
+            primary: '#666666',
             secondary: '#808080',
           },
         }
       : {
           // Dark mode colors
           primary: {
-            main: '#90caf9',
+            main: RAL_2005,
+            light: '#FF6B4D',
+            dark: '#E63A1A',
           },
           background: {
             default: '#121212',
             paper: '#1e1e1e',
           },
           secondary: {
-            main: '#808080', // Gray
+            main: '#808080',
           },
           accent: {
-            main: '#FF4D2A', // RAL 2005 Orange
+            main: RAL_2005,
+            light: '#FF6B4D',
+            dark: '#E63A1A',
           },
           text: {
-            primary: '#FFFFFF', // White text
+            primary: '#FFFFFF',
             secondary: '#B3B3B3',
           },
         }),
   },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      fontWeight: 600,
-      '@media (max-width:600px)': {
-        fontSize: '2rem',
-      },
-    },
-    h2: {
-      fontSize: '2rem',
-      fontWeight: 500,
-      '@media (max-width:600px)': {
-        fontSize: '1.75rem',
-      },
-    },
-    h3: {
-      fontSize: '1.75rem',
-      fontWeight: 500,
-      '@media (max-width:600px)': {
-        fontSize: '1.5rem',
-      },
-    },
-    body1: {
-      fontSize: '1rem',
-      lineHeight: 1.5,
-    },
-    body2: {
-      fontSize: '0.875rem',
-      lineHeight: 1.43,
-    },
-    button: {
-      textTransform: 'none',
-    },
-  },
   components: {
-    MuiCssBaseline: {
+    MuiChip: {
       styleOverrides: {
-        body: {
-          margin: 0,
-          WebkitFontSmoothing: 'antialiased',
-          MozOsxFontSmoothing: 'grayscale',
+        root: ({ theme }) => ({
+          '&.MuiChip-filled': {
+            backgroundColor: theme.palette.mode === 'dark' 
+              ? 'rgba(255, 77, 42, 0.2)' 
+              : 'rgba(255, 77, 42, 0.1)',
+            color: RAL_2005,
+            '& .MuiChip-icon': {
+              color: RAL_2005,
+            },
+          },
+        }),
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          '&:hover': {
+            backgroundColor: `${RAL_2005}20`,
+          },
         },
-        code: {
-          fontFamily: 'source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace',
+      },
+    },
+    MuiCircularProgress: {
+      styleOverrides: {
+        root: {
+          color: RAL_2005,
+        },
+      },
+    },
+    MuiLink: {
+      styleOverrides: {
+        root: {
+          color: RAL_2005,
+          '&:hover': {
+            color: '#FF6B4D',
+          },
         },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          textTransform: 'none',
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          '&.MuiButton-contained': {
+            backgroundColor: RAL_2005,
+            color: '#fff',
+            '&:hover': {
+              backgroundColor: '#E63A1A',
+            },
+          },
+          '&.MuiButton-outlined': {
+            borderColor: RAL_2005,
+            color: RAL_2005,
+            '&:hover': {
+              backgroundColor: `${RAL_2005}20`,
+            },
           },
         },
       },
     },
-    MuiPaper: {
-      defaultProps: {
-        elevation: 0,
-      },
-      styleOverrides: {
-        root: {
-          backgroundImage: 'none',
-        },
-      },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontWeight: 500,
+    },
+    h2: {
+      fontWeight: 500,
+    },
+    h3: {
+      fontWeight: 500,
+    },
+    h4: {
+      fontWeight: 500,
+    },
+    h5: {
+      fontWeight: 500,
+    },
+    h6: {
+      fontWeight: 500,
     },
   },
 });
