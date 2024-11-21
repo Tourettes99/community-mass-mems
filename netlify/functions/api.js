@@ -480,6 +480,118 @@ router.get('/test', async (req, res) => {
   }
 });
 
+// Add test endpoint for MongoDB connection
+router.get('/test-connection', async (req, res) => {
+  try {
+    const state = mongoose.connection.readyState;
+    let stateText;
+    switch (state) {
+      case 0: stateText = 'Disconnected'; break;
+      case 1: stateText = 'Connected'; break;
+      case 2: stateText = 'Connecting'; break;
+      case 3: stateText = 'Disconnecting'; break;
+      default: stateText = 'Unknown';
+    }
+
+    // Get database stats
+    const stats = await mongoose.connection.db.stats();
+    
+    res.json({
+      status: 'success',
+      connection: {
+        state: stateText,
+        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
+        database: mongoose.connection.name,
+        host: mongoose.connection.host
+      },
+      stats: {
+        collections: stats.collections,
+        documents: stats.objects,
+        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
+        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
+      }
+    });
+  } catch (error) {
+    console.error('MongoDB connection test error:', error);
+    res.status(500).json({
+      status: 'error',
+      error: {
+        message: error.message,
+        name: error.name,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      }
+    });
+  }
+});
+
+// Add comprehensive database test endpoint
+router.get('/test-db', async (req, res) => {
+  try {
+    // 1. Check connection status
+    const state = mongoose.connection.readyState;
+    let stateText;
+    switch (state) {
+      case 0: stateText = 'Disconnected'; break;
+      case 1: stateText = 'Connected'; break;
+      case 2: stateText = 'Connecting'; break;
+      case 3: stateText = 'Disconnecting'; break;
+      default: stateText = 'Unknown';
+    }
+
+    // 2. Get database stats
+    const stats = await mongoose.connection.db.stats();
+    
+    // 3. Test CRUD operations
+    const TestModel = mongoose.model('Test', new mongoose.Schema({
+      message: String,
+      timestamp: { type: Date, default: Date.now }
+    }));
+
+    // Create
+    const testDoc = await TestModel.create({
+      message: 'Test document ' + new Date().toISOString()
+    });
+
+    // Read
+    const foundDoc = await TestModel.findById(testDoc._id);
+
+    // Delete
+    await TestModel.findByIdAndDelete(testDoc._id);
+
+    res.json({
+      status: 'success',
+      connection: {
+        state: stateText,
+        url: MONGODB_URI ? MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):[^@]+@/, 'mongodb+srv://$1:****@') : 'Not configured',
+        database: mongoose.connection.name,
+        host: mongoose.connection.host
+      },
+      stats: {
+        collections: stats.collections,
+        documents: stats.objects,
+        dataSize: `${(stats.dataSize / 1024 / 1024).toFixed(2)} MB`,
+        storageSize: `${(stats.storageSize / 1024 / 1024).toFixed(2)} MB`
+      },
+      testResults: {
+        createSuccess: !!testDoc,
+        readSuccess: !!foundDoc,
+        dataMatch: foundDoc?.message === testDoc?.message,
+        deleteSuccess: true
+      }
+    });
+  } catch (error) {
+    console.error('Database test error:', error);
+    res.status(500).json({
+      status: 'error',
+      error: {
+        message: error.message,
+        name: error.name,
+        code: error.code
+      }
+    });
+  }
+});
+
 // Mount routes
 app.use('/', router);
 

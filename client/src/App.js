@@ -18,6 +18,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import UploadForm from './components/UploadForm';
 import MemoryGrid from './components/MemoryGrid';
+import ConnectionTest from './components/ConnectionTest';
 import { getMemories } from './api';
 
 // RAL 2005 color (luminous orange)
@@ -39,6 +40,7 @@ function App() {
   const [showWarning, setShowWarning] = useState(true);
   const [memories, setMemories] = useState([]);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showConnectionTest, setShowConnectionTest] = useState(true);
 
   useEffect(() => {
     // Check if this is the user's first visit
@@ -166,6 +168,11 @@ function App() {
         </Dialog>
 
         <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
+          {showConnectionTest && (
+            <Paper sx={{ mb: 2 }}>
+              <ConnectionTest />
+            </Paper>
+          )}
           <Collapse in={showWarning}>
             <Alert
               severity="info"

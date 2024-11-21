@@ -25,10 +25,21 @@ api.interceptors.response.use(
 // API endpoints
 const ENDPOINTS = {
   MEMORIES: '/memories',
-  UPLOAD: '/upload'
+  UPLOAD: '/upload',
+  TEST_CONNECTION: '/test-connection'
 };
 
 // API functions
+const testConnection = async () => {
+  try {
+    const response = await api.get(ENDPOINTS.TEST_CONNECTION);
+    return response.data;
+  } catch (error) {
+    console.error('Error testing connection:', error);
+    throw error;
+  }
+};
+
 const getMemories = async () => {
   try {
     const response = await api.get(ENDPOINTS.MEMORIES);
@@ -77,4 +88,4 @@ const getMemoryFile = async (memoryId) => {
   }
 };
 
-export { api, ENDPOINTS, getMemories, uploadMemory, getMemoryFile };
+export { api, ENDPOINTS, getMemories, uploadMemory, getMemoryFile, testConnection };
