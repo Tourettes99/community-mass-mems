@@ -25,7 +25,7 @@ api.interceptors.response.use(
 // API endpoints
 export const ENDPOINTS = {
   MEMORIES: '/memories',
-  UPLOAD: '/memories',
+  UPLOAD: '/upload',
   TEST: '/test'
 };
 
@@ -42,7 +42,7 @@ export const testAPI = async () => {
 
 export const getMemories = async () => {
   try {
-    const response = await api.get('/memories');
+    const response = await api.get(ENDPOINTS.MEMORIES);
     return response.data;
   } catch (error) {
     console.error('Error fetching memories:', error);
@@ -52,7 +52,19 @@ export const getMemories = async () => {
 
 export const uploadMemory = async (formData) => {
   try {
-    const response = await api.post('/memories', formData, {
+    // For text memories, convert FormData to JSON
+    if (formData.get('type') === 'text') {
+      const data = {
+        type: 'text',
+        content: formData.get('content')
+      };
+      
+      const response = await api.post(ENDPOINTS.UPLOAD, data);
+      return response.data;
+    }
+    
+    // For file uploads, use multipart/form-data
+    const response = await api.post(ENDPOINTS.UPLOAD, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -66,7 +78,7 @@ export const uploadMemory = async (formData) => {
 
 export const getMemoryFile = async (memoryId) => {
   try {
-    const response = await api.get(`/memories/${memoryId}/file`, {
+    const response = await api.get(`${ENDPOINTS.MEMORIES}/${memoryId}/file`, {
       responseType: 'blob',
     });
     return response.data;
