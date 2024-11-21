@@ -150,9 +150,9 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
       
       const requestBody = {
         type,
-        url,
-        content,
-        tags
+        url: url || undefined,
+        content: content || undefined,
+        tags: tags || []
       };
 
       const response = await fetch('/.netlify/functions/file-upload', {
@@ -171,11 +171,16 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
       const data = await response.json();
       console.log('Server response:', data);
       
+      if (!data.memory) {
+        throw new Error('No memory data in server response');
+      }
+
       onMemoryCreated(data.memory);
       setSuccess(true);
       setUrl('');
       setContent('');
       setTags([]);
+      setType('url');
     } catch (err) {
       console.error('Error uploading memory:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload memory');
