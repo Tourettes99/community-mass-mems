@@ -31,6 +31,19 @@ if (!MONGODB_URI) {
   throw new Error('MONGODB_URI must be defined');
 }
 
+// MongoDB connection options
+const mongooseOptions = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+  family: 4,
+  retryWrites: true,
+  w: 'majority',
+  authSource: 'admin',
+  dbName: 'memories'  // Specify the database name explicitly
+};
+
 // MongoDB connection with retry logic
 let isConnecting = false;
 let connectionAttempts = 0;
@@ -47,18 +60,28 @@ async function connectWithRetry(retries = MAX_RETRIES) {
     connectionAttempts++;
     
     console.log(`🔄 MongoDB Connection Attempt ${connectionAttempts}/${MAX_RETRIES}`);
-    
-    await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+    console.log('🔌 Connection Options:', {
+      uri: MONGODB_URI ? 'URI Present' : 'URI Missing',
+      dbName: mongooseOptions.dbName,
+      authSource: mongooseOptions.authSource
     });
     
+    await mongoose.connect(MONGODB_URI, mongooseOptions);
+    
     console.log('✅ MongoDB Connected');
+    console.log('📊 Connection State:', mongoose.connection.readyState);
+    console.log('📁 Database:', mongoose.connection.db.databaseName);
+    
     isConnecting = false;
     connectionAttempts = 0;
     return true;
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('❌ MongoDB connection error:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
+    
     isConnecting = false;
     
     if (retries > 0) {
