@@ -6,7 +6,7 @@ import axios from 'axios';
 
 interface Memory {
   _id: string;
-  type: 'url' | 'image' | 'video' | 'audio' | 'text';
+  type: 'url' | 'image' | 'video' | 'audio' | 'text' | 'static';
   url: string;
   content?: string;
   metadata?: {
@@ -14,10 +14,18 @@ interface Memory {
     description?: string;
     siteName?: string;
     favicon?: string;
-    mediaType?: 'url' | 'image' | 'video' | 'audio';
+    mediaType?: 'url' | 'image' | 'video' | 'audio' | 'static';
     previewUrl?: string;
     playbackHtml?: string;
     isPlayable?: boolean;
+    fileSize?: number;
+    contentType?: string;
+    resolution?: string;
+    duration?: string;
+    format?: string;
+    encoding?: string;
+    lastModified?: Date;
+    rawContent?: string;
   };
   tags?: string[];
 }
@@ -30,6 +38,49 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
       return;
     }
     setExpanded(!expanded);
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
+
+  const renderMetadataDetails = (metadata: Memory['metadata']) => {
+    if (!metadata) return null;
+
+    const details = [];
+
+    if (metadata.fileSize) {
+      details.push(`Size: ${formatFileSize(metadata.fileSize)}`);
+    }
+    if (metadata.contentType) {
+      details.push(`Type: ${metadata.contentType}`);
+    }
+    if (metadata.resolution) {
+      details.push(`Resolution: ${metadata.resolution}`);
+    }
+    if (metadata.duration) {
+      details.push(`Duration: ${metadata.duration}`);
+    }
+    if (metadata.format) {
+      details.push(`Format: ${metadata.format}`);
+    }
+    if (metadata.lastModified) {
+      details.push(`Modified: ${new Date(metadata.lastModified).toLocaleString()}`);
+    }
+
+    if (details.length === 0) return null;
+
+    return (
+      <Box sx={{ mt: 1, mb: 1 }}>
+        <Typography variant="caption" color="text.secondary" component="div">
+          {details.join(' • ')}
+        </Typography>
+      </Box>
+    );
   };
 
   const renderUrlCard = () => {
@@ -49,7 +100,7 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
         }}
         onClick={handleCardClick}
       >
-        {/* Header with favicon, title, and site name */}
+        {/* Header with favicon and title */}
         <CardHeader
           avatar={
             metadata.favicon ? (
@@ -80,13 +131,16 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           subheader={metadata.siteName}
         />
 
+        {/* File Metadata */}
+        {renderMetadataDetails(metadata)}
+
         {/* Media Content */}
         {metadata.isPlayable && metadata.playbackHtml ? (
           <Box 
             sx={{ 
               width: '100%',
               position: 'relative',
-              paddingTop: metadata.mediaType === 'video' ? '56.25%' : 'auto', // 16:9 aspect ratio for videos
+              paddingTop: metadata.mediaType === 'video' ? '56.25%' : 'auto',
               '& iframe': {
                 position: metadata.mediaType === 'video' ? 'absolute' : 'relative',
                 top: 0,
@@ -117,8 +171,8 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
           />
         ) : null}
 
-        {/* Description */}
-        {metadata.description && (
+        {/* Description or Raw Content */}
+        {(metadata.description || metadata.rawContent) && (
           <CardContent>
             <Typography
               variant="body2"
@@ -129,9 +183,14 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
                 transition: 'all 0.3s ease',
+                ...(metadata.rawContent && {
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap',
+                  fontSize: '0.75rem'
+                })
               }}
             >
-              {metadata.description}
+              {metadata.rawContent || metadata.description}
             </Typography>
           </CardContent>
         )}
@@ -159,8 +218,11 @@ const MemoryCard: React.FC<{ memory: Memory }> = ({ memory }) => {
   // Render different card types based on memory type
   switch (memory.type) {
     case 'url':
+    case 'image':
+    case 'video':
+    case 'audio':
+    case 'static':
       return renderUrlCard();
-    // Add other memory type renderers here
     default:
       return null;
   }
