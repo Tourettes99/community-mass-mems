@@ -9,64 +9,104 @@ const connectDb = async () => {
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI environment variable is not set');
     }
-    conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
-    });
+    
+    try {
+      conn = await mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 10000,
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+      });
+      console.log('Successfully connected to MongoDB');
+    } catch (err) {
+      console.error('MongoDB connection error:', err);
+      throw err;
+    }
   }
   return conn;
 };
 
 exports.handler = async (event, context) => {
+  // Prevent function from waiting for connections to close
   context.callbackWaitsForEmptyEventLoop = false;
   
+  // Set default headers
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  };
+
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS'
-      },
+      headers,
       body: ''
     };
   }
 
+  // Validate HTTP method
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
-      headers: {
-        'Allow': 'GET',
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
+      headers: { ...headers, 'Allow': 'GET' },
       body: JSON.stringify({ message: 'Method Not Allowed' })
     };
   }
   
   try {
+    // Connect to database
     await connectDb();
-    const memories = await Memory.find().sort({ createdAt: -1 });
-    
+    console.log('Connected to database, fetching memories...');
+
+    // Fetch memories with proper error handling
+    let memories;
+    try {
+      memories = await Memory.find()
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec();
+      
+      console.log(`Successfully fetched ${memories.length} memories`);
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      throw new Error(`Database query failed: ${dbError.message}`);
+    }
+
+    // Validate memories array
+    if (!Array.isArray(memories)) {
+      console.error('Invalid memories format:', memories);
+      throw new Error('Invalid data format returned from database');
+    }
+
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept'
-      },
+      headers,
       body: JSON.stringify(memories)
     };
   } catch (error) {
-    console.error('Error fetching memories:', error);
+    console.error('Error in getMemories function:', error);
+    
+    // Determine if it's a connection error
+    const isConnectionError = error.name === 'MongooseError' || 
+                            error.name === 'MongoError' ||
+                            error.message.includes('connect');
+    
+    const statusCode = isConnectionError ? 503 : 500;
+    const message = isConnectionError 
+      ? 'Database connection error. Please try again later.'
+      : 'Internal server error while fetching memories.';
+
     return {
-      statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept'
-      },
-      body: JSON.stringify({ message: 'Error fetching memories', error: error.message })
+      statusCode,
+      headers,
+      body: JSON.stringify({
+        message,
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      })
     };
   }
 };
