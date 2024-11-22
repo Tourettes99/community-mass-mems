@@ -2,17 +2,13 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Memory = require('./models/Memory');
 
-// Common media file extensions
-const MEDIA_EXTENSIONS = [
-  // Images
-  'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff',
-  // Videos
-  'mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mkv',
-  // Audio
-  'mp3', 'wav', 'aac', 'm4a', 'opus', 'wma', 'flac',
-  // Documents
-  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-];
+// Media file extensions
+const MEDIA_EXTENSIONS = {
+  images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'],
+  videos: ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mkv'],
+  audio: ['mp3', 'wav', 'aac', 'm4a', 'opus', 'wma', 'flac'],
+  documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
+};
 
 let conn = null;
 
@@ -38,84 +34,58 @@ const isCloudStorageUrl = (domain) => {
 const validateUrl = (urlString) => {
   try {
     const url = new URL(urlString);
-    // Allow both HTTPS and HTTP for media URLs
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-      return false;
-    }
-
-    // Get file extension if any
-    const pathname = url.pathname.toLowerCase();
-    const extension = pathname.split('.').pop();
-
-    // If it's a media file, allow HTTP as well
-    const isMediaFile = MEDIA_EXTENSIONS.includes(extension);
-    
-    // For non-media files, require HTTPS
-    if (!isMediaFile && url.protocol !== 'https:') {
-      return false;
-    }
-
-    return true;
+    return url.protocol === 'https:' || url.protocol === 'http:';
   } catch (e) {
     return false;
   }
 };
 
-const getUrlMetadata = (url) => {
+const isMediaUrl = (url) => {
+  const pathname = url.pathname.toLowerCase();
+  const extension = pathname.split('.').pop();
+  return Object.values(MEDIA_EXTENSIONS).flat().includes(extension);
+};
+
+const getUrlMetadata = async (urlString) => {
   try {
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.replace('www.', '');
-    const pathname = urlObj.pathname.toLowerCase();
-    
+    const url = new URL(urlString);
+    const domain = url.hostname.replace('www.', '');
+    const pathname = url.pathname.toLowerCase();
+    const extension = pathname.split('.').pop();
+
     // Basic metadata
     const metadata = {
+      url: urlString,
       domain,
-      url,
+      protocol: url.protocol,
       type: 'url',
-      title: url,
-      isSecure: urlObj.protocol === 'https:',
-      isCloudStorage: isCloudStorageUrl(domain)
+      isSecure: url.protocol === 'https:',
+      createdAt: new Date().toISOString()
     };
 
-    // Get file extension
-    const extension = pathname.split('.').pop().toLowerCase();
-    
-    // Check if it's a direct media URL by extension
-    if (MEDIA_EXTENSIONS.includes(extension)) {
+    // Determine content type from extension
+    if (MEDIA_EXTENSIONS.images.includes(extension)) {
+      metadata.type = 'image';
+      metadata.mediaType = 'image';
       metadata.fileType = extension;
-      
-      // Categorize by file type
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(extension)) {
-        metadata.type = 'image';
-      } else if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mkv'].includes(extension)) {
-        metadata.type = 'video';
-      } else if (['mp3', 'wav', 'aac', 'm4a', 'opus', 'wma', 'flac'].includes(extension)) {
-        metadata.type = 'audio';
-      } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(extension)) {
-        metadata.type = 'document';
-      }
+    } else if (MEDIA_EXTENSIONS.videos.includes(extension)) {
+      metadata.type = 'video';
+      metadata.mediaType = 'video';
+      metadata.fileType = extension;
+    } else if (MEDIA_EXTENSIONS.audio.includes(extension)) {
+      metadata.type = 'audio';
+      metadata.mediaType = 'audio';
+      metadata.fileType = extension;
+    } else if (MEDIA_EXTENSIONS.documents.includes(extension)) {
+      metadata.type = 'document';
+      metadata.mediaType = 'document';
+      metadata.fileType = extension;
     }
 
-    // Handle cloud storage URLs
-    if (metadata.isCloudStorage) {
-      metadata.storageProvider = domain.split('.')[0];
-      // If type wasn't set by extension, try to determine from URL structure
-      if (!metadata.type || metadata.type === 'url') {
-        const urlPath = pathname.toLowerCase();
-        if (urlPath.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/)) {
-          metadata.type = 'image';
-          metadata.fileType = urlPath.split('.').pop();
-        } else if (urlPath.match(/\.(mp4|webm|ogg|mov|avi|wmv|flv|m4v|mkv)$/)) {
-          metadata.type = 'video';
-          metadata.fileType = urlPath.split('.').pop();
-        } else if (urlPath.match(/\.(mp3|wav|aac|m4a|opus|wma|flac)$/)) {
-          metadata.type = 'audio';
-          metadata.fileType = urlPath.split('.').pop();
-        } else if (urlPath.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/)) {
-          metadata.type = 'document';
-          metadata.fileType = urlPath.split('.').pop();
-        }
-      }
+    // Additional metadata for media URLs
+    if (metadata.type !== 'url') {
+      metadata.contentUrl = urlString;
+      metadata.title = pathname.split('/').pop() || 'Untitled';
     }
 
     // Platform-specific metadata
@@ -131,18 +101,31 @@ const getUrlMetadata = (url) => {
     } else if (domain.includes('soundcloud.com')) {
       metadata.platform = 'soundcloud';
       metadata.type = 'audio';
-    } else if (domain.includes('figma.com')) {
-      metadata.platform = 'figma';
-      metadata.type = metadata.type || 'design';
+    }
+
+    // Validate media URLs
+    if (metadata.type !== 'url') {
+      try {
+        const response = await fetch(urlString, { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error('Media resource not accessible');
+        }
+        metadata.contentType = response.headers.get('content-type');
+        metadata.contentLength = response.headers.get('content-length');
+      } catch (error) {
+        console.warn('Media validation failed:', error);
+        metadata.warning = 'Media resource might not be accessible';
+      }
     }
 
     return metadata;
   } catch (error) {
-    console.error('Error getting URL metadata:', error);
+    console.error('Error extracting URL metadata:', error);
     return {
+      url: urlString,
       type: 'url',
-      title: url,
-      error: 'Failed to extract metadata'
+      error: 'Failed to extract metadata',
+      createdAt: new Date().toISOString()
     };
   }
 };
@@ -202,7 +185,7 @@ exports.handler = async (event, context) => {
     await connectDb();
 
     // Get URL metadata
-    const metadata = getUrlMetadata(url);
+    const metadata = await getUrlMetadata(url);
 
     // Create memory
     const memory = new Memory({

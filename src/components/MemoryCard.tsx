@@ -11,7 +11,8 @@ import {
   Link,
   Collapse,
   Button,
-  Stack
+  Stack,
+  Grow
 } from '@mui/material';
 import {
   Link as LinkIcon,
@@ -33,6 +34,7 @@ import { Memory } from '../types';
 interface MemoryCardProps {
   memory: Memory;
   onVote?: (memoryId: string, vote: 1 | -1) => Promise<void>;
+  isNew?: boolean;
 }
 
 const getMemoryTypeIcon = (type: string) => {
@@ -109,7 +111,7 @@ const getMemoryPreview = (memory: Memory, expanded: boolean) => {
   }
 };
 
-const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
+const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote, isNew = false }) => {
   const [expanded, setExpanded] = useState(false);
   const [votes, setVotes] = useState(memory.votes || 0);
   const [userVote, setUserVote] = useState<1 | -1 | 0>(0);
@@ -146,97 +148,102 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
   };
 
   return (
-    <Card 
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        transition: 'transform 0.2s',
-        '&:hover': {
-          transform: 'scale(1.02)',
-        },
-      }}
-    >
-      {getMemoryPreview(memory, expanded)}
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          {getMemoryTypeIcon(type)}
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-            {new Date(createdAt).toLocaleDateString('en-US', { 
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            })}
+    <Grow in={true} timeout={isNew ? 1000 : 0}>
+      <Card 
+        sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          position: 'relative',
+          transform: isNew ? 'scale(1.02)' : 'scale(1)',
+          transition: 'transform 0.3s ease-in-out',
+          '&:hover': {
+            transform: 'scale(1.02)',
+            boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)'
+          },
+        }}
+      >
+        {getMemoryPreview(memory, expanded)}
+        <CardContent sx={{ flexGrow: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            {getMemoryTypeIcon(type)}
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+              {new Date(createdAt).toLocaleDateString('en-US', { 
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </Typography>
+          </Box>
+
+          {url && type === 'url' && (
+            <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+              {metadata?.favicon && (
+                <Box
+                  component="img"
+                  src={metadata.favicon}
+                  alt={metadata?.siteName || 'Website favicon'}
+                  sx={{ width: 16, height: 16, objectFit: 'contain' }}
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              <Link
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                color="primary"
+                underline="hover"
+              >
+                {metadata?.siteName || new URL(url).hostname}
+              </Link>
+            </Stack>
+          )}
+
+          <Typography variant="h6" component="div" gutterBottom noWrap>
+            {metadata?.title || 'Untitled Memory'}
           </Typography>
-        </Box>
 
-        {url && type === 'url' && (
-          <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-            {metadata?.favicon && (
-              <Box
-                component="img"
-                src={metadata.favicon}
-                alt={metadata?.siteName || 'Website favicon'}
-                sx={{ width: 16, height: 16, objectFit: 'contain' }}
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            )}
-            <Link
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              color="primary"
-              underline="hover"
-            >
-              {metadata?.siteName || new URL(url).hostname}
-            </Link>
-          </Stack>
-        )}
-
-        <Typography variant="h6" component="div" gutterBottom noWrap>
-          {metadata?.title || 'Untitled Memory'}
-        </Typography>
-
-        <Box sx={{ mt: 2 }}>
-          <CardActions disableSpacing>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton 
-                onClick={() => handleVote(1)}
-                color={userVote === 1 ? 'primary' : 'default'}
-                disabled={isVoting}
+          <Box sx={{ mt: 2 }}>
+            <CardActions disableSpacing>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <IconButton 
+                  onClick={() => handleVote(1)}
+                  color={userVote === 1 ? 'primary' : 'default'}
+                  disabled={isVoting}
+                >
+                  <ThumbUp />
+                </IconButton>
+                <Typography>{votes}</Typography>
+                <IconButton 
+                  onClick={() => handleVote(-1)}
+                  color={userVote === -1 ? 'primary' : 'default'}
+                  disabled={isVoting}
+                >
+                  <ThumbDown />
+                </IconButton>
+              </Box>
+              <IconButton
+                onClick={handleExpandClick}
+                aria-expanded={expanded}
+                aria-label="show more"
+                sx={{ marginLeft: 'auto' }}
               >
-                <ThumbUp />
+                {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
               </IconButton>
-              <Typography>{votes}</Typography>
-              <IconButton 
-                onClick={() => handleVote(-1)}
-                color={userVote === -1 ? 'primary' : 'default'}
-                disabled={isVoting}
-              >
-                <ThumbDown />
-              </IconButton>
-            </Box>
-            <IconButton
-              onClick={handleExpandClick}
-              aria-expanded={expanded}
-              aria-label="show more"
-              sx={{ marginLeft: 'auto' }}
-            >
-              {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-          </CardActions>
-          <Collapse in={expanded} timeout="auto" unmountOnExit>
-            <CardContent>
-              <Typography paragraph>
-                {content || metadata?.description || 'No description available'}
-              </Typography>
-            </CardContent>
-          </Collapse>
-        </Box>
-      </CardContent>
-    </Card>
+            </CardActions>
+            <Collapse in={expanded} timeout="auto" unmountOnExit>
+              <CardContent>
+                <Typography paragraph>
+                  {content || metadata?.description || 'No description available'}
+                </Typography>
+              </CardContent>
+            </Collapse>
+          </Box>
+        </CardContent>
+      </Card>
+    </Grow>
   );
 };
 
