@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Card,
   CardContent,
@@ -9,241 +9,119 @@ import {
   IconButton,
   CardActions,
   Link,
-  Collapse,
-  Button,
-  Stack,
-  Grow
+  Tooltip
 } from '@mui/material';
-import {
-  Link as LinkIcon,
-  TextFields,
-  Image,
-  VideoLibrary,
-  AudioFile,
-  Description,
-  Share,
-  Favorite,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  ThumbUp,
-  ThumbDown
-} from '@mui/icons-material';
-import EmbedPlayer from './EmbedPlayer';
-import { Memory } from '../types';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { Memory } from '../types/Memory';
+import useMemoryStore from '../stores/memoryStore';
 
 interface MemoryCardProps {
   memory: Memory;
-  onVote?: (memoryId: string, vote: 1 | -1) => Promise<void>;
-  isNew?: boolean;
 }
 
-const getMemoryTypeIcon = (type: string) => {
-  switch (type) {
-    case 'url':
-      return <LinkIcon />;
-    case 'text':
-      return <TextFields />;
-    case 'image':
-      return <Image />;
-    case 'video':
-      return <VideoLibrary />;
-    case 'audio':
-      return <AudioFile />;
-    default:
-      return <Description />;
-  }
-};
+const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
+  const updateMemory = useMemoryStore(state => state.updateMemory);
 
-const getMemoryPreview = (memory: Memory, expanded: boolean) => {
-  const { type, url, content, metadata } = memory;
-
-  // For media content, use the EmbedPlayer
-  if ((type === 'video' || type === 'audio') && url) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <EmbedPlayer
-          type={type}
-          url={url}
-          title={metadata?.title}
-          metadata={metadata}
-        />
-      </Box>
-    );
-  }
-
-  switch (type) {
-    case 'url':
-      if (metadata?.playbackHtml) {
-        return (
-          <Box sx={{ p: 2 }}>
-            <EmbedPlayer
-              type={type}
-              url={url || ''}
-              title={metadata?.title}
-              metadata={metadata}
-            />
-          </Box>
-        );
-      }
-      return metadata?.previewUrl ? (
-        <Link href={url} target="_blank" rel="noopener noreferrer">
-          <CardMedia
-            component="img"
-            height="140"
-            image={metadata.previewUrl}
-            alt={metadata.title || 'URL preview'}
-          />
-        </Link>
-      ) : null;
-
-    case 'image':
-      return url ? (
-        <CardMedia
-          component="img"
-          sx={{ maxHeight: expanded ? '400px' : '140px', objectFit: 'contain' }}
-          image={url}
-          alt={metadata?.title || 'Image memory'}
-        />
-      ) : null;
-
-    default:
-      return null;
-  }
-};
-
-const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote, isNew = false }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [votes, setVotes] = useState(memory.votes || 0);
-  const [userVote, setUserVote] = useState<1 | -1 | 0>(0);
-  const [isVoting, setIsVoting] = useState(false);
-  const { type, metadata, tags = [], createdAt, url, content } = memory;
-
-  const handleExpandClick = () => {
-    setExpanded(!expanded);
-  };
-
-  const handleVote = async (vote: 1 | -1) => {
-    if (isVoting || !onVote) return;
-
-    setIsVoting(true);
+  const handleVote = async (type: 'up' | 'down') => {
     try {
-      // If user is clicking the same vote button again, remove their vote
-      const newVote = userVote === vote ? 0 : vote;
-      const voteDiff = newVote - userVote;
-      
-      // Optimistically update UI
-      setVotes(prev => prev + voteDiff);
-      setUserVote(newVote);
+      const response = await fetch('/.netlify/functions/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          memoryId: memory._id,
+          voteType: type
+        }),
+      });
 
-      // Call the API
-      await onVote(memory._id, vote);
+      if (!response.ok) {
+        throw new Error('Failed to vote');
+      }
+
+      const updatedMemory = await response.json();
+      updateMemory(updatedMemory);
     } catch (error) {
-      // Revert on error
-      setVotes(prev => prev - (vote - userVote));
-      setUserVote(userVote);
-      console.error('Failed to vote:', error);
-    } finally {
-      setIsVoting(false);
+      console.error('Error voting:', error);
     }
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
   return (
-    <Grow in={true} timeout={isNew ? 1000 : 0}>
-      <Card 
-        sx={{ 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column',
-          position: 'relative',
-          transform: isNew ? 'scale(1.02)' : 'scale(1)',
-          transition: 'transform 0.3s ease-in-out',
-          '&:hover': {
-            transform: 'scale(1.02)',
-            boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)'
-          },
-        }}
-      >
-        {getMemoryPreview(memory, expanded)}
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            {getMemoryTypeIcon(type)}
-            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-              {new Date(createdAt).toLocaleDateString('en-US', { 
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </Typography>
-          </Box>
-
-          {url && type === 'url' && (
-            <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-              {metadata?.favicon && (
-                <Box
-                  component="img"
-                  src={metadata.favicon}
-                  alt={metadata?.siteName || 'Website favicon'}
-                  sx={{ width: 16, height: 16, objectFit: 'contain' }}
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              )}
-              <Link
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                color="primary"
-                underline="hover"
-              >
-                {metadata?.siteName || new URL(url).hostname}
-              </Link>
-            </Stack>
-          )}
-
-          <Typography variant="h6" component="div" gutterBottom noWrap>
-            {metadata?.title || 'Untitled Memory'}
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {memory.metadata.thumbnailUrl && (
+        <CardMedia
+          component="img"
+          height="140"
+          image={memory.metadata.thumbnailUrl}
+          alt={memory.metadata.title || 'Memory thumbnail'}
+          sx={{ objectFit: 'cover' }}
+        />
+      )}
+      <CardContent sx={{ flexGrow: 1 }}>
+        <Typography variant="h6" component="h2" gutterBottom>
+          {memory.metadata.title || 'Untitled Memory'}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" paragraph>
+          {memory.metadata.description || (memory.type === 'text' ? memory.content : '')}
+        </Typography>
+        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+          {memory.tags.map((tag, index) => (
+            <Chip
+              key={index}
+              label={tag}
+              size="small"
+              variant="outlined"
+            />
+          ))}
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+          {formatDate(memory.metadata.createdAt)}
+        </Typography>
+      </CardContent>
+      <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 1 }}>
+        <Box>
+          <Tooltip title="Upvote">
+            <IconButton onClick={() => handleVote('up')} size="small">
+              <ThumbUpIcon color={memory.votes.up > 0 ? 'primary' : 'inherit'} />
+            </IconButton>
+          </Tooltip>
+          <Typography variant="body2" component="span" sx={{ px: 1 }}>
+            {memory.votes.up - memory.votes.down}
           </Typography>
-
-          <Box sx={{ mt: 2 }}>
-            <CardActions disableSpacing>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <IconButton 
-                  onClick={() => handleVote(1)}
-                  color={userVote === 1 ? 'primary' : 'default'}
-                  disabled={isVoting}
-                >
-                  <ThumbUp />
-                </IconButton>
-                <Typography>{votes}</Typography>
-                <IconButton 
-                  onClick={() => handleVote(-1)}
-                  color={userVote === -1 ? 'primary' : 'default'}
-                  disabled={isVoting}
-                >
-                  <ThumbDown />
-                </IconButton>
-              </Box>
-              <IconButton
-                onClick={handleExpandClick}
-                aria-expanded={expanded}
-                aria-label="show more"
-                sx={{ marginLeft: 'auto' }}
-              >
-                {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </IconButton>
-            </CardActions>
-            <Collapse in={expanded} timeout="auto" unmountOnExit>
-              <CardContent>
-                <Typography paragraph>
-                  {content || metadata?.description || 'No description available'}
-                </Typography>
-              </CardContent>
-            </Collapse>
-          </Box>
-        </CardContent>
-      </Card>
-    </Grow>
+          <Tooltip title="Downvote">
+            <IconButton onClick={() => handleVote('down')} size="small">
+              <ThumbDownIcon color={memory.votes.down > 0 ? 'error' : 'inherit'} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        {memory.type === 'url' && memory.url && (
+          <Tooltip title="Open link in new tab">
+            <IconButton
+              component={Link}
+              href={memory.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="small"
+            >
+              <OpenInNewIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+      </CardActions>
+    </Card>
   );
 };
 
