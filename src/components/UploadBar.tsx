@@ -13,7 +13,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Typography
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -45,8 +46,8 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
   };
 
   const handleTagAdd = () => {
-    if (currentTag && !tags.includes(currentTag)) {
-      setTags([...tags, currentTag]);
+    if (currentTag.trim() && !tags.includes(currentTag.trim())) {
+      setTags([...tags, currentTag.trim()]);
       setCurrentTag('');
     }
   };
@@ -56,7 +57,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
   };
 
   const handleKeyPress = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' && currentTag) {
+    if (event.key === 'Enter' && currentTag.trim()) {
       event.preventDefault();
       handleTagAdd();
     }
@@ -101,7 +102,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
         }
 
         const data = await response.json();
-        onUploadSuccess('Memory uploaded successfully!');
+        onUploadSuccess('URL memory uploaded successfully!');
       } else if (type === 'text') {
         if (!content.trim()) {
           throw new Error('Content is required');
@@ -112,7 +113,10 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ content: content.trim(), tags })
+          body: JSON.stringify({ 
+            content: content.trim(), 
+            tags: tags.map(tag => tag.trim()).filter(Boolean)
+          })
         });
 
         if (!response.ok) {
@@ -121,7 +125,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
         }
 
         const data = await response.json();
-        onUploadSuccess('Memory uploaded successfully!');
+        onUploadSuccess('Text memory uploaded successfully!');
       }
 
       setSuccess(true);
@@ -131,7 +135,6 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
       setContent('');
       setTags([]);
       setCurrentTag('');
-      setType('url');
     } catch (err) {
       console.error('Error uploading memory:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload memory');
@@ -173,71 +176,86 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
             label="URL"
             value={url}
             onChange={handleUrlChange}
+            placeholder="Enter a URL (e.g., YouTube, Instagram, etc.)"
             InputProps={{
               startAdornment: getTypeIcon(type)
             }}
           />
         )}
 
-        {/* Text Content Input */}
+        {/* Text Input */}
         {type === 'text' && (
           <TextField
             fullWidth
-            multiline
-            rows={4}
-            label="Text Content"
+            label="Content"
             value={content}
             onChange={handleContentChange}
+            multiline
+            rows={4}
+            placeholder="Enter your memory text here..."
           />
         )}
 
         {/* Tags Input */}
-        <Stack spacing={1}>
+        <Box>
+          <Typography variant="body2" color="textSecondary" gutterBottom>
+            Tags (press Enter or click + to add)
+          </Typography>
           <Stack direction="row" spacing={1} alignItems="center">
             <TextField
-              label="Add Tags"
+              size="small"
+              label="Add Tag"
               value={currentTag}
               onChange={handleTagChange}
               onKeyPress={handleKeyPress}
-              size="small"
+              placeholder="Enter tag..."
+              sx={{ flexGrow: 1 }}
             />
-            <IconButton onClick={handleTagAdd} disabled={!currentTag}>
+            <IconButton 
+              onClick={handleTagAdd}
+              disabled={!currentTag.trim()}
+              color="primary"
+              size="small"
+            >
               <AddIcon />
             </IconButton>
           </Stack>
-          {tags.length > 0 && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {tags.map((tag, index) => (
-                <Chip
-                  key={index}
-                  label={tag}
-                  onDelete={() => handleTagDelete(tag)}
-                  deleteIcon={<ClearIcon />}
-                />
-              ))}
-            </Box>
-          )}
-        </Stack>
+          
+          {/* Tags Display */}
+          <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {tags.map((tag, index) => (
+              <Chip
+                key={index}
+                label={tag}
+                onDelete={() => handleTagDelete(tag)}
+                color="primary"
+                variant="outlined"
+                size="small"
+              />
+            ))}
+          </Box>
+        </Box>
 
         {/* Submit Button */}
         <Button
           type="submit"
           variant="contained"
-          disabled={loading || (!url && !content)}
+          color="primary"
+          disabled={loading || (!url && !content) || (type === 'url' && !url) || (type === 'text' && !content)}
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >
-          Create Memory
+          {loading ? 'Uploading...' : 'Upload Memory'}
         </Button>
       </Stack>
 
       {/* Error Snackbar */}
-      <Snackbar
-        open={!!error}
-        autoHideDuration={6000}
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000} 
         onClose={() => setError(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity="error" onClose={() => setError(null)}>
+        <Alert onClose={() => setError(null)} severity="error">
           {error}
         </Alert>
       </Snackbar>
@@ -245,12 +263,12 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
       {/* Success Snackbar */}
       <Snackbar
         open={success}
-        autoHideDuration={3000}
+        autoHideDuration={6000}
         onClose={() => setSuccess(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity="success" onClose={() => setSuccess(false)}>
-          Memory created successfully!
+        <Alert onClose={() => setSuccess(false)} severity="success">
+          Memory uploaded successfully!
         </Alert>
       </Snackbar>
     </Box>

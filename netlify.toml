@@ -50,20 +50,26 @@ Content-Security-Policy = """
     https://*.facebook.net 
     https://*.redditmedia.com 
     https://*.reddit.com
-    https://w.soundcloud.com
-    https://connect.facebook.net
-    https://platform.twitter.com
-    https://www.youtube.com
-    https://player.vimeo.com
-    https://app.suno.ai
-    https://r1prompts.com
-    https://discord.com;
+    https://*.soundcloud.com
+    https://*.spotify.com
+    https://*.youtube.com
+    https://*.vimeo.com
+    https://*.dailymotion.com
+    https://*.flickr.com
+    https://*.imgur.com
+    https://*.giphy.com
+    https://*.medium.com
+    https://*.github.com
+    https://*.wikipedia.org;
   style-src 'self' 'unsafe-inline' 
     https://*.twitter.com
     https://*.instagram.com
     https://*.tiktok.com
     https://*.facebook.com
-    https://*.redditmedia.com;
+    https://*.redditmedia.com
+    https://*.youtube.com
+    https://*.vimeo.com
+    https://*.medium.com;
   img-src 'self' data: blob: 
     https://*.twitter.com
     https://*.twimg.com
@@ -77,9 +83,13 @@ Content-Security-Policy = """
     https://*.soundcloud.com
     https://*.sndcdn.com
     https://*.spotify.com
-    https://*.discordapp.com
-    https://*.r1prompts.com
-    https://*.suno.ai;
+    https://*.flickr.com
+    https://*.imgur.com
+    https://*.giphy.com
+    https://*.medium.com
+    https://*.githubusercontent.com
+    https://*.wikimedia.org
+    https://*.dailymotion.com;
   font-src 'self' data:;
   frame-src
     https://*.twitter.com
@@ -88,13 +98,17 @@ Content-Security-Policy = """
     https://*.facebook.com
     https://*.reddit.com
     https://*.redditmedia.com
-    https://w.soundcloud.com
-    https://open.spotify.com
-    https://www.youtube.com
-    https://player.vimeo.com
-    https://discord.com
-    https://r1prompts.com
-    https://app.suno.ai;
+    https://*.soundcloud.com
+    https://*.spotify.com
+    https://*.youtube.com
+    https://*.vimeo.com
+    https://*.dailymotion.com
+    https://*.flickr.com
+    https://*.imgur.com
+    https://*.giphy.com
+    https://*.medium.com
+    https://*.github.com
+    https://*.wikipedia.org;
   connect-src 'self'
     https://*.twitter.com
     https://*.instagram.com
@@ -102,13 +116,17 @@ Content-Security-Policy = """
     https://*.facebook.com
     https://*.reddit.com
     https://*.redditmedia.com
-    https://w.soundcloud.com
-    https://api.spotify.com
-    https://www.youtube.com
-    https://player.vimeo.com
-    https://discord.com
-    https://r1prompts.com
-    https://app.suno.ai;
+    https://*.soundcloud.com
+    https://*.spotify.com
+    https://*.youtube.com
+    https://*.vimeo.com
+    https://*.dailymotion.com
+    https://*.flickr.com
+    https://*.imgur.com
+    https://*.giphy.com
+    https://*.medium.com
+    https://*.github.com
+    https://*.wikipedia.org;
   media-src 'self'
     blob:
     https://*.twitter.com
@@ -121,10 +139,11 @@ Content-Security-Policy = """
     https://*.sndcdn.com
     https://*.spotify.com
     https://*.youtube.com
-    https://*.vimeocdn.com
-    https://discord.com
-    https://r1prompts.com
-    https://app.suno.ai;
+    https://*.vimeo.com
+    https://*.dailymotion.com
+    https://*.flickr.com
+    https://*.imgur.com
+    https://*.giphy.com;
 """
 
 [[headers]]
