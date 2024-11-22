@@ -42,108 +42,14 @@ X-Content-Type-Options = "nosniff"
 Referrer-Policy = "strict-origin-when-cross-origin"
 Content-Security-Policy = """
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' 
-    https://*.twitter.com 
-    https://*.instagram.com 
-    https://*.tiktok.com 
-    https://*.facebook.com 
-    https://*.facebook.net 
-    https://*.redditmedia.com 
-    https://*.reddit.com
-    https://*.soundcloud.com
-    https://*.spotify.com
-    https://*.youtube.com
-    https://*.vimeo.com
-    https://*.dailymotion.com
-    https://*.flickr.com
-    https://*.imgur.com
-    https://*.giphy.com
-    https://*.medium.com
-    https://*.github.com
-    https://*.wikipedia.org;
-  style-src 'self' 'unsafe-inline' 
-    https://*.twitter.com
-    https://*.instagram.com
-    https://*.tiktok.com
-    https://*.facebook.com
-    https://*.redditmedia.com
-    https://*.youtube.com
-    https://*.vimeo.com
-    https://*.medium.com;
-  img-src 'self' data: blob: 
-    https://*.twitter.com
-    https://*.twimg.com
-    https://*.instagram.com
-    https://*.fbcdn.net
-    https://*.tiktokcdn.com
-    https://*.redditmedia.com
-    https://*.redditstatic.com
-    https://*.vimeocdn.com
-    https://*.ytimg.com
-    https://*.soundcloud.com
-    https://*.sndcdn.com
-    https://*.spotify.com
-    https://*.flickr.com
-    https://*.imgur.com
-    https://*.giphy.com
-    https://*.medium.com
-    https://*.githubusercontent.com
-    https://*.wikimedia.org
-    https://*.dailymotion.com;
-  font-src 'self' data:;
-  frame-src
-    https://*.twitter.com
-    https://*.instagram.com
-    https://*.tiktok.com
-    https://*.facebook.com
-    https://*.reddit.com
-    https://*.redditmedia.com
-    https://*.soundcloud.com
-    https://*.spotify.com
-    https://*.youtube.com
-    https://*.vimeo.com
-    https://*.dailymotion.com
-    https://*.flickr.com
-    https://*.imgur.com
-    https://*.giphy.com
-    https://*.medium.com
-    https://*.github.com
-    https://*.wikipedia.org;
-  connect-src 'self'
-    https://*.twitter.com
-    https://*.instagram.com
-    https://*.tiktok.com
-    https://*.facebook.com
-    https://*.reddit.com
-    https://*.redditmedia.com
-    https://*.soundcloud.com
-    https://*.spotify.com
-    https://*.youtube.com
-    https://*.vimeo.com
-    https://*.dailymotion.com
-    https://*.flickr.com
-    https://*.imgur.com
-    https://*.giphy.com
-    https://*.medium.com
-    https://*.github.com
-    https://*.wikipedia.org;
-  media-src 'self'
-    blob:
-    https://*.twitter.com
-    https://*.instagram.com
-    https://*.tiktok.com
-    https://*.facebook.com
-    https://*.reddit.com
-    https://*.redditmedia.com
-    https://*.soundcloud.com
-    https://*.sndcdn.com
-    https://*.spotify.com
-    https://*.youtube.com
-    https://*.vimeo.com
-    https://*.dailymotion.com
-    https://*.flickr.com
-    https://*.imgur.com
-    https://*.giphy.com;
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*;
+  style-src 'self' 'unsafe-inline' https://*;
+  img-src 'self' data: blob: https://* http://*;
+  font-src 'self' data: https://*;
+  frame-src https://* http://*;
+  connect-src 'self' https://* http://*;
+  media-src 'self' blob: https://* http://*;
+  object-src 'self' https://* http://*;
 """
 
 [[headers]]
@@ -151,3 +57,21 @@ for = "/*.mp3"
 [headers.values]
 Cache-Control = "public, max-age=31536000"
 Content-Type = "audio/mpeg"
+
+[[headers]]
+for = "/*.mp4"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+Content-Type = "video/mp4"
+
+[[headers]]
+for = "/*.webm"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+Content-Type = "video/webm"
+
+[[headers]]
+for = "/*.pdf"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+Content-Type = "application/pdf"
