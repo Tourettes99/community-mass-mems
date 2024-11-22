@@ -38,7 +38,7 @@ const AppContent = () => {
     setError(null);
     
     try {
-      const response = await fetch('/.netlify/functions/get-memories');
+      const response = await fetch('/.netlify/functions/getMemories');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

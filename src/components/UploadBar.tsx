@@ -82,63 +82,52 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
     try {
       console.log('Submitting memory:', { type, url, content, tags });
       
-      const requestBody: any = {
-        type,
-        tags,
-      };
-
       if (type === 'url') {
         if (!url.trim()) {
           throw new Error('URL is required');
         }
         
-        // Detect if URL is a direct media file
-        const urlLower = url.toLowerCase();
-        const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/.test(urlLower);
-        const isVideoUrl = /\.(mp4|webm|ogg|mov)(\?.*)?$/.test(urlLower);
-        const isAudioUrl = /\.(mp3|wav|ogg|m4a)(\?.*)?$/.test(urlLower);
-        
-        // Set the appropriate type based on URL
-        if (isImageUrl) {
-          requestBody.type = 'image';
-        } else if (isVideoUrl) {
-          requestBody.type = 'video';
-        } else if (isAudioUrl) {
-          requestBody.type = 'audio';
+        // Send URL to uploadUrl endpoint
+        const response = await fetch('/.netlify/functions/uploadUrl', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url: url.trim() })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to upload URL');
         }
-        
-        requestBody.url = url.trim();
-        requestBody.content = url.trim();
+
+        const data = await response.json();
+        onMemoryCreated(data);
       } else if (type === 'text') {
         if (!content) {
           throw new Error('Content is required for text type memories');
         }
-        requestBody.content = content;
+        
+        // Send text content to upload endpoint
+        const formData = new FormData();
+        formData.append('content', content);
+        
+        const response = await fetch('/.netlify/functions/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to upload content');
+        }
+
+        const data = await response.json();
+        onMemoryCreated(data);
       } else {
         throw new Error('No content provided');
       }
 
-      const response = await fetch('/.netlify/functions/file-upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload memory');
-      }
-
-      const data = await response.json();
-      console.log('Server response:', data);
-      
-      if (!data.memory) {
-        throw new Error('No memory data in server response');
-      }
-
-      onMemoryCreated(data.memory);
       setSuccess(true);
       
       // Reset form
