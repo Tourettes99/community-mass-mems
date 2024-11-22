@@ -9,7 +9,7 @@ timeout = 30
 memory = 1024
 
 [build]
-command = "GENERATE_SOURCEMAP=false CI=false npm run build"
+command = "npm run build"
 publish = "build"
 functions = "netlify/functions"
 
@@ -36,21 +36,21 @@ status = 200
 [[headers]]
 for = "/*"
 [headers.values]
-X-Frame-Options = "SAMEORIGIN"
-X-XSS-Protection = "1; mode=block"
-X-Content-Type-Options = "nosniff"
-Referrer-Policy = "strict-origin-when-cross-origin"
 Content-Security-Policy = """
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*;
-  style-src 'self' 'unsafe-inline' https://*;
-  img-src 'self' data: blob: https://* http://*;
-  font-src 'self' data: https://*;
-  frame-src https://* http://*;
-  connect-src 'self' https://* http://*;
-  media-src 'self' blob: https://* http://*;
-  object-src 'self' https://* http://*;
+  img-src 'self' data: https: http:;
+  media-src 'self' data: https: http:;
+  object-src 'self' https: http:;
+  frame-src 'self' https: http:;
+  connect-src 'self' https: http:;
+  style-src 'self' 'unsafe-inline' https:;
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+  font-src 'self' data: https:;
 """
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
 [[headers]]
 for = "/*.mp3"

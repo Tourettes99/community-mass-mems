@@ -30,10 +30,32 @@ const connectDb = async () => {
   return conn;
 };
 
+const isCloudStorageUrl = (domain) => {
+  const cloudStorageProviders = ['drive.google.com', 'onedrive.live.com', 'dropbox.com'];
+  return cloudStorageProviders.includes(domain);
+};
+
 const validateUrl = (urlString) => {
   try {
     const url = new URL(urlString);
-    return url.protocol === 'https:' || url.protocol === 'http:';
+    // Allow both HTTPS and HTTP for media URLs
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      return false;
+    }
+
+    // Get file extension if any
+    const pathname = url.pathname.toLowerCase();
+    const extension = pathname.split('.').pop();
+
+    // If it's a media file, allow HTTP as well
+    const isMediaFile = MEDIA_EXTENSIONS.includes(extension);
+    
+    // For non-media files, require HTTPS
+    if (!isMediaFile && url.protocol !== 'https:') {
+      return false;
+    }
+
+    return true;
   } catch (e) {
     return false;
   }
@@ -51,12 +73,18 @@ const getUrlMetadata = (url) => {
       url,
       type: 'url',
       title: url,
-      isSecure: urlObj.protocol === 'https:'
+      isSecure: urlObj.protocol === 'https:',
+      isCloudStorage: isCloudStorageUrl(domain)
     };
 
-    // Check if it's a media file by extension
+    // Get file extension
     const extension = pathname.split('.').pop().toLowerCase();
+    
+    // Check if it's a direct media URL by extension
     if (MEDIA_EXTENSIONS.includes(extension)) {
+      metadata.fileType = extension;
+      
+      // Categorize by file type
       if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'].includes(extension)) {
         metadata.type = 'image';
       } else if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mkv'].includes(extension)) {
@@ -65,6 +93,28 @@ const getUrlMetadata = (url) => {
         metadata.type = 'audio';
       } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(extension)) {
         metadata.type = 'document';
+      }
+    }
+
+    // Handle cloud storage URLs
+    if (metadata.isCloudStorage) {
+      metadata.storageProvider = domain.split('.')[0];
+      // If type wasn't set by extension, try to determine from URL structure
+      if (!metadata.type || metadata.type === 'url') {
+        const urlPath = pathname.toLowerCase();
+        if (urlPath.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/)) {
+          metadata.type = 'image';
+          metadata.fileType = urlPath.split('.').pop();
+        } else if (urlPath.match(/\.(mp4|webm|ogg|mov|avi|wmv|flv|m4v|mkv)$/)) {
+          metadata.type = 'video';
+          metadata.fileType = urlPath.split('.').pop();
+        } else if (urlPath.match(/\.(mp3|wav|aac|m4a|opus|wma|flac)$/)) {
+          metadata.type = 'audio';
+          metadata.fileType = urlPath.split('.').pop();
+        } else if (urlPath.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/)) {
+          metadata.type = 'document';
+          metadata.fileType = urlPath.split('.').pop();
+        }
       }
     }
 
@@ -81,18 +131,9 @@ const getUrlMetadata = (url) => {
     } else if (domain.includes('soundcloud.com')) {
       metadata.platform = 'soundcloud';
       metadata.type = 'audio';
-    } else if (domain.includes('instagram.com')) {
-      metadata.platform = 'instagram';
-      metadata.type = 'social';
-    } else if (domain.includes('twitter.com')) {
-      metadata.platform = 'twitter';
-      metadata.type = 'social';
-    } else if (domain.includes('facebook.com')) {
-      metadata.platform = 'facebook';
-      metadata.type = 'social';
-    } else if (domain.includes('github.com')) {
-      metadata.platform = 'github';
-      metadata.type = 'code';
+    } else if (domain.includes('figma.com')) {
+      metadata.platform = 'figma';
+      metadata.type = metadata.type || 'design';
     }
 
     return metadata;
@@ -100,7 +141,8 @@ const getUrlMetadata = (url) => {
     console.error('Error getting URL metadata:', error);
     return {
       type: 'url',
-      title: url
+      title: url,
+      error: 'Failed to extract metadata'
     };
   }
 };
