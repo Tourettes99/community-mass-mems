@@ -3,6 +3,7 @@ export interface Memory {
   type: 'url' | 'image' | 'video' | 'audio' | 'text' | 'static';
   url?: string;
   content?: string;
+  votes: number;
   metadata?: {
     title?: string;
     description?: string;
@@ -19,10 +20,9 @@ export interface Memory {
     format?: string;
     encoding?: string;
     lastModified?: Date;
-    rawContent?: string;
   };
   tags?: string[];
   createdAt: string;
-  votes?: number;
+  updatedAt: string;
   userVote?: 1 | -1 | 0;
 }

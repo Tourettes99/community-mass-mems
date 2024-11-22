@@ -199,78 +199,43 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, onVote }) => {
           {metadata?.title || 'Untitled Memory'}
         </Typography>
 
-        <Collapse in={expanded} timeout="auto" unmountOnExit>
-          <Typography variant="body2" color="text.secondary" paragraph>
-            {metadata?.description || content || 'No description available'}
-          </Typography>
-        </Collapse>
-
-        {!expanded && (
-          <Typography 
-            variant="body2" 
-            color="text.secondary"
-            sx={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              mb: 2
-            }}
-          >
-            {metadata?.description || content || 'No description available'}
-          </Typography>
-        )}
-
-        {tags.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-            {tags.map((tag, index) => (
-              <Chip
-                key={index}
-                label={tag}
-                size="small"
-                variant="outlined"
-                color="primary"
-              />
-            ))}
-          </Box>
-        )}
+        <Box sx={{ mt: 2 }}>
+          <CardActions disableSpacing>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton 
+                onClick={() => handleVote(1)}
+                color={userVote === 1 ? 'primary' : 'default'}
+                disabled={isVoting}
+              >
+                <ThumbUp />
+              </IconButton>
+              <Typography>{votes}</Typography>
+              <IconButton 
+                onClick={() => handleVote(-1)}
+                color={userVote === -1 ? 'primary' : 'default'}
+                disabled={isVoting}
+              >
+                <ThumbDown />
+              </IconButton>
+            </Box>
+            <IconButton
+              onClick={handleExpandClick}
+              aria-expanded={expanded}
+              aria-label="show more"
+              sx={{ marginLeft: 'auto' }}
+            >
+              {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </CardActions>
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <CardContent>
+              <Typography paragraph>
+                {content || metadata?.description || 'No description available'}
+              </Typography>
+            </CardContent>
+          </Collapse>
+        </Box>
       </CardContent>
-
-      <CardActions disableSpacing>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <IconButton 
-            onClick={() => handleVote(1)}
-            color={userVote === 1 ? "primary" : "default"}
-            disabled={isVoting}
-          >
-            <ThumbUp />
-          </IconButton>
-          <Typography variant="body2" color="text.secondary">
-            {votes}
-          </Typography>
-          <IconButton 
-            onClick={() => handleVote(-1)}
-            color={userVote === -1 ? "primary" : "default"}
-            disabled={isVoting}
-          >
-            <ThumbDown />
-          </IconButton>
-        </Stack>
-        <IconButton aria-label="share">
-          <Share />
-        </IconButton>
-        <IconButton aria-label="add to favorites">
-          <Favorite />
-        </IconButton>
-        <Button
-          onClick={handleExpandClick}
-          endIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          size="small"
-          sx={{ ml: 'auto' }}
-        >
-          {expanded ? 'Show Less' : 'Show More'}
-        </Button>
-      </CardActions>
     </Card>
   );
 };

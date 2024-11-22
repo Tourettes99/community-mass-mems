@@ -61,15 +61,11 @@ const AppContent = () => {
         return dateB - dateA;
       });
 
-      // Only update if there are changes
-      const hasChanges = JSON.stringify(sortedData) !== JSON.stringify(memories);
-      if (hasChanges) {
-        setMemories(sortedData);
-        if (isBackground) {
-          console.log(`Silently updated with ${data.length} memories`);
-        } else {
-          console.log(`Loaded ${data.length} memories from database`);
-        }
+      setMemories(sortedData);
+      if (isBackground) {
+        console.log(`Silently updated with ${data.length} memories`);
+      } else {
+        console.log(`Loaded ${data.length} memories from database`);
       }
     } catch (error) {
       console.error('Error fetching memories:', error);
@@ -82,97 +78,101 @@ const AppContent = () => {
       }
       setIsBackgroundRefresh(false);
     }
-  }, [memories]);
+  }, []);
+
+  const handleMemoryUpdate = useCallback((updatedMemory: Memory) => {
+    setMemories(prevMemories => {
+      const index = prevMemories.findIndex(m => m._id === updatedMemory._id);
+      if (index === -1) return prevMemories;
+      
+      const newMemories = [...prevMemories];
+      newMemories[index] = updatedMemory;
+      return newMemories;
+    });
+  }, []);
 
   useEffect(() => {
     fetchMemories(false);
 
-    // Poll for updates every 10 seconds
+    // Poll for updates every 30 seconds
     const intervalId = setInterval(() => {
       fetchMemories(true);
-    }, 10000);
+    }, 30000);
 
     return () => clearInterval(intervalId);
   }, [fetchMemories]);
 
-  useEffect(() => {
-    if (!showIntro) {
-      try {
-        localStorage.setItem('introShown', 'true');
-      } catch (error) {
-        console.error('Failed to save intro state:', error);
-      }
-    }
-  }, [showIntro]);
-
-  const handleMemoryCreated = async (newMemory: Memory) => {
-    // Optimistically add the new memory to the list
-    setMemories(prev => [newMemory, ...prev]);
-    
-    // Show notification
-    setNotification('Memory added successfully!');
-    
-    // Fetch latest memories to ensure consistency
-    await fetchMemories(true);
-  };
-
-  const handleRefresh = () => {
-    setNotification('Refreshing memories...');
+  const handleUploadSuccess = useCallback((message: string) => {
+    setNotification(message);
     fetchMemories(false);
-  };
+  }, [fetchMemories]);
+
+  const handleCloseIntro = useCallback(() => {
+    setShowIntro(false);
+    try {
+      localStorage.setItem('introShown', 'true');
+    } catch {
+      console.warn('Failed to save intro state to localStorage');
+    }
+  }, []);
 
   return (
     <MuiThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ 
-        minHeight: '100vh',
-        bgcolor: 'background.default',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <ThemeToggle />
-        <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          bgcolor: 'background.default',
+          color: 'text.primary',
+          pt: 2,
+          pb: 6
+        }}
+      >
+        <Container maxWidth="lg">
+          <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end' }}>
+            <ThemeToggle />
+          </Box>
+
           <InfoBar />
-          <UploadBar onMemoryCreated={handleMemoryCreated} />
-          <MemoryGrid 
-            memories={memories} 
+          <PatreonBar />
+          
+          <UploadBar onUploadSuccess={handleUploadSuccess} />
+          
+          <MemoryGrid
+            memories={memories}
             loading={loading}
             error={error}
-            onRefresh={handleRefresh}
+            onRefresh={() => fetchMemories(false)}
             isBackgroundRefresh={isBackgroundRefresh}
+            onMemoryUpdate={handleMemoryUpdate}
           />
-          <PatreonBar />
-        </Container>
-        <IntroDialog 
-          open={showIntro} 
-          onClose={() => setShowIntro(false)} 
-          audioPath="episode-1-introduktion.mp3"
-        />
-        <Snackbar 
-          open={!!notification} 
-          autoHideDuration={3000} 
-          onClose={() => setNotification(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert 
-            onClose={() => setNotification(null)} 
-            severity="success" 
-            sx={{ width: '100%' }}
+
+          <Snackbar
+            open={!!notification}
+            autoHideDuration={6000}
+            onClose={() => setNotification(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           >
-            {notification}
-          </Alert>
-        </Snackbar>
+            <Alert 
+              onClose={() => setNotification(null)} 
+              severity="success"
+              variant="filled"
+            >
+              {notification}
+            </Alert>
+          </Snackbar>
+
+          <IntroDialog open={showIntro} onClose={handleCloseIntro} />
+        </Container>
       </Box>
     </MuiThemeProvider>
   );
 };
 
-function App() {
-  return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
-  );
-}
+const App = () => (
+  <ThemeProvider>
+    <AppContent />
+  </ThemeProvider>
+);
 
 export default App;

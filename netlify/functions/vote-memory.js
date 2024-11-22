@@ -1,64 +1,121 @@
-const { MongoClient } = require('mongodb');
+require('dotenv').config();
+const mongoose = require('mongoose');
+const Memory = require('./models/Memory');
+
+let conn = null;
+
+const connectDb = async () => {
+  if (conn == null) {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
+    conn = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000
+    });
+  }
+  return conn;
+};
 
 exports.handler = async (event, context) => {
-  // Only allow POST requests
-  if (event.httpMethod !== 'POST') {
+  context.callbackWaitsForEmptyEventLoop = false;
+
+  // Handle OPTIONS request for CORS
+  if (event.httpMethod === 'OPTIONS') {
     return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
+      statusCode: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Accept',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: ''
     };
   }
 
-  let client;
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers: {
+        'Allow': 'POST',
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ message: 'Method Not Allowed' })
+    };
+  }
+
   try {
-    // Parse request body
     const { memoryId, vote } = JSON.parse(event.body);
 
     // Validate input
-    if (!memoryId || ![1, -1].includes(vote)) {
+    if (!memoryId) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Invalid input' })
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ message: 'Memory ID is required' })
       };
     }
 
-    // Connect to MongoDB
-    client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    const db = client.db(process.env.MONGODB_DATABASE);
-    const memories = db.collection('memories');
+    if (![1, -1].includes(vote)) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ message: 'Vote must be either 1 or -1' })
+      };
+    }
 
-    // Update vote count
-    const result = await memories.findOneAndUpdate(
-      { _id: memoryId },
+    await connectDb();
+
+    // Find and update the memory
+    const memory = await Memory.findByIdAndUpdate(
+      memoryId,
       { $inc: { votes: vote } },
-      { returnDocument: 'after' }
+      { 
+        new: true,
+        runValidators: true
+      }
     );
 
-    if (!result.value) {
+    if (!memory) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Memory not found' })
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ message: 'Memory not found' })
       };
     }
 
     return {
       statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({
         message: 'Vote recorded successfully',
-        memory: result.value
+        memory
       })
     };
-
   } catch (error) {
-    console.error('Error in vote-memory function:', error);
+    console.error('Error voting on memory:', error);
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
+      statusCode: error.name === 'CastError' ? 400 : 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({ 
+        message: error.name === 'CastError' ? 'Invalid Memory ID format' : 'Error voting on memory',
+        error: error.message
+      })
     };
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 };

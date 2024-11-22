@@ -4,7 +4,7 @@ const memorySchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['image', 'gif', 'audio', 'url']
+    enum: ['image', 'gif', 'audio', 'url', 'text']
   },
   url: {
     type: String,
@@ -14,6 +14,10 @@ const memorySchema = new mongoose.Schema({
     fileName: String,
     format: String,
     siteName: String
+  },
+  votes: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true
