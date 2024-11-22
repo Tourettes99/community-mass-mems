@@ -49,14 +49,23 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
   };
 
   return (
@@ -88,7 +97,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
           ))}
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-          {formatDate(memory.metadata.createdAt)}
+          {memory.metadata.createdAt ? formatDate(memory.metadata.createdAt) : 'No date available'}
         </Typography>
       </CardContent>
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 1 }}>
