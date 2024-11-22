@@ -48,13 +48,20 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'No date available';
+    
     try {
+      // First try parsing as ISO string
       const date = new Date(dateString);
-      // Check if date is valid
+      
+      // Validate the date
       if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateString);
         return 'Invalid date';
       }
+
+      // Format the date
       return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
         month: 'short',
@@ -63,7 +70,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         minute: '2-digit'
       }).format(date);
     } catch (error) {
-      console.error('Error formatting date:', error);
+      console.error('Error formatting date:', error, dateString);
       return 'Invalid date';
     }
   };
@@ -87,7 +94,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
           {memory.metadata.description || (memory.type === 'text' ? memory.content : '')}
         </Typography>
         <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {memory.tags.map((tag, index) => (
+          {memory.tags?.map((tag, index) => (
             <Chip
               key={index}
               label={tag}
@@ -97,35 +104,38 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
           ))}
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-          {memory.metadata.createdAt ? formatDate(memory.metadata.createdAt) : 'No date available'}
+          Created: {formatDate(memory.metadata?.createdAt)}
         </Typography>
       </CardContent>
-      <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 1 }}>
+      <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         <Box>
-          <Tooltip title="Upvote">
+          <Tooltip title="Like">
             <IconButton onClick={() => handleVote('up')} size="small">
-              <ThumbUpIcon color={memory.votes.up > 0 ? 'primary' : 'inherit'} />
+              <ThumbUpIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Typography variant="body2" component="span" sx={{ px: 1 }}>
-            {memory.votes.up - memory.votes.down}
+          <Typography variant="body2" component="span" sx={{ mx: 1 }}>
+            {memory.votes.up}
           </Typography>
-          <Tooltip title="Downvote">
+          <Tooltip title="Dislike">
             <IconButton onClick={() => handleVote('down')} size="small">
-              <ThumbDownIcon color={memory.votes.down > 0 ? 'error' : 'inherit'} />
+              <ThumbDownIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Typography variant="body2" component="span" sx={{ ml: 1 }}>
+            {memory.votes.down}
+          </Typography>
         </Box>
-        {memory.type === 'url' && memory.url && (
-          <Tooltip title="Open link in new tab">
-            <IconButton
-              component={Link}
-              href={memory.url}
-              target="_blank"
+        {memory.url && (
+          <Tooltip title="Open in new tab">
+            <IconButton 
+              component={Link} 
+              href={memory.url} 
+              target="_blank" 
               rel="noopener noreferrer"
               size="small"
             >
-              <OpenInNewIcon />
+              <OpenInNewIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         )}
