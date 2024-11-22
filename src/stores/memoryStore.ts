@@ -12,22 +12,38 @@ interface MemoryStore {
   setError: (error: string | null) => void;
 }
 
+const getValidDate = (dateString?: string): number => {
+  if (!dateString) return 0;
+  try {
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? 0 : date.getTime();
+  } catch {
+    return 0;
+  }
+};
+
 const useMemoryStore = create<MemoryStore>((set) => ({
   memories: [],
   loading: false,
   error: null,
   
-  setMemories: (memories) => set({ memories }),
+  setMemories: (memories) => set({ 
+    memories: memories.sort((a, b) => 
+      getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
+    )
+  }),
   
   addMemories: (newMemories) => set((state) => ({
     memories: [...newMemories, ...state.memories].sort((a, b) => 
-      new Date(b.metadata.createdAt).getTime() - new Date(a.metadata.createdAt).getTime()
+      getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
     )
   })),
   
   updateMemory: (updatedMemory) => set((state) => ({
     memories: state.memories.map((memory) => 
       memory._id === updatedMemory._id ? updatedMemory : memory
+    ).sort((a, b) => 
+      getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
     )
   })),
 

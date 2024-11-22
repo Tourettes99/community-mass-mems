@@ -27,6 +27,35 @@ const connectDb = async () => {
   return conn;
 };
 
+const formatDate = (date) => {
+  if (!date) return null;
+  try {
+    return date instanceof Date ? date.toISOString() : new Date(date).toISOString();
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return null;
+  }
+};
+
+const formatMemory = (memory) => {
+  if (!memory) return null;
+  try {
+    const formatted = {
+      ...memory,
+      metadata: {
+        ...memory.metadata,
+        createdAt: formatDate(memory.createdAt),
+        updatedAt: formatDate(memory.updatedAt)
+      }
+    };
+    delete formatted.__v;
+    return formatted;
+  } catch (error) {
+    console.error('Error formatting memory:', error);
+    return memory;
+  }
+};
+
 exports.handler = async (event, context) => {
   // Prevent function from waiting for connections to close
   context.callbackWaitsForEmptyEventLoop = false;
@@ -69,6 +98,9 @@ exports.handler = async (event, context) => {
         .sort({ createdAt: -1 })
         .lean()
         .exec();
+      
+      // Format memories to ensure proper date handling
+      memories = memories.map(formatMemory).filter(Boolean);
       
       console.log(`Successfully fetched ${memories.length} memories`);
     } catch (dbError) {
