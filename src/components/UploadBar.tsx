@@ -24,10 +24,10 @@ import { Memory } from '../types';
 type MemoryType = 'text' | 'url';
 
 interface UploadBarProps {
-  onMemoryCreated: (memory: Memory) => void;
+  onUploadSuccess: (message: string) => void;
 }
 
-const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
+const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
   const [type, setType] = useState<MemoryType>('url');
   const [url, setUrl] = useState('');
   const [content, setContent] = useState('');
@@ -92,7 +92,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ url: url.trim() })
+          body: JSON.stringify({ url: url.trim(), tags })
         });
 
         if (!response.ok) {
@@ -101,7 +101,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         }
 
         const data = await response.json();
-        onMemoryCreated(data);
+        onUploadSuccess('Memory uploaded successfully!');
       } else if (type === 'text') {
         if (!content.trim()) {
           throw new Error('Content is required');
@@ -112,7 +112,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ content: content.trim() })
+          body: JSON.stringify({ content: content.trim(), tags })
         });
 
         if (!response.ok) {
@@ -121,7 +121,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         }
 
         const data = await response.json();
-        onMemoryCreated(data);
+        onUploadSuccess('Memory uploaded successfully!');
       }
 
       setSuccess(true);
