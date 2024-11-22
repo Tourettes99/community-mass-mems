@@ -38,11 +38,11 @@ for = "/*"
 [headers.values]
 Content-Security-Policy = """
   default-src 'self';
-  img-src 'self' data: https: http:;
-  media-src 'self' data: https: http:;
-  object-src 'self' https: http:;
-  frame-src 'self' https: http:;
-  connect-src 'self' https: http:;
+  img-src 'self' data: http: https:;
+  media-src 'self' data: http: https:;
+  object-src 'self' http: https:;
+  frame-src 'self' http: https:;
+  connect-src 'self' http: https:;
   style-src 'self' 'unsafe-inline' https:;
   script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
   font-src 'self' data: https:;
@@ -53,10 +53,29 @@ Referrer-Policy = "strict-origin-when-cross-origin"
 Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
 [[headers]]
-for = "/*.mp3"
+for = "/*.jpg"
 [headers.values]
 Cache-Control = "public, max-age=31536000"
-Content-Type = "audio/mpeg"
+
+[[headers]]
+for = "/*.jpeg"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+for = "/*.png"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+for = "/*.gif"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+for = "/*.webp"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
 
 [[headers]]
 for = "/*.mp4"
@@ -69,6 +88,17 @@ for = "/*.webm"
 [headers.values]
 Cache-Control = "public, max-age=31536000"
 Content-Type = "video/webm"
+
+[[headers]]
+for = "/*.mp3"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+Content-Type = "audio/mpeg"
+
+[[headers]]
+for = "/*.wav"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
 
 [[headers]]
 for = "/*.pdf"
