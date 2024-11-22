@@ -36,21 +36,39 @@ const memorySchema = new mongoose.Schema({
     duration: String,
     format: String,
     encoding: String,
-    lastModified: Date
+    lastModified: Date,
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
   },
   tags: [String],
   votes: {
-    type: Number,
-    default: 0,
-    required: true
+    up: {
+      type: Number,
+      default: 0
+    },
+    down: {
+      type: Number,
+      default: 0
+    }
   }
 }, {
   timestamps: true,
   toJSON: {
     virtuals: true,
     transform: function(doc, ret) {
-      ret.createdAt = ret.createdAt.toISOString();
-      ret.updatedAt = ret.updatedAt.toISOString();
+      // Ensure dates are in ISO format
+      if (ret.metadata) {
+        ret.metadata.createdAt = ret.createdAt ? ret.createdAt.toISOString() : null;
+        ret.metadata.updatedAt = ret.updatedAt ? ret.updatedAt.toISOString() : null;
+      }
+      // Remove internal MongoDB fields
+      delete ret.__v;
       return ret;
     }
   },
@@ -59,4 +77,21 @@ const memorySchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('Memory', memorySchema);
+// Update timestamps in metadata before saving
+memorySchema.pre('save', function(next) {
+  if (this.isModified()) {
+    const now = new Date();
+    if (!this.metadata) {
+      this.metadata = {};
+    }
+    if (this.isNew) {
+      this.metadata.createdAt = now;
+    }
+    this.metadata.updatedAt = now;
+  }
+  next();
+});
+
+const Memory = mongoose.model('Memory', memorySchema);
+
+module.exports = Memory;
