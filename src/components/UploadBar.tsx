@@ -87,7 +87,6 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
           throw new Error('URL is required');
         }
         
-        // Send URL to uploadUrl endpoint
         const response = await fetch('/.netlify/functions/uploadUrl', {
           method: 'POST',
           headers: {
@@ -104,28 +103,25 @@ const UploadBar: React.FC<UploadBarProps> = ({ onMemoryCreated }) => {
         const data = await response.json();
         onMemoryCreated(data);
       } else if (type === 'text') {
-        if (!content) {
-          throw new Error('Content is required for text type memories');
+        if (!content.trim()) {
+          throw new Error('Content is required');
         }
         
-        // Send text content to upload endpoint
-        const formData = new FormData();
-        formData.append('content', content);
-        
-        const response = await fetch('/.netlify/functions/upload', {
+        const response = await fetch('/.netlify/functions/uploadText', {
           method: 'POST',
-          body: formData
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ content: content.trim() })
         });
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to upload content');
+          throw new Error(errorData.message || 'Failed to upload text');
         }
 
         const data = await response.json();
         onMemoryCreated(data);
-      } else {
-        throw new Error('No content provided');
       }
 
       setSuccess(true);
