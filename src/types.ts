@@ -23,4 +23,6 @@ export interface Memory {
   };
   tags?: string[];
   createdAt: string;
+  votes?: number;
+  userVote?: 1 | -1 | 0;
 }
