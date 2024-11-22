@@ -46,6 +46,16 @@ const isMediaUrl = (url) => {
   return Object.values(MEDIA_EXTENSIONS).flat().includes(extension);
 };
 
+const formatDate = (date) => {
+  if (!date) return null;
+  try {
+    return date instanceof Date ? date.toISOString() : new Date(date).toISOString();
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return null;
+  }
+};
+
 const getUrlMetadata = async (urlString) => {
   try {
     const url = new URL(urlString);
@@ -60,7 +70,8 @@ const getUrlMetadata = async (urlString) => {
       protocol: url.protocol,
       type: 'url',
       isSecure: url.protocol === 'https:',
-      createdAt: new Date().toISOString()
+      createdAt: formatDate(new Date()),
+      updatedAt: formatDate(new Date())
     };
 
     // Determine content type from extension
@@ -103,29 +114,13 @@ const getUrlMetadata = async (urlString) => {
       metadata.type = 'audio';
     }
 
-    // Validate media URLs
-    if (metadata.type !== 'url') {
-      try {
-        const response = await fetch(urlString, { method: 'HEAD' });
-        if (!response.ok) {
-          throw new Error('Media resource not accessible');
-        }
-        metadata.contentType = response.headers.get('content-type');
-        metadata.contentLength = response.headers.get('content-length');
-      } catch (error) {
-        console.warn('Media validation failed:', error);
-        metadata.warning = 'Media resource might not be accessible';
-      }
-    }
-
     return metadata;
   } catch (error) {
-    console.error('Error extracting URL metadata:', error);
+    console.error('Error getting URL metadata:', error);
     return {
-      url: urlString,
       type: 'url',
-      error: 'Failed to extract metadata',
-      createdAt: new Date().toISOString()
+      createdAt: formatDate(new Date()),
+      updatedAt: formatDate(new Date())
     };
   }
 };
@@ -136,11 +131,10 @@ exports.handler = async (event, context) => {
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+    'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 
-  // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 204,
@@ -152,70 +146,75 @@ exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: { ...headers, 'Allow': 'POST' },
+      headers,
       body: JSON.stringify({ message: 'Method Not Allowed' })
     };
   }
 
   try {
-    const { url, tags = [] } = JSON.parse(event.body);
-    
-    // Validate URL
-    if (!url || typeof url !== 'string' || !validateUrl(url)) {
+    const { type, url, content, tags = [] } = JSON.parse(event.body);
+
+    // Validate input
+    if (type === 'url' && !url) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ 
-          message: 'Invalid URL. Please provide a valid HTTP or HTTPS URL.',
-          error: 'URL validation failed'
-        })
+        body: JSON.stringify({ message: 'URL is required for url type memories' })
       };
     }
 
-    // Validate tags
-    if (!Array.isArray(tags)) {
+    if (type === 'text' && !content) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ message: 'Tags must be an array' })
+        body: JSON.stringify({ message: 'Content is required for text type memories' })
+      };
+    }
+
+    if (type === 'url' && !validateUrl(url)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ message: 'Invalid URL format' })
       };
     }
 
     // Connect to database
     await connectDb();
 
-    // Get URL metadata
-    const metadata = await getUrlMetadata(url);
-
-    // Create memory
-    const memory = new Memory({
-      type: metadata.type || 'url',
-      content: url,
-      tags: tags.map(tag => tag.trim()).filter(tag => tag.length > 0),
-      metadata: {
-        ...metadata,
-        createdAt: new Date().toISOString()
+    // Create memory object
+    const memoryData = {
+      type,
+      url: type === 'url' ? url : undefined,
+      content: type === 'text' ? content : undefined,
+      tags: Array.isArray(tags) ? tags : [],
+      metadata: type === 'url' ? await getUrlMetadata(url) : {
+        type: 'text',
+        createdAt: formatDate(new Date()),
+        updatedAt: formatDate(new Date())
+      },
+      votes: {
+        up: 0,
+        down: 0
       }
-    });
+    };
 
-    // Save memory
+    const memory = new Memory(memoryData);
     await memory.save();
 
     return {
-      statusCode: 201,
+      statusCode: 200,
       headers,
-      body: JSON.stringify({
-        message: 'URL memory created successfully',
-        memory
-      })
+      body: JSON.stringify(memory)
     };
   } catch (error) {
-    console.error('Error creating URL memory:', error);
+    console.error('Error in uploadUrl:', error);
+
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        message: 'Error creating URL memory',
+        message: 'Error uploading memory',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };

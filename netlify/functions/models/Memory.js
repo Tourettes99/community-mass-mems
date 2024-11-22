@@ -4,12 +4,12 @@ const memorySchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['url', 'image', 'video', 'audio', 'text', 'static']
+    enum: ['url', 'text', 'image', 'video', 'audio', 'document']
   },
   url: {
     type: String,
     required: function() {
-      return this.type === 'url' || this.type === 'image' || this.type === 'video' || this.type === 'audio';
+      return this.type === 'url' || this.type === 'image' || this.type === 'video' || this.type === 'audio' || this.type === 'document';
     }
   },
   content: {
@@ -18,25 +18,20 @@ const memorySchema = new mongoose.Schema({
       return this.type === 'text';
     }
   },
+  tags: {
+    type: [String],
+    default: []
+  },
   metadata: {
     title: String,
     description: String,
-    siteName: String,
-    favicon: String,
-    mediaType: {
-      type: String,
-      enum: ['url', 'image', 'video', 'audio', 'static']
-    },
-    previewUrl: String,
-    playbackHtml: String,
-    isPlayable: Boolean,
-    fileSize: Number,
-    contentType: String,
-    resolution: String,
-    duration: String,
-    format: String,
-    encoding: String,
-    lastModified: Date,
+    thumbnailUrl: String,
+    mediaType: String,
+    platform: String,
+    contentUrl: String,
+    fileType: String,
+    domain: String,
+    isSecure: Boolean,
     createdAt: {
       type: Date,
       default: Date.now
@@ -46,7 +41,6 @@ const memorySchema = new mongoose.Schema({
       default: Date.now
     }
   },
-  tags: [String],
   votes: {
     up: {
       type: Number,
@@ -62,12 +56,12 @@ const memorySchema = new mongoose.Schema({
   toJSON: {
     virtuals: true,
     transform: function(doc, ret) {
-      // Ensure dates are in ISO format
+      // Format dates as ISO strings
       if (ret.metadata) {
-        ret.metadata.createdAt = ret.createdAt ? ret.createdAt.toISOString() : null;
-        ret.metadata.updatedAt = ret.updatedAt ? ret.updatedAt.toISOString() : null;
+        ret.metadata.createdAt = ret.metadata.createdAt ? new Date(ret.metadata.createdAt).toISOString() : null;
+        ret.metadata.updatedAt = ret.metadata.updatedAt ? new Date(ret.metadata.updatedAt).toISOString() : null;
       }
-      // Remove internal MongoDB fields
+      // Remove MongoDB-specific fields
       delete ret.__v;
       return ret;
     }
@@ -77,7 +71,7 @@ const memorySchema = new mongoose.Schema({
   }
 });
 
-// Update timestamps in metadata before saving
+// Update metadata timestamps before saving
 memorySchema.pre('save', function(next) {
   if (this.isModified()) {
     const now = new Date();
