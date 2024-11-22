@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import { CssBaseline, Container, Box, Snackbar, Alert } from '@mui/material';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -16,7 +16,7 @@ const AppContent = () => {
   const theme = getTheme(mode);
   
   // Initialize intro dialog state
-  const [showIntro, setShowIntro] = React.useState(() => {
+  const [showIntro, setShowIntro] = useState(() => {
     try {
       return localStorage.getItem('introShown') !== 'true';
     } catch {
@@ -36,30 +36,14 @@ const AppContent = () => {
   return (
     <MuiThemeProvider theme={theme}>
       <CssBaseline />
-      <Box
-        sx={{
-          minHeight: '100vh',
-          bgcolor: 'background.default',
-          color: 'text.primary',
-          pt: 2,
-          pb: 6
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end' }}>
-            <ThemeToggle />
-          </Box>
-
-          <InfoBar />
-          <PatreonBar />
-          
-          <UploadBar />
-          
-          <MemoryGrid />
-
-          <IntroDialog open={showIntro} onClose={handleCloseIntro} />
-        </Container>
-      </Box>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <InfoBar />
+        <PatreonBar />
+        <ThemeToggle />
+        <UploadBar />
+        <MemoryGrid />
+        <IntroDialog open={showIntro} onClose={handleCloseIntro} />
+      </Container>
     </MuiThemeProvider>
   );
 };
