@@ -10,6 +10,7 @@ interface MemoryGridProps {
   error?: string | null;
   onRefresh?: () => void;
   isBackgroundRefresh?: boolean;
+  onMemoryUpdate?: (updatedMemory: Memory) => void;
 }
 
 const MemoryGrid: React.FC<MemoryGridProps> = ({
@@ -17,7 +18,8 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
   loading = false,
   error = null,
   onRefresh,
-  isBackgroundRefresh = false
+  isBackgroundRefresh = false,
+  onMemoryUpdate
 }) => {
   const [voteError, setVoteError] = useState<string | null>(null);
 
@@ -36,7 +38,12 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
         throw new Error(error.message || 'Failed to vote');
       }
 
-      await response.json();
+      const { memory } = await response.json();
+      
+      // Update the memory in the parent component if callback is provided
+      if (onMemoryUpdate) {
+        onMemoryUpdate(memory);
+      }
     } catch (error) {
       setVoteError(error instanceof Error ? error.message : 'Failed to vote');
       throw error;
@@ -51,66 +58,60 @@ const MemoryGrid: React.FC<MemoryGridProps> = ({
     );
   }
 
-  if (error) {
-    return (
-      <Box sx={{ textAlign: 'center', p: 4 }}>
-        <Typography color="error" gutterBottom>
+  return (
+    <Box sx={{ width: '100%', position: 'relative' }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
           {error}
-        </Typography>
-        {onRefresh && (
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={onRefresh}
-            variant="contained"
+        </Alert>
+      )}
+      
+      {voteError && (
+        <Snackbar 
+          open={!!voteError} 
+          autoHideDuration={6000} 
+          onClose={() => setVoteError(null)}
+        >
+          <Alert 
+            onClose={() => setVoteError(null)} 
+            severity="error"
           >
-            Retry
-          </Button>
-        )}
-      </Box>
-    );
-  }
+            {voteError}
+          </Alert>
+        </Snackbar>
+      )}
 
-  if (!memories.length) {
-    return (
-      <Box sx={{ textAlign: 'center', p: 4 }}>
-        <Typography variant="h6" color="text.secondary">
-          No memories found
-        </Typography>
-        {onRefresh && (
+      {onRefresh && (
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             startIcon={<RefreshIcon />}
             onClick={onRefresh}
-            variant="contained"
-            sx={{ mt: 2 }}
+            disabled={loading}
           >
             Refresh
           </Button>
-        )}
-      </Box>
-    );
-  }
+        </Box>
+      )}
 
-  return (
-    <>
-      <Grid container spacing={2}>
+      <Grid container spacing={3}>
         {memories.map((memory) => (
-          <Grid key={memory._id} item xs={12} sm={6} md={4}>
-            <MemoryCard memory={memory} onVote={handleVote} />
+          <Grid item xs={12} sm={6} md={4} key={memory._id}>
+            <MemoryCard 
+              memory={memory} 
+              onVote={handleVote}
+            />
           </Grid>
         ))}
       </Grid>
 
-      <Snackbar
-        open={!!voteError}
-        autoHideDuration={6000}
-        onClose={() => setVoteError(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setVoteError(null)} severity="error">
-          {voteError}
-        </Alert>
-      </Snackbar>
-    </>
+      {memories.length === 0 && !loading && (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography variant="body1" color="text.secondary">
+            No memories found. Share something with your community!
+          </Typography>
+        </Box>
+      )}
+    </Box>
   );
 };
 
