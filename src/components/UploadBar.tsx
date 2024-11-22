@@ -21,14 +21,12 @@ import ClearIcon from '@mui/icons-material/Clear';
 import LinkIcon from '@mui/icons-material/Link';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import { Memory } from '../types';
+import useMemoryStore from '../stores/memoryStore';
 
 type MemoryType = 'text' | 'url';
 
-interface UploadBarProps {
-  onUploadSuccess: (message: string) => void;
-}
-
-const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
+const UploadBar: React.FC = () => {
+  const addMemories = useMemoryStore(state => state.addMemories);
   const [type, setType] = useState<MemoryType>('url');
   const [url, setUrl] = useState('');
   const [content, setContent] = useState('');
@@ -75,68 +73,37 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUploadSuccess }) => {
     setCurrentTag(event.target.value);
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      console.log('Submitting memory:', { type, url, content, tags });
-      
-      if (type === 'url') {
-        if (!url.trim()) {
-          throw new Error('URL is required');
-        }
-        
-        const response = await fetch('/.netlify/functions/uploadUrl', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url: url.trim(), tags })
-        });
+      const response = await fetch('/.netlify/functions/uploadUrl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type,
+          url: type === 'url' ? url : undefined,
+          content: type === 'text' ? content : undefined,
+          tags
+        }),
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to upload URL');
-        }
-
-        const data = await response.json();
-        onUploadSuccess('URL memory uploaded successfully!');
-      } else if (type === 'text') {
-        if (!content.trim()) {
-          throw new Error('Content is required');
-        }
-        
-        const response = await fetch('/.netlify/functions/uploadText', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            content: content.trim(), 
-            tags: tags.map(tag => tag.trim()).filter(Boolean)
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to upload text');
-        }
-
-        const data = await response.json();
-        onUploadSuccess('Text memory uploaded successfully!');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload memory');
       }
 
+      const newMemory = await response.json();
+      addMemories([newMemory]);
       setSuccess(true);
-      
-      // Reset form
       setUrl('');
       setContent('');
       setTags([]);
-      setCurrentTag('');
     } catch (err) {
-      console.error('Error uploading memory:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload memory');
     } finally {
       setLoading(false);
