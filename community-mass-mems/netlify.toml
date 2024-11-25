@@ -9,6 +9,7 @@ timeout = 30
 memory = 1024
 
 [build]
+base = "community-mass-mems"
 command = "npm run build"
 publish = "build"
 functions = "netlify/functions"
