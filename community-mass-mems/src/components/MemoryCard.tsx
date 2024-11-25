@@ -19,9 +19,11 @@ import useMemoryStore from '../stores/memoryStore';
 
 interface MemoryCardProps {
   memory: Memory;
+  selectedTags: string[];
+  onTagClick: (tag: string) => void;
 }
 
-const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
+const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClick }) => {
   const updateMemory = useMemoryStore(state => state.updateMemory);
   const [userVote, setUserVote] = React.useState<string | null>(
     localStorage.getItem(`vote_${memory._id}`)
@@ -29,7 +31,6 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
 
   const handleVote = async (type: 'up' | 'down') => {
     try {
-      // Generate a persistent user ID if not exists
       let userId = localStorage.getItem('userId');
       if (!userId) {
         userId = 'user_' + Math.random().toString(36).substr(2, 9);
@@ -54,7 +55,6 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
 
       const { votes, userVote } = await response.json();
       
-      // Update local storage with user's vote
       if (userVote) {
         localStorage.setItem(`vote_${memory._id}`, userVote);
       } else {
@@ -116,7 +116,15 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
               key={index}
               label={tag}
               size="small"
-              variant="outlined"
+              onClick={() => onTagClick(tag)}
+              className={selectedTags.includes(tag) ? 'active' : ''}
+              sx={{
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                },
+              }}
             />
           ))}
         </Box>

@@ -2,7 +2,7 @@ import { createTheme, Theme } from '@mui/material/styles';
 import { PaletteMode } from '@mui/material';
 
 // RAL 2005 Luminous Orange
-export const RAL_2005 = '#FF4D2A';
+export const RAL_2005 = '#FF4D06';
 
 // Extend the Theme type to include our custom colors
 declare module '@mui/material/styles' {
@@ -22,20 +22,24 @@ export const getTheme = (mode: PaletteMode): Theme => createTheme({
           // Light mode colors
           primary: {
             main: RAL_2005,
-            light: '#FF6B4D',
-            dark: '#E63A1A',
+            light: '#ff7438',
+            dark: '#c23900',
+            contrastText: '#ffffff',
           },
           background: {
-            default: '#f5f5f5',
+            default: '#fafafa',
             paper: '#ffffff',
           },
           secondary: {
-            main: '#808080',
+            main: '#424242',
+            light: '#6d6d6d',
+            dark: '#1b1b1b',
+            contrastText: '#ffffff',
           },
           accent: {
             main: RAL_2005,
-            light: '#FF6B4D',
-            dark: '#E63A1A',
+            light: '#ff7438',
+            dark: '#c23900',
           },
           text: {
             primary: '#666666',
@@ -46,20 +50,24 @@ export const getTheme = (mode: PaletteMode): Theme => createTheme({
           // Dark mode colors
           primary: {
             main: RAL_2005,
-            light: '#FF6B4D',
-            dark: '#E63A1A',
+            light: '#ff7438',
+            dark: '#c23900',
+            contrastText: '#ffffff',
           },
           background: {
             default: '#121212',
             paper: '#1e1e1e',
           },
           secondary: {
-            main: '#808080',
+            main: '#424242',
+            light: '#6d6d6d',
+            dark: '#1b1b1b',
+            contrastText: '#ffffff',
           },
           accent: {
             main: RAL_2005,
-            light: '#FF6B4D',
-            dark: '#E63A1A',
+            light: '#ff7438',
+            dark: '#c23900',
           },
           text: {
             primary: '#FFFFFF',
@@ -79,6 +87,13 @@ export const getTheme = (mode: PaletteMode): Theme => createTheme({
             '& .MuiChip-icon': {
               color: RAL_2005,
             },
+          },
+          '&.MuiChip-clickable:hover': {
+            backgroundColor: `${RAL_2005}20`,
+          },
+          '&.MuiChip-clickable.active': {
+            backgroundColor: RAL_2005,
+            color: '#ffffff',
           },
         }),
       },
@@ -104,7 +119,7 @@ export const getTheme = (mode: PaletteMode): Theme => createTheme({
         root: {
           color: RAL_2005,
           '&:hover': {
-            color: '#FF6B4D',
+            color: '#ff7438',
           },
         },
       },
@@ -112,11 +127,12 @@ export const getTheme = (mode: PaletteMode): Theme => createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
+          borderRadius: 8,
           '&.MuiButton-contained': {
             backgroundColor: RAL_2005,
             color: '#fff',
             '&:hover': {
-              backgroundColor: '#E63A1A',
+              backgroundColor: '#c23900',
             },
           },
           '&.MuiButton-outlined': {
@@ -125,6 +141,23 @@ export const getTheme = (mode: PaletteMode): Theme => createTheme({
             '&:hover': {
               backgroundColor: `${RAL_2005}20`,
             },
+          },
+        },
+        contained: {
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: 'none',
+          },
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
           },
         },
       },

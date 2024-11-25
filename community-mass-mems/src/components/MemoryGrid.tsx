@@ -1,7 +1,6 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
-import { Grid, Box, useTheme, Fade, CircularProgress, Typography, Alert } from '@mui/material';
+import { Grid, Box, useTheme, Fade, CircularProgress, Typography, Alert, Chip, Stack } from '@mui/material';
 import MemoryCard from './MemoryCard';
-import TagFilter from './TagFilter';
 import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
 
@@ -60,6 +59,19 @@ const MemoryGrid: React.FC = () => {
     );
   }, [memories, selectedTags]);
 
+  const handleTagClick = (tag: string) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tag)) {
+        return prev.filter(t => t !== tag);
+      }
+      return [...prev, tag];
+    });
+  };
+
+  const handleClearTags = () => {
+    setSelectedTags([]);
+  };
+
   if (error) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
@@ -80,16 +92,55 @@ const MemoryGrid: React.FC = () => {
         </Typography>
       ) : (
         <>
-          <TagFilter
-            availableTags={availableTags}
-            selectedTags={selectedTags}
-            onTagsChange={setSelectedTags}
-          />
+          <Stack 
+            direction="row" 
+            spacing={1} 
+            sx={{ 
+              mb: 3, 
+              flexWrap: 'wrap', 
+              gap: 1,
+              '& > *': { my: 0.5 }
+            }}
+          >
+            {availableTags.map((tag) => (
+              <Chip
+                key={tag}
+                label={tag}
+                onClick={() => handleTagClick(tag)}
+                className={selectedTags.includes(tag) ? 'active' : ''}
+                sx={{
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-1px)',
+                  },
+                }}
+              />
+            ))}
+            {selectedTags.length > 0 && (
+              <Chip
+                label="Clear Filters"
+                onClick={handleClearTags}
+                color="secondary"
+                variant="outlined"
+                sx={{
+                  cursor: 'pointer',
+                  '&:hover': {
+                    backgroundColor: theme.palette.secondary.light + '20',
+                  },
+                }}
+              />
+            )}
+          </Stack>
           <Fade in={true}>
             <Grid container spacing={3}>
               {filteredMemories.map((memory) => (
                 <Grid item xs={12} sm={6} md={4} key={memory._id}>
-                  <MemoryCard memory={memory} />
+                  <MemoryCard 
+                    memory={memory} 
+                    selectedTags={selectedTags}
+                    onTagClick={handleTagClick}
+                  />
                 </Grid>
               ))}
             </Grid>
