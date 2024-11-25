@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  useTheme,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
@@ -23,6 +24,7 @@ interface UploadBarProps {
 }
 
 const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
+  const theme = useTheme();
   const [content, setContent] = useState('');
   const [currentTag, setCurrentTag] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -76,12 +78,14 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
   return (
     <AppBar 
       position="static" 
-      color="default" 
       elevation={1}
       sx={{ 
-        backgroundColor: 'background.paper',
+        backgroundColor: theme.palette.mode === 'dark' 
+          ? 'background.paper' 
+          : '#ffffff',
         borderRadius: 2,
-        mb: 3
+        mb: 3,
+        color: 'text.primary'
       }}
     >
       <Toolbar sx={{ flexWrap: 'wrap', gap: 2, py: 2 }}>
@@ -96,7 +100,14 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
           sx={{ 
             flexGrow: 1,
             '& .MuiOutlinedInput-root': {
-              backgroundColor: 'background.paper',
+              backgroundColor: theme.palette.mode === 'dark' 
+                ? 'rgba(255, 255, 255, 0.05)'
+                : 'rgba(0, 0, 0, 0.02)',
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.1)'
+                  : 'rgba(0, 0, 0, 0.04)',
+              }
             }
           }}
         />
@@ -105,9 +116,11 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
             <IconButton
               onClick={() => setIsTagDialogOpen(true)}
               sx={{ 
-                color: tags.length > 0 ? RAL_2005 : 'inherit',
+                color: tags.length > 0 ? RAL_2005 : 'text.secondary',
                 '&:hover': {
-                  backgroundColor: `${RAL_2005}20`,
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? `${RAL_2005}40`
+                    : `${RAL_2005}20`,
                 }
               }}
             >
@@ -119,6 +132,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
             onClick={handleSubmit}
             sx={{
               backgroundColor: RAL_2005,
+              color: '#ffffff',
               '&:hover': {
                 backgroundColor: '#c23900',
               }
@@ -144,9 +158,20 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
                 label={tag}
                 onDelete={() => handleRemoveTag(tag)}
                 sx={{
-                  backgroundColor: `${RAL_2005}20`,
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? `${RAL_2005}40`
+                    : `${RAL_2005}20`,
+                  color: theme.palette.text.primary,
                   '&:hover': {
-                    backgroundColor: `${RAL_2005}30`,
+                    backgroundColor: theme.palette.mode === 'dark'
+                      ? `${RAL_2005}60`
+                      : `${RAL_2005}30`,
+                  },
+                  '& .MuiChip-deleteIcon': {
+                    color: theme.palette.text.secondary,
+                    '&:hover': {
+                      color: theme.palette.text.primary,
+                    }
                   }
                 }}
               />
@@ -160,8 +185,15 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
         onClose={() => setIsTagDialogOpen(false)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: theme.palette.mode === 'dark' 
+              ? 'background.paper' 
+              : '#ffffff',
+          }
+        }}
       >
-        <DialogTitle>
+        <DialogTitle sx={{ color: 'text.primary' }}>
           Add Tags
           <IconButton
             aria-label="close"
@@ -170,6 +202,10 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
               position: 'absolute',
               right: 8,
               top: 8,
+              color: 'text.secondary',
+              '&:hover': {
+                color: 'text.primary',
+              }
             }}
           >
             <CloseIcon />
@@ -200,9 +236,20 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
                   label={tag}
                   onDelete={() => handleRemoveTag(tag)}
                   sx={{
-                    backgroundColor: `${RAL_2005}20`,
+                    backgroundColor: theme.palette.mode === 'dark'
+                      ? `${RAL_2005}40`
+                      : `${RAL_2005}20`,
+                    color: theme.palette.text.primary,
                     '&:hover': {
-                      backgroundColor: `${RAL_2005}30`,
+                      backgroundColor: theme.palette.mode === 'dark'
+                        ? `${RAL_2005}60`
+                        : `${RAL_2005}30`,
+                    },
+                    '& .MuiChip-deleteIcon': {
+                      color: theme.palette.text.secondary,
+                      '&:hover': {
+                        color: theme.palette.text.primary,
+                      }
                     }
                   }}
                 />
