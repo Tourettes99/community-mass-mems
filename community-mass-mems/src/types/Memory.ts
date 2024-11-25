@@ -1,3 +1,9 @@
+export interface WeeklyStats {
+  postsThisWeek: number;
+  weeklyLimit: number;
+  nextReset: string;
+}
+
 export interface Memory {
   id?: string;
   _id?: string;
@@ -7,7 +13,7 @@ export interface Memory {
   tags: string[];
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string;
-  metadata: {
+  metadata?: {
     title?: string;
     description?: string;
     thumbnailUrl?: string;
@@ -33,5 +39,5 @@ export interface Memory {
     up: number;
     down: number;
   };
-  userVotes: Map<string, string>;
+  userVotes?: Map<string, string>;
 }

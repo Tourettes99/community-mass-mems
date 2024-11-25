@@ -45,8 +45,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     setShowFavicon(false);
   };
 
-  const shouldShowFavicon = memory.metadata.favicon && 
-    isValidUrl(memory.metadata.favicon) && 
+  const shouldShowFavicon = memory.metadata?.favicon && 
+    isValidUrl(memory.metadata?.favicon) && 
     !faviconError;
 
   const handleVote = async (type: 'up' | 'down') => {
@@ -185,7 +185,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   border: 'none'
                 }}
                 src={`https://www.youtube.com/embed/${videoId}`}
-                title={memory.metadata?.title || 'YouTube video'}
+                title={memory.metadata?.title ?? 'YouTube video'}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
@@ -204,7 +204,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           <Box 
             component="img"
             src={memory.url}
-            alt={memory.metadata?.title || 'Memory image'}
+            alt={memory.metadata?.title ?? 'Image'}
             sx={{
               width: '100%',
               height: 'auto',
@@ -213,7 +213,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               borderRadius: 1
             }}
             onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-              e.currentTarget.src = memory.metadata?.ogImage || memory.metadata?.twitterImage || '/placeholder.png';
+              e.currentTarget.src = memory.metadata?.ogImage ?? memory.metadata?.twitterImage ?? '/placeholder.png';
             }}
           />
         </>
@@ -221,7 +221,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     }
 
     // Handle other URLs with thumbnails
-    const thumbnail = memory.metadata?.ogImage || memory.metadata?.twitterImage;
+    const thumbnail = memory.metadata?.ogImage ?? memory.metadata?.twitterImage;
     if (thumbnail) {
       return (
         <>
@@ -240,7 +240,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             <Box
               component="img"
               src={thumbnail}
-              alt={memory.metadata?.title || 'Memory thumbnail'}
+              alt={memory.metadata?.title ?? 'Thumbnail'}
               sx={{
                 width: '100%',
                 height: 'auto',
@@ -253,13 +253,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               }}
             />
             <Typography variant="body2" sx={{ mt: 1 }}>
-              {memory.metadata?.title || memory.url}
+              {memory.metadata?.title ?? memory.url}
             </Typography>
-            {memory.metadata?.description && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                {memory.metadata.description}
-              </Typography>
-            )}
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {memory.metadata?.description ?? 'No description available'}
+            </Typography>
           </Box>
         </>
       );
@@ -281,13 +279,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           }}
         >
           <Typography variant="body1">
-            {memory.metadata?.title || memory.url}
+            {memory.metadata?.title ?? memory.url}
           </Typography>
-          {memory.metadata?.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {memory.metadata.description}
-            </Typography>
-          )}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {memory.metadata?.description ?? 'No description available'}
+          </Typography>
         </Box>
       </>
     );
