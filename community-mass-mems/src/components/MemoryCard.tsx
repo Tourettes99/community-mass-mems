@@ -73,7 +73,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       }
 
       const result = await response.json();
-      const { votes, userVote } = result;
+      const { votes, userVote, userVotes } = result;
       
       if (userVote) {
         localStorage.setItem(`vote_${memory.id || memory._id}`, userVote);
@@ -87,15 +87,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       const updatedMemory: Memory = {
         ...memory,
         votes: { ...votes },
-        userVotes: new Map(memory.userVotes || [])
+        userVotes: new Map(Object.entries(userVotes || {}))
       };
-
-      // Update the userVotes map
-      if (userVote) {
-        updatedMemory.userVotes.set(userId, userVote);
-      } else {
-        updatedMemory.userVotes.delete(userId);
-      }
 
       // Update the memory in the store
       updateMemory(updatedMemory);

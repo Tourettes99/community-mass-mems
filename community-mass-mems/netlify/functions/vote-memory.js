@@ -80,9 +80,9 @@ exports.handler = async (event, context) => {
       memory.votes = { up: 0, down: 0 };
     }
 
-    // Convert userVotes to Map if it's not already
-    if (!(memory.userVotes instanceof Map)) {
-      memory.userVotes = new Map(Object.entries(memory.userVotes || {}));
+    // Initialize userVotes if it doesn't exist
+    if (!memory.userVotes || !(memory.userVotes instanceof Map)) {
+      memory.userVotes = new Map();
     }
 
     // Get current user's vote
@@ -108,13 +108,20 @@ exports.handler = async (event, context) => {
       // Save the updated memory
       await memory.save();
 
+      // Convert userVotes to object for JSON response
+      const userVotesObj = {};
+      memory.userVotes.forEach((value, key) => {
+        userVotesObj[key] = value;
+      });
+
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           message: 'Vote recorded successfully',
           votes: memory.votes,
-          userVote: memory.userVotes.get(userId) || null
+          userVote: memory.userVotes.get(userId) || null,
+          userVotes: userVotesObj
         })
       };
     } catch (updateError) {
