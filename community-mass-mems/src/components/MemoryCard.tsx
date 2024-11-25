@@ -6,7 +6,6 @@ import {
   Box,
   Chip,
   IconButton,
-  CardActions,
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -25,7 +24,6 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     localStorage.getItem(`vote_${memory.id || memory._id}`)
   );
   const [faviconError, setFaviconError] = React.useState(false);
-  const [showFavicon, setShowFavicon] = React.useState(true);
 
   const isValidUrl = (urlString: string): boolean => {
     try {
@@ -38,12 +36,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   const handleFaviconError = () => {
     setFaviconError(true);
-    setShowFavicon(false);
   };
-
-  const shouldShowFavicon = memory.metadata?.favicon && 
-    isValidUrl(memory.metadata?.favicon) && 
-    !faviconError;
 
   const handleVote = async (type: 'up' | 'down') => {
     try {
@@ -121,10 +114,12 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
   };
 
   const renderContent = () => {
-    const favicon = memory.metadata?.favicon;
     const title = memory.metadata?.title || memory.url || 'No title';
+    const showFavicon = memory.metadata?.favicon && 
+      isValidUrl(memory.metadata.favicon) && 
+      !faviconError;
 
-    const renderFavicon = shouldShowFavicon && (
+    const renderFavicon = showFavicon && (
       <img 
         src={memory.metadata?.favicon}
         alt=""
@@ -139,19 +134,15 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       />
     );
 
-    const renderTitle = (
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        {renderFavicon}
-        <Typography variant="subtitle1">
-          {title}
-        </Typography>
-      </Box>
-    );
-
     if (!memory.url) {
       return (
         <>
-          {renderTitle}
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            {renderFavicon}
+            <Typography variant="subtitle1">
+              {title}
+            </Typography>
+          </Box>
           <Typography variant="body1" color="text.secondary">
             {memory.content || 'No content available'}
           </Typography>
@@ -169,7 +160,12 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       if (videoId) {
         return (
           <>
-            {renderTitle}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              {renderFavicon}
+              <Typography variant="subtitle1">
+                {title}
+              </Typography>
+            </Box>
             <Box sx={{ position: 'relative', paddingTop: '56.25%', width: '100%' }}>
               <iframe
                 style={{
@@ -196,7 +192,12 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     if (isDirectFile) {
       return (
         <>
-          {renderTitle}
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            {renderFavicon}
+            <Typography variant="subtitle1">
+              {title}
+            </Typography>
+          </Box>
           <Box 
             component="img"
             src={memory.url}
@@ -221,7 +222,12 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     if (thumbnail) {
       return (
         <>
-          {renderTitle}
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            {renderFavicon}
+            <Typography variant="subtitle1">
+              {title}
+            </Typography>
+          </Box>
           <Box
             component="a"
             href={memory.url}
@@ -262,7 +268,12 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     // Fallback for other content
     return (
       <>
-        {renderTitle}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          {renderFavicon}
+          <Typography variant="subtitle1">
+            {title}
+          </Typography>
+        </Box>
         <Box
           component="a"
           href={memory.url}
@@ -309,7 +320,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           Created: {formatDate(memory.metadata?.createdAt)}
         </Typography>
       </CardContent>
-      <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+      <Box sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <IconButton
             onClick={() => handleVote('up')}
@@ -326,7 +337,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           </IconButton>
           <Typography>{memory.votes.down}</Typography>
         </Box>
-      </CardActions>
+      </Box>
     </Card>
   );
 };
