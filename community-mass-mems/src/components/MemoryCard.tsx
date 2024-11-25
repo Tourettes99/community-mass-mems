@@ -41,8 +41,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         throw new Error('Failed to vote');
       }
 
-      const updatedMemory = await response.json();
-      updateMemory(updatedMemory);
+      const { votes } = await response.json();
+      updateMemory({ ...memory, votes });
     } catch (error) {
       console.error('Error voting:', error);
     }
