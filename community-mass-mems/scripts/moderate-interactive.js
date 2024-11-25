@@ -11,150 +11,69 @@ function formatMemory(memory, index) {
     '╔════════════════════════════════════════════════════════════',
     '║ MEMORY #' + (index + 1),
     '║ ' + '─'.repeat(55),
-    '║ Created: ' + memory.createdAt.toLocaleString(),
+    '║ Created: ' + new Date(memory.createdAt).toLocaleString(),
     '║ ID: ' + memory._id,
     '║'
   ];
 
-  // Basic Info Section
+  // Title from metadata
   if (memory.metadata?.title) {
     lines.push('║ Title: ' + memory.metadata.title);
   }
 
+  // URL
   if (memory.url) {
     lines.push('║');
     lines.push('║ URL: ' + memory.url);
-    
-    // Show URL metadata
-    if (memory.metadata) {
-      lines.push('║');
-      lines.push('║ URL METADATA');
-      lines.push('║ ' + '─'.repeat(30));
-
-      // Platform-specific info
-      if (memory.metadata.platform) {
-        lines.push('║ Platform: ' + memory.metadata.platform.toUpperCase());
-        if (memory.metadata.videoId) {
-          lines.push('║ Video ID: ' + memory.metadata.videoId);
-        }
-        if (memory.metadata.embedUrl) {
-          lines.push('║ Embed URL: ' + memory.metadata.embedUrl);
-        }
-      }
-
-      // File info for direct files
-      if (memory.metadata.isDirectFile) {
-        lines.push('║ File Type: ' + memory.metadata.fileType);
-        if (memory.metadata.mimeType) {
-          lines.push('║ MIME Type: ' + memory.metadata.mimeType);
-        }
-        if (memory.metadata.fileSize) {
-          lines.push('║ Size: ' + (memory.metadata.fileSize / 1024).toFixed(2) + ' KB');
-        }
-      }
-
-      // Media info
-      if (memory.metadata.mediaType) {
-        lines.push('║ Media Type: ' + memory.metadata.mediaType);
-      }
-      if (memory.metadata.thumbnailUrl) {
-        lines.push('║ Thumbnail: ' + memory.metadata.thumbnailUrl);
-      }
-
-      // OpenGraph Data
-      if (memory.metadata.ogTitle || memory.metadata.ogDescription || memory.metadata.ogImage) {
-        lines.push('║');
-        lines.push('║ OPENGRAPH DATA');
-        lines.push('║ ' + '─'.repeat(30));
-        
-        if (memory.metadata.ogTitle) {
-          lines.push('║ Title: ' + memory.metadata.ogTitle);
-        }
-        if (memory.metadata.ogDescription) {
-          lines.push('║ Description:');
-          const descLines = memory.metadata.ogDescription.match(/.{1,45}/g) || [''];
-          descLines.forEach(line => {
-            lines.push('║   ' + line);
-          });
-        }
-        if (memory.metadata.ogImage) {
-          lines.push('║ Image: ' + memory.metadata.ogImage);
-        }
-        if (memory.metadata.ogType) {
-          lines.push('║ Type: ' + memory.metadata.ogType);
-        }
-      }
-
-      // Twitter Card Data
-      if (memory.metadata.twitterTitle || memory.metadata.twitterDescription || memory.metadata.twitterImage) {
-        lines.push('║');
-        lines.push('║ TWITTER CARD DATA');
-        lines.push('║ ' + '─'.repeat(30));
-        
-        if (memory.metadata.twitterCard) {
-          lines.push('║ Card Type: ' + memory.metadata.twitterCard);
-        }
-        if (memory.metadata.twitterTitle) {
-          lines.push('║ Title: ' + memory.metadata.twitterTitle);
-        }
-        if (memory.metadata.twitterDescription) {
-          lines.push('║ Description:');
-          const descLines = memory.metadata.twitterDescription.match(/.{1,45}/g) || [''];
-          descLines.forEach(line => {
-            lines.push('║   ' + line);
-          });
-        }
-        if (memory.metadata.twitterImage) {
-          lines.push('║ Image: ' + memory.metadata.twitterImage);
-        }
-      }
-
-      // oEmbed Data
-      if (memory.metadata.oembedType || memory.metadata.oembedTitle) {
-        lines.push('║');
-        lines.push('║ OEMBED DATA');
-        lines.push('║ ' + '─'.repeat(30));
-        
-        if (memory.metadata.oembedType) {
-          lines.push('║ Type: ' + memory.metadata.oembedType);
-        }
-        if (memory.metadata.oembedTitle) {
-          lines.push('║ Title: ' + memory.metadata.oembedTitle);
-        }
-        if (memory.metadata.oembedAuthor) {
-          lines.push('║ Author: ' + memory.metadata.oembedAuthor);
-        }
-        if (memory.metadata.oembedProvider) {
-          lines.push('║ Provider: ' + memory.metadata.oembedProvider);
-        }
-      }
-
-      // Description (if not shown in OG/Twitter data)
-      if (memory.metadata.description && 
-          memory.metadata.description !== memory.metadata.ogDescription && 
-          memory.metadata.description !== memory.metadata.twitterDescription) {
-        lines.push('║');
-        lines.push('║ DESCRIPTION');
-        lines.push('║ ' + '─'.repeat(30));
-        const descLines = memory.metadata.description.match(/.{1,45}/g) || [''];
-        descLines.forEach(line => {
-          lines.push('║ ' + line);
-        });
-      }
-    }
   }
 
-  if (memory.content) {
+  // Metadata section
+  if (memory.metadata) {
     lines.push('║');
-    lines.push('║ CONTENT');
+    lines.push('║ METADATA');
     lines.push('║ ' + '─'.repeat(30));
-    const contentLines = memory.content.split('\n');
-    contentLines.forEach(line => {
-      const wrappedLines = line.match(/.{1,50}/g) || [''];
-      wrappedLines.forEach(wrapped => {
-        lines.push('║ ' + wrapped);
+
+    // Platform info
+    if (memory.metadata.platform) {
+      lines.push('║ Platform: ' + memory.metadata.platform.toUpperCase());
+    }
+
+    // Author info
+    if (memory.metadata.author) {
+      lines.push('║ Author: ' + memory.metadata.author);
+    }
+    if (memory.metadata.authorUrl) {
+      lines.push('║ Channel: ' + memory.metadata.authorUrl);
+    }
+
+    // Video info
+    if (memory.metadata.videoId) {
+      lines.push('║ Video ID: ' + memory.metadata.videoId);
+    }
+    if (memory.metadata.embedUrl) {
+      lines.push('║ Embed URL: ' + memory.metadata.embedUrl);
+    }
+
+    // Media type
+    if (memory.metadata.mediaType) {
+      lines.push('║ Media Type: ' + memory.metadata.mediaType);
+    }
+
+    // Thumbnail
+    if (memory.metadata.thumbnailUrl) {
+      lines.push('║ Thumbnail: ' + memory.metadata.thumbnailUrl);
+    }
+
+    // HTML embed code
+    if (memory.metadata.html) {
+      lines.push('║');
+      lines.push('║ EMBED CODE');
+      lines.push('║ ' + '─'.repeat(30));
+      const embedLines = memory.metadata.html.match(/.{1,50}/g) || [''];
+      embedLines.forEach(line => {
+        lines.push('║ ' + line);
       });
-    });
+    }
   }
 
   lines.push('╚════════════════════════════════════════════════════════════');
@@ -201,14 +120,28 @@ async function moderateMemories() {
     console.log('=== Community Mass Memories - Moderation Console ===\n');
 
     let memories = [];
+    let lastMemoryCount = 0;
+    let checkInterval;
     
-    async function refreshMemories() {
+    async function refreshMemories(force = false) {
       try {
         console.log('\nFetching pending memories...');
-        memories = await collection.find({ status: 'pending' }).sort({ createdAt: -1 }).toArray();
-        console.clear();
-        console.log('\n=== Community Mass Memories - Moderation Console ===\n');
-        await displayMemories(memories);
+        const newMemories = await collection.find({ status: 'pending' }).sort({ createdAt: -1 }).toArray();
+        
+        // Only refresh display if there are new memories or forced refresh
+        if (force || newMemories.length !== lastMemoryCount) {
+          memories = newMemories;
+          lastMemoryCount = memories.length;
+          console.clear();
+          console.log('\n=== Community Mass Memories - Moderation Console ===\n');
+          await displayMemories(memories);
+          
+          // Play notification sound if new memories were added
+          if (!force && newMemories.length > lastMemoryCount) {
+            console.log('\n New memories have been submitted!\n');
+            process.stdout.write('\x07'); // System beep
+          }
+        }
       } catch (error) {
         console.error('\nError fetching memories:', error.message);
         console.error('\nPlease check your connection and try again.\n');
@@ -216,7 +149,10 @@ async function moderateMemories() {
     }
 
     // Initial load
-    await refreshMemories();
+    await refreshMemories(true);
+
+    // Set up auto-refresh every 30 seconds
+    checkInterval = setInterval(() => refreshMemories(), 30000);
 
     const rl = readline.createInterface({
       input: process.stdin,
@@ -227,9 +163,10 @@ async function moderateMemories() {
       input = input.trim().toLowerCase();
       
       if (input === 'q') {
+        clearInterval(checkInterval);
         rl.close();
       } else if (input === 'r') {
-        await refreshMemories();
+        await refreshMemories(true);
       } else if (input.match(/^\d+[ar]$/)) {
         const index = parseInt(input.slice(0, -1)) - 1;
         const action = input.slice(-1);
@@ -238,11 +175,11 @@ async function moderateMemories() {
           try {
             const memory = memories[index];
             await collection.updateOne(
-              { _id: ObjectId(memory._id) },
+              { _id: memory._id },
               { $set: { status: action === 'a' ? 'approved' : 'rejected' } }
             );
             console.log('\nMemory #' + (index + 1) + ' ' + (action === 'a' ? 'approved' : 'rejected') + '!\n');
-            await refreshMemories();
+            await refreshMemories(true);
           } catch (error) {
             console.error('\nError updating memory:', error.message);
             console.log('\nPress r to refresh or q to quit\n');
@@ -256,10 +193,11 @@ async function moderateMemories() {
     });
 
     rl.on('close', async () => {
+      clearInterval(checkInterval);
       try {
         await client.close();
         console.log('\nDisconnected from MongoDB');
-        console.log('Goodbye! 👋\n');
+        console.log('Goodbye! \n');
       } catch (error) {
         console.error('\nError disconnecting:', error.message);
       }

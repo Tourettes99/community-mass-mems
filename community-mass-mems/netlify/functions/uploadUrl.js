@@ -211,18 +211,39 @@ const getUrlMetadata = async (urlString) => {
     if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
       metadata.platform = 'youtube';
       metadata.type = 'video';
+      metadata.mediaType = 'video';
       
       const videoId = domain.includes('youtu.be') 
         ? pathname.slice(1)
         : url.searchParams.get('v');
       if (videoId) {
         metadata.videoId = videoId;
-        metadata.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        metadata.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
         metadata.embedUrl = `https://www.youtube.com/embed/${videoId}`;
+        
+        // Fetch video details from YouTube oEmbed API
+        try {
+          const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+          const response = await fetch(oembedUrl);
+          const data = await response.json();
+          
+          if (data) {
+            metadata.title = data.title;
+            metadata.author = data.author_name;
+            metadata.authorUrl = data.author_url;
+            metadata.thumbnailUrl = data.thumbnail_url || metadata.thumbnailUrl;
+            metadata.thumbnailWidth = data.thumbnail_width;
+            metadata.thumbnailHeight = data.thumbnail_height;
+            metadata.html = data.html;
+          }
+        } catch (error) {
+          console.error('Error fetching YouTube metadata:', error);
+        }
       }
     } else if (domain.includes('vimeo.com')) {
       metadata.platform = 'vimeo';
       metadata.type = 'video';
+      metadata.mediaType = 'video';
       
       const videoId = pathname.split('/').pop();
       if (videoId) {
@@ -235,6 +256,11 @@ const getUrlMetadata = async (urlString) => {
             metadata.thumbnailUrl = vimeoData[0].thumbnail_large;
             if (!metadata.title) metadata.title = vimeoData[0].title;
             if (!metadata.description) metadata.description = vimeoData[0].description;
+            metadata.author = vimeoData[0].user_name;
+            metadata.authorUrl = vimeoData[0].user_url;
+            metadata.duration = vimeoData[0].duration;
+            metadata.width = vimeoData[0].width;
+            metadata.height = vimeoData[0].height;
           }
         } catch (error) {
           console.error('Error fetching Vimeo metadata:', error);
@@ -243,6 +269,7 @@ const getUrlMetadata = async (urlString) => {
     } else if (domain.includes('spotify.com')) {
       metadata.platform = 'spotify';
       metadata.type = 'audio';
+      metadata.mediaType = 'audio';
       // Extract Spotify URI for embedding
       const spotifyPath = pathname.split('/');
       if (spotifyPath.length >= 3) {
@@ -255,6 +282,7 @@ const getUrlMetadata = async (urlString) => {
     } else if (domain.includes('soundcloud.com')) {
       metadata.platform = 'soundcloud';
       metadata.type = 'audio';
+      metadata.mediaType = 'audio';
     } else if (domain.includes('twitter.com') || domain.includes('x.com')) {
       metadata.platform = 'twitter';
       metadata.type = 'social';
