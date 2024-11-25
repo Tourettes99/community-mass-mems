@@ -43,6 +43,7 @@ function formatMemory(memory, index) {
     '║'
   ];
 
+  // Basic Info Section
   if (memory.metadata?.title) {
     lines.push(`║ Title: ${memory.metadata.title}`);
   }
@@ -54,64 +55,106 @@ function formatMemory(memory, index) {
     // Show URL metadata
     if (memory.metadata) {
       lines.push('║');
-      lines.push('║ URL METADATA:');
+      lines.push('║ URL METADATA');
       lines.push('║ ' + '─'.repeat(30));
 
+      // Platform-specific info (YouTube, Vimeo, etc.)
+      if (memory.metadata.platform) {
+        lines.push(`║ Platform: ${memory.metadata.platform.toUpperCase()}`);
+        if (memory.metadata.videoId) {
+          lines.push(`║ Video ID: ${memory.metadata.videoId}`);
+        }
+        if (memory.metadata.thumbnailUrl) {
+          lines.push(`║ Thumbnail: ${memory.metadata.thumbnailUrl}`);
+        }
+      }
+
+      // Basic metadata
       if (memory.metadata.type) {
-        lines.push(`║   Type: ${memory.metadata.type}`);
+        lines.push(`║ Type: ${memory.metadata.type}`);
+      }
+      if (memory.metadata.mediaType) {
+        lines.push(`║ Media Type: ${memory.metadata.mediaType}`);
+      }
+      if (memory.metadata.fileType) {
+        lines.push(`║ File Type: ${memory.metadata.fileType}`);
+      }
+      if (memory.metadata.domain) {
+        lines.push(`║ Domain: ${memory.metadata.domain}`);
       }
 
-      if (memory.metadata.image) {
-        lines.push(`║   Image: ${memory.metadata.image}`);
+      // OpenGraph Data
+      if (memory.metadata.ogTitle || memory.metadata.ogDescription || memory.metadata.ogImage || memory.metadata.ogType) {
+        lines.push('║');
+        lines.push('║ OPENGRAPH DATA');
+        lines.push('║ ' + '─'.repeat(30));
+        
+        if (memory.metadata.ogTitle) {
+          lines.push(`║ Title: ${memory.metadata.ogTitle}`);
+        }
+        if (memory.metadata.ogDescription) {
+          lines.push('║ Description:');
+          const descLines = memory.metadata.ogDescription.match(/.{1,45}/g) || [''];
+          descLines.forEach(line => {
+            lines.push(`║   ${line}`);
+          });
+        }
+        if (memory.metadata.ogImage) {
+          lines.push(`║ Image: ${memory.metadata.ogImage}`);
+        }
+        if (memory.metadata.ogType) {
+          lines.push(`║ Type: ${memory.metadata.ogType}`);
+        }
       }
 
-      if (memory.metadata.description) {
-        lines.push('║   Description:');
-        // Wrap description text
+      // Twitter Card Data
+      if (memory.metadata.twitterTitle || memory.metadata.twitterDescription || memory.metadata.twitterImage || memory.metadata.twitterCard) {
+        lines.push('║');
+        lines.push('║ TWITTER CARD DATA');
+        lines.push('║ ' + '─'.repeat(30));
+        
+        if (memory.metadata.twitterCard) {
+          lines.push(`║ Card Type: ${memory.metadata.twitterCard}`);
+        }
+        if (memory.metadata.twitterTitle) {
+          lines.push(`║ Title: ${memory.metadata.twitterTitle}`);
+        }
+        if (memory.metadata.twitterDescription) {
+          lines.push('║ Description:');
+          const descLines = memory.metadata.twitterDescription.match(/.{1,45}/g) || [''];
+          descLines.forEach(line => {
+            lines.push(`║   ${line}`);
+          });
+        }
+        if (memory.metadata.twitterImage) {
+          lines.push(`║ Image: ${memory.metadata.twitterImage}`);
+        }
+      }
+
+      // Description (if not shown in OG/Twitter data)
+      if (memory.metadata.description && 
+          memory.metadata.description !== memory.metadata.ogDescription && 
+          memory.metadata.description !== memory.metadata.twitterDescription) {
+        lines.push('║');
+        lines.push('║ DESCRIPTION');
+        lines.push('║ ' + '─'.repeat(30));
         const descLines = memory.metadata.description.match(/.{1,45}/g) || [''];
         descLines.forEach(line => {
-          lines.push(`║     ${line}`);
+          lines.push(`║ ${line}`);
         });
       }
 
-      // Additional OpenGraph metadata if available
-      if (memory.metadata.ogTitle && memory.metadata.ogTitle !== memory.metadata.title) {
-        lines.push(`║   OG Title: ${memory.metadata.ogTitle}`);
+      // Favicon
+      if (memory.metadata.favicon) {
+        lines.push('║');
+        lines.push(`║ Favicon: ${memory.metadata.favicon}`);
       }
-
-      if (memory.metadata.ogDescription && memory.metadata.ogDescription !== memory.metadata.description) {
-        lines.push('║   OG Description:');
-        const ogDescLines = memory.metadata.ogDescription.match(/.{1,45}/g) || [''];
-        ogDescLines.forEach(line => {
-          lines.push(`║     ${line}`);
-        });
-      }
-
-      if (memory.metadata.ogImage && memory.metadata.ogImage !== memory.metadata.image) {
-        lines.push(`║   OG Image: ${memory.metadata.ogImage}`);
-      }
-
-      if (memory.metadata.siteName) {
-        lines.push(`║   Site Name: ${memory.metadata.siteName}`);
-      }
-
-      // Show any additional metadata fields
-      const skipFields = ['type', 'image', 'description', 'ogTitle', 'ogDescription', 'ogImage', 'siteName', 'title'];
-      Object.entries(memory.metadata).forEach(([key, value]) => {
-        if (!skipFields.includes(key) && value) {
-          if (typeof value === 'string') {
-            lines.push(`║   ${key}: ${value}`);
-          } else if (typeof value === 'object' && value !== null) {
-            lines.push(`║   ${key}: ${JSON.stringify(value)}`);
-          }
-        }
-      });
     }
   }
 
   if (memory.content) {
     lines.push('║');
-    lines.push('║ CONTENT:');
+    lines.push('║ CONTENT');
     lines.push('║ ' + '─'.repeat(30));
     // Split content into lines and wrap them
     const contentLines = memory.content.split('\n');
@@ -119,7 +162,7 @@ function formatMemory(memory, index) {
       // Wrap long lines
       const wrappedLines = line.match(/.{1,50}/g) || [''];
       wrappedLines.forEach(wrapped => {
-        lines.push(`║   ${wrapped}`);
+        lines.push(`║ ${wrapped}`);
       });
     });
   }
