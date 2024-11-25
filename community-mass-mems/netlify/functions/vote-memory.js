@@ -66,22 +66,18 @@ exports.handler = async (event, context) => {
     await connectDb();
 
     // Find the memory first
-    const memory = await Memory.findById(memoryId);
+    const memory = await Memory.findById(memoryId).exec();
     if (!memory) {
       return {
         statusCode: 404,
         headers,
-        body: JSON.stringify({ message: 'Memory not found' })
+        body: JSON.stringify({ message: `Memory not found with ID: ${memoryId}` })
       };
     }
 
     // Initialize votes and userVotes if they don't exist
-    if (!memory.votes) {
-      memory.votes = { up: 0, down: 0 };
-    }
-    if (!memory.userVotes) {
-      memory.userVotes = new Map();
-    }
+    memory.votes = memory.votes || { up: 0, down: 0 };
+    memory.userVotes = memory.userVotes || new Map();
 
     // Get current user's vote
     const currentVote = memory.userVotes.get(userId);
@@ -110,26 +106,41 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Update the memory with the new vote
-    const updatedMemory = await Memory.findByIdAndUpdate(
-      memoryId,
-      updateQuery,
-      { 
-        new: true,
-        runValidators: true
+    try {
+      // Update the memory with the new vote
+      const updatedMemory = await Memory.findByIdAndUpdate(
+        memoryId,
+        updateQuery,
+        { 
+          new: true,
+          runValidators: true
+        }
+      ).exec();
+
+      if (!updatedMemory) {
+        throw new Error('Memory not found after update');
       }
-    );
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        message: 'Vote recorded successfully',
-        votes: updatedMemory.votes,
-        userVote: updatedMemory.userVotes.get(userId) || null
-      })
-    };
-
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          message: 'Vote recorded successfully',
+          votes: updatedMemory.votes,
+          userVote: updatedMemory.userVotes.get(userId) || null
+        })
+      };
+    } catch (updateError) {
+      console.error('Error updating vote:', updateError);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          message: 'Failed to update vote',
+          error: process.env.NODE_ENV === 'development' ? updateError.message : undefined
+        })
+      };
+    }
   } catch (error) {
     console.error('Error in vote function:', error);
     

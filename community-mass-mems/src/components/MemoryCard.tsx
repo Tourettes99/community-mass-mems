@@ -43,28 +43,30 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          memoryId: memory.id,
+          memoryId: memory.id || memory._id,
           voteType: type,
           userId
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to vote');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to vote');
       }
 
       const { votes, userVote } = await response.json();
       
       if (userVote) {
-        localStorage.setItem(`vote_${memory.id}`, userVote);
+        localStorage.setItem(`vote_${memory.id || memory._id}`, userVote);
       } else {
-        localStorage.removeItem(`vote_${memory.id}`);
+        localStorage.removeItem(`vote_${memory.id || memory._id}`);
       }
       
       setUserVote(userVote);
       updateMemory({ ...memory, votes });
     } catch (error) {
       console.error('Error voting:', error);
+      // Don't throw the error, just log it
     }
   };
 
