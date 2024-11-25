@@ -1,5 +1,6 @@
 export interface Memory {
-  id: string;
+  id?: string;
+  _id?: string;
   type: 'url' | 'text' | 'image' | 'video' | 'audio' | 'document';
   url?: string;
   content?: string;
@@ -12,10 +13,10 @@ export interface Memory {
     platform?: string;
     contentUrl?: string;
     fileType?: string;
-    createdAt?: string;
-    updatedAt?: string;
     domain?: string;
     isSecure?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
   };
   votes: {
     up: number;
