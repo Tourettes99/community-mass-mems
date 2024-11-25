@@ -325,7 +325,8 @@ exports.handler = async (event, context) => {
       const moderationToken = Buffer.from(`${memory._id}:${process.env.EMAIL_USER}`).toString('base64');
       const baseUrl = process.env.REACT_APP_API_URL || 'https://community-mass-mems.onrender.com';
       
-      const moderateUrl = `${baseUrl}/moderate.html`;
+      // Use the root URL for the moderation page
+      const moderateUrl = `${baseUrl}/public/moderate.html`;
 
       await transporter.sendMail({
         from: process.env.EMAIL_USER,

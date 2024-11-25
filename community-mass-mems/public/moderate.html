@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Memory Moderation</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -18,10 +19,13 @@
             background-color: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
         }
         .message {
             margin: 20px 0;
             font-size: 18px;
+            color: #1a1a1a;
         }
         .spinner {
             border: 4px solid #f3f3f3;
@@ -35,6 +39,12 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        .error {
+            color: #f44336;
+        }
+        .success {
+            color: #4CAF50;
         }
     </style>
 </head>
@@ -51,9 +61,20 @@
         const memoryId = urlParams.get('memoryId');
         const token = urlParams.get('token');
 
+        // Function to update message
+        function updateMessage(text, isError = false, isSuccess = false) {
+            const messageEl = document.querySelector('.message');
+            messageEl.textContent = text;
+            messageEl.className = 'message ' + (isError ? 'error' : isSuccess ? 'success' : '');
+        }
+
         // Function to handle moderation
         async function moderateMemory() {
             try {
+                if (!action || !memoryId || !token) {
+                    throw new Error('Missing required parameters');
+                }
+
                 const response = await fetch('/.netlify/functions/moderate-memory', {
                     method: 'POST',
                     headers: {
@@ -69,15 +90,12 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    document.querySelector('.message').textContent = 
-                        `Memory successfully ${action}ed!`;
+                    updateMessage(`Memory successfully ${action}ed!`, false, true);
                 } else {
-                    document.querySelector('.message').textContent = 
-                        `Error: ${result.error || 'Failed to process moderation'}`;
+                    updateMessage(`Error: ${result.error || 'Failed to process moderation'}`, true);
                 }
             } catch (error) {
-                document.querySelector('.message').textContent = 
-                    'Error: Failed to connect to the server';
+                updateMessage(error.message || 'Error: Failed to connect to the server', true);
             }
             document.querySelector('.spinner').style.display = 'none';
         }
