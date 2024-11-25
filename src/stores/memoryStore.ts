@@ -1,4 +1,4 @@
-import create from 'zustand';
+import { create } from 'zustand';
 import { Memory } from '../types/Memory';
 
 interface MemoryStore {
@@ -22,7 +22,7 @@ const getValidDate = (dateString?: string): number => {
   }
 };
 
-const useMemoryStore = create<MemoryStore>((set) => ({
+const useMemoryStore = create<MemoryStore>()((set) => ({
   memories: [],
   loading: false,
   error: null,
