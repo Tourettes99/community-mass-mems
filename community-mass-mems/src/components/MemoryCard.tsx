@@ -81,21 +81,24 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       }
       
       setUserVote(userVote);
-      // Update memory while preserving all existing properties
+      
+      // Create updated memory with new votes
       const updatedMemory = {
         ...memory,
         votes,
-        userVotes: memory.userVotes || new Map()
+        userVotes: memory.userVotes instanceof Map ? memory.userVotes : new Map()
       };
+
+      // Update the userVotes map
       if (userVote) {
         updatedMemory.userVotes.set(userId, userVote);
       } else {
         updatedMemory.userVotes.delete(userId);
       }
+
       updateMemory(updatedMemory);
     } catch (error) {
       console.error('Error voting:', error);
-      // Don't throw the error, just log it
     }
   };
 

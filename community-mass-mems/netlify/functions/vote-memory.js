@@ -75,59 +75,46 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Initialize votes and userVotes if they don't exist
-    memory.votes = memory.votes || { up: 0, down: 0 };
-    memory.userVotes = memory.userVotes || new Map();
+    // Initialize votes if they don't exist
+    if (!memory.votes) {
+      memory.votes = { up: 0, down: 0 };
+    }
+
+    // Convert userVotes to Map if it's not already
+    if (!(memory.userVotes instanceof Map)) {
+      memory.userVotes = new Map(Object.entries(memory.userVotes || {}));
+    }
 
     // Get current user's vote
     const currentVote = memory.userVotes.get(userId);
-    let updateQuery = {};
 
+    // Calculate vote changes
     if (!currentVote) {
       // New vote
-      updateQuery = {
-        $inc: { [`votes.${voteType}`]: 1 },
-        $set: { [`userVotes.${userId}`]: voteType }
-      };
+      memory.votes[voteType] += 1;
+      memory.userVotes.set(userId, voteType);
     } else if (currentVote === voteType) {
       // Undo vote
-      updateQuery = {
-        $inc: { [`votes.${voteType}`]: -1 },
-        $unset: { [`userVotes.${userId}`]: "" }
-      };
+      memory.votes[voteType] -= 1;
+      memory.userVotes.delete(userId);
     } else {
       // Change vote (e.g., from up to down)
-      updateQuery = {
-        $inc: {
-          [`votes.${currentVote}`]: -1,
-          [`votes.${voteType}`]: 1
-        },
-        $set: { [`userVotes.${userId}`]: voteType }
-      };
+      memory.votes[currentVote] -= 1;
+      memory.votes[voteType] += 1;
+      memory.userVotes.set(userId, voteType);
     }
 
     try {
-      // Update the memory with the new vote
-      const updatedMemory = await Memory.findByIdAndUpdate(
-        memoryId,
-        updateQuery,
-        { 
-          new: true,
-          runValidators: true
-        }
-      ).exec();
-
-      if (!updatedMemory) {
-        throw new Error('Memory not found after update');
-      }
+      // Save the updated memory
+      await memory.save();
 
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           message: 'Vote recorded successfully',
-          votes: updatedMemory.votes,
-          userVote: updatedMemory.userVotes.get(userId) || null
+          votes: memory.votes,
+          userVote: memory.userVotes.get(userId) || null
         })
       };
     } catch (updateError) {
