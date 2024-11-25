@@ -1,8 +1,18 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Memory = require('./models/Memory');
+const nodemailer = require('nodemailer'); // Import nodemailer
 
 let conn = null;
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: process.env.EMAIL_SECURE, // or 'STARTTLS'
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
 
 const connectDb = async () => {
   if (conn == null) {
@@ -60,13 +70,34 @@ exports.handler = async (event, context) => {
     await connectDb();
     const memory = new Memory({
       type: 'text',
-      url: content, // Store the text content in the url field
+      content: content, // Store in content field instead of url
+      status: 'pending',
       metadata: {
-        format: 'text/plain'
+        format: 'text/plain',
+        title: content.slice(0, 50) + (content.length > 50 ? '...' : ''), // Create a title from content
+        description: content
       }
     });
 
     await memory.save();
+    
+    // Send moderation email
+    try {
+      await transporter.sendMail({
+        from: process.env.SENDER_EMAIL,
+        to: process.env.SENDER_EMAIL, // Send to same email for moderation
+        subject: 'New Text Memory Submission for Review',
+        text: `New text memory submitted for review:
+        
+Content: ${content}
+Submitted at: ${new Date().toLocaleString()}
+
+Please review this submission.`
+      });
+    } catch (emailError) {
+      console.error('Error sending moderation email:', emailError);
+      // Continue even if email fails
+    }
     
     return {
       statusCode: 201,
