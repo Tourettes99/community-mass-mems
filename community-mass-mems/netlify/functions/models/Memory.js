@@ -71,11 +71,22 @@ const memorySchema = new mongoose.Schema({
       delete ret._id;
       // Remove MongoDB-specific fields
       delete ret.__v;
+      // Convert userVotes Map to object for JSON
+      if (ret.userVotes instanceof Map) {
+        ret.userVotes = Object.fromEntries(ret.userVotes);
+      }
       return ret;
     }
   },
   toObject: {
-    virtuals: true
+    virtuals: true,
+    transform: function(doc, ret) {
+      ret.id = ret._id.toString();
+      if (!(ret.userVotes instanceof Map)) {
+        ret.userVotes = new Map(Object.entries(ret.userVotes || {}));
+      }
+      return ret;
+    }
   }
 });
 
