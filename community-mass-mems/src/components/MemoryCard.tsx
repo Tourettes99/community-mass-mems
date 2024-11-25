@@ -328,14 +328,14 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           >
             <ThumbUpIcon />
           </IconButton>
-          <Typography>{memory.votes.up}</Typography>
+          <Typography>{memory.votes?.up || 0}</Typography>
           <IconButton
             onClick={() => handleVote('down')}
             color={userVote === 'down' ? 'primary' : 'default'}
           >
             <ThumbDownIcon />
           </IconButton>
-          <Typography>{memory.votes.down}</Typography>
+          <Typography>{memory.votes?.down || 0}</Typography>
         </Box>
       </Box>
     </Card>
