@@ -6,59 +6,20 @@ let conn = null;
 
 const connectDb = async () => {
   if (conn == null) {
-    const MONGODB_URI = process.env.REACT_APP_MONGODB_URI;
-    if (!MONGODB_URI) {
-      throw new Error('REACT_APP_MONGODB_URI environment variable is not set');
-    }
-    
     try {
-      conn = await mongoose.connect(MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000,
+      conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0', {
+        serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 45000,
-        connectTimeoutMS: 10000,
-        useNewUrlParser: true,
-        useUnifiedTopology: true
+        connectTimeoutMS: 10000
       });
-      console.log('Successfully connected to MongoDB memories database');
-    } catch (err) {
-      console.error('MongoDB connection error:', err);
-      throw err;
+      console.log('Successfully connected to MongoDB');
+      return conn;
+    } catch (error) {
+      console.error('MongoDB connection error:', error);
+      throw error;
     }
   }
   return conn;
-};
-
-const formatDate = (date) => {
-  if (!date) return null;
-  try {
-    return date instanceof Date ? date.toISOString() : new Date(date).toISOString();
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return null;
-  }
-};
-
-const formatMemory = (memory) => {
-  if (!memory) return null;
-  try {
-    const formatted = {
-      ...memory,
-      metadata: {
-        ...memory.metadata,
-        createdAt: formatDate(memory.createdAt),
-        updatedAt: formatDate(memory.updatedAt)
-      },
-      votes: {
-        up: memory.votes?.up || 0,
-        down: memory.votes?.down || 0
-      }
-    };
-    delete formatted.__v;
-    return formatted;
-  } catch (error) {
-    console.error('Error formatting memory:', error);
-    return null;
-  }
 };
 
 exports.handler = async (event, context) => {
@@ -105,7 +66,11 @@ exports.handler = async (event, context) => {
         .exec();
       
       // Format memories to ensure proper date handling
-      memories = memories.map(formatMemory).filter(Boolean);
+      memories = memories.map(memory => ({
+        ...memory,
+        createdAt: memory.createdAt ? new Date(memory.createdAt).toISOString() : null,
+        updatedAt: memory.updatedAt ? new Date(memory.updatedAt).toISOString() : null
+      }));
       
       console.log(`Successfully fetched ${memories.length} memories`);
     } catch (dbError) {
