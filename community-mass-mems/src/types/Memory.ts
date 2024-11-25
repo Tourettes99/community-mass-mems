@@ -1,5 +1,5 @@
 export interface Memory {
-  _id: string;
+  id: string;
   type: 'url' | 'text' | 'image' | 'video' | 'audio' | 'document';
   url?: string;
   content?: string;
@@ -21,4 +21,5 @@ export interface Memory {
     up: number;
     down: number;
   };
+  userVotes?: Map<string, string>;
 }

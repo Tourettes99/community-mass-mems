@@ -26,7 +26,7 @@ interface MemoryCardProps {
 const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClick }) => {
   const updateMemory = useMemoryStore(state => state.updateMemory);
   const [userVote, setUserVote] = React.useState<string | null>(
-    localStorage.getItem(`vote_${memory._id}`)
+    localStorage.getItem(`vote_${memory.id}`)
   );
 
   const handleVote = async (type: 'up' | 'down') => {
@@ -43,7 +43,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          memoryId: memory._id,
+          memoryId: memory.id,
           voteType: type,
           userId
         }),
@@ -56,9 +56,9 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       const { votes, userVote } = await response.json();
       
       if (userVote) {
-        localStorage.setItem(`vote_${memory._id}`, userVote);
+        localStorage.setItem(`vote_${memory.id}`, userVote);
       } else {
-        localStorage.removeItem(`vote_${memory._id}`);
+        localStorage.removeItem(`vote_${memory.id}`);
       }
       
       setUserVote(userVote);
