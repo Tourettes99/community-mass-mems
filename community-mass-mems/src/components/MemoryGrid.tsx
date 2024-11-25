@@ -135,7 +135,7 @@ const MemoryGrid: React.FC = () => {
           <Fade in={true}>
             <Grid container spacing={3}>
               {filteredMemories.map((memory) => (
-                <Grid item xs={12} sm={6} md={4} key={memory._id}>
+                <Grid item xs={12} sm={6} md={4} key={memory.id || memory._id}>
                   <MemoryCard 
                     memory={memory} 
                     selectedTags={selectedTags}

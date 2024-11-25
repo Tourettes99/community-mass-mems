@@ -103,7 +103,7 @@ const MemoryCard = ({ memory }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          memoryId: memory._id,
+          memoryId: memory.id || memory._id,
           vote: voteType === 'up' ? 1 : -1
         })
       });
