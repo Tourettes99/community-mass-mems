@@ -149,11 +149,8 @@ const getUrlMetadata = async (urlString) => {
         : url.searchParams.get('v');
       if (videoId) {
         metadata.videoId = videoId;
-        // Try different YouTube thumbnail qualities
-        const thumbnailQualities = ['maxresdefault', 'hqdefault', 'mqdefault', 'default'];
-        metadata.thumbnailUrl = thumbnailQualities.map(quality => 
-          `https://img.youtube.com/vi/${videoId}/${quality}.jpg`
-        )[1]; // Use hqdefault as it's most reliable
+        // Use hqdefault as it's the most reliably available thumbnail
+        metadata.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
       }
     } else if (domain.includes('vimeo.com')) {
       metadata.platform = 'vimeo';
