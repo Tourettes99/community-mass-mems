@@ -26,8 +26,26 @@ interface MemoryCardProps {
 const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClick }) => {
   const updateMemory = useMemoryStore(state => state.updateMemory);
   const [userVote, setUserVote] = React.useState<string | null>(
-    localStorage.getItem(`vote_${memory.id}`)
+    localStorage.getItem(`vote_${memory.id || memory._id}`)
   );
+  const [faviconError, setFaviconError] = React.useState(false);
+
+  const isValidUrl = (urlString: string): boolean => {
+    try {
+      const url = new URL(urlString);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const handleFaviconError = () => {
+    setFaviconError(true);
+  };
+
+  const shouldShowFavicon = memory.metadata.favicon && 
+    isValidUrl(memory.metadata.favicon) && 
+    !faviconError;
 
   const handleVote = async (type: 'up' | 'down') => {
     try {
@@ -121,15 +139,17 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       )}
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
-          {memory.metadata.favicon && (
+          {shouldShowFavicon && (
             <img 
-              src={memory.metadata.favicon} 
-              alt="Site favicon"
+              src={memory.metadata.favicon}
+              alt=""
+              onError={handleFaviconError}
               style={{ 
                 width: 16, 
                 height: 16, 
                 objectFit: 'contain',
-                marginRight: 8
+                marginRight: 8,
+                flexShrink: 0
               }} 
             />
           )}
