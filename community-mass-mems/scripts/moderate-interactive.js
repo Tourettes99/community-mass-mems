@@ -1,4 +1,7 @@
-const path = require('path');
+Connecting to MongoDB...
+Connected to MongoDB successfully!
+
+=== Community Mass Memories - Moderation Console ===const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const readline = require('readline');
@@ -24,21 +27,21 @@ const rl = readline.createInterface({
 function formatMemory(memory, index) {
   const lines = [
     '╔════════════════════════════════════════════════════════════',
-    `║ MEMORY #${index + 1}`,
+    '║ MEMORY #' + (index + 1),
     '║ ' + '─'.repeat(55),
-    `║ Created: ${memory.createdAt.toLocaleString()}`,
-    `║ ID: ${memory._id}`,
+    '║ Created: ' + memory.createdAt.toLocaleString(),
+    '║ ID: ' + memory._id,
     '║'
   ];
 
   // Basic Info Section
   if (memory.metadata?.title) {
-    lines.push(`║ Title: ${memory.metadata.title}`);
+    lines.push('║ Title: ' + memory.metadata.title);
   }
 
   if (memory.url) {
     lines.push('║');
-    lines.push(`║ URL: ${memory.url}`);
+    lines.push('║ URL: ' + memory.url);
     
     // Show URL metadata
     if (memory.metadata) {
@@ -48,32 +51,32 @@ function formatMemory(memory, index) {
 
       // Platform-specific info
       if (memory.metadata.platform) {
-        lines.push(`║ Platform: ${memory.metadata.platform.toUpperCase()}`);
+        lines.push('║ Platform: ' + memory.metadata.platform.toUpperCase());
         if (memory.metadata.videoId) {
-          lines.push(`║ Video ID: ${memory.metadata.videoId}`);
+          lines.push('║ Video ID: ' + memory.metadata.videoId);
         }
         if (memory.metadata.embedUrl) {
-          lines.push(`║ Embed URL: ${memory.metadata.embedUrl}`);
+          lines.push('║ Embed URL: ' + memory.metadata.embedUrl);
         }
       }
 
       // File info for direct files
       if (memory.metadata.isDirectFile) {
-        lines.push(`║ File Type: ${memory.metadata.fileType}`);
+        lines.push('║ File Type: ' + memory.metadata.fileType);
         if (memory.metadata.mimeType) {
-          lines.push(`║ MIME Type: ${memory.metadata.mimeType}`);
+          lines.push('║ MIME Type: ' + memory.metadata.mimeType);
         }
         if (memory.metadata.fileSize) {
-          lines.push(`║ Size: ${(memory.metadata.fileSize / 1024).toFixed(2)} KB`);
+          lines.push('║ Size: ' + (memory.metadata.fileSize / 1024).toFixed(2) + ' KB');
         }
       }
 
       // Media info
       if (memory.metadata.mediaType) {
-        lines.push(`║ Media Type: ${memory.metadata.mediaType}`);
+        lines.push('║ Media Type: ' + memory.metadata.mediaType);
       }
       if (memory.metadata.thumbnailUrl) {
-        lines.push(`║ Thumbnail: ${memory.metadata.thumbnailUrl}`);
+        lines.push('║ Thumbnail: ' + memory.metadata.thumbnailUrl);
       }
 
       // OpenGraph Data
@@ -83,20 +86,20 @@ function formatMemory(memory, index) {
         lines.push('║ ' + '─'.repeat(30));
         
         if (memory.metadata.ogTitle) {
-          lines.push(`║ Title: ${memory.metadata.ogTitle}`);
+          lines.push('║ Title: ' + memory.metadata.ogTitle);
         }
         if (memory.metadata.ogDescription) {
           lines.push('║ Description:');
           const descLines = memory.metadata.ogDescription.match(/.{1,45}/g) || [''];
           descLines.forEach(line => {
-            lines.push(`║   ${line}`);
+            lines.push('║   ' + line);
           });
         }
         if (memory.metadata.ogImage) {
-          lines.push(`║ Image: ${memory.metadata.ogImage}`);
+          lines.push('║ Image: ' + memory.metadata.ogImage);
         }
         if (memory.metadata.ogType) {
-          lines.push(`║ Type: ${memory.metadata.ogType}`);
+          lines.push('║ Type: ' + memory.metadata.ogType);
         }
       }
 
@@ -107,20 +110,20 @@ function formatMemory(memory, index) {
         lines.push('║ ' + '─'.repeat(30));
         
         if (memory.metadata.twitterCard) {
-          lines.push(`║ Card Type: ${memory.metadata.twitterCard}`);
+          lines.push('║ Card Type: ' + memory.metadata.twitterCard);
         }
         if (memory.metadata.twitterTitle) {
-          lines.push(`║ Title: ${memory.metadata.twitterTitle}`);
+          lines.push('║ Title: ' + memory.metadata.twitterTitle);
         }
         if (memory.metadata.twitterDescription) {
           lines.push('║ Description:');
           const descLines = memory.metadata.twitterDescription.match(/.{1,45}/g) || [''];
           descLines.forEach(line => {
-            lines.push(`║   ${line}`);
+            lines.push('║   ' + line);
           });
         }
         if (memory.metadata.twitterImage) {
-          lines.push(`║ Image: ${memory.metadata.twitterImage}`);
+          lines.push('║ Image: ' + memory.metadata.twitterImage);
         }
       }
 
@@ -131,16 +134,16 @@ function formatMemory(memory, index) {
         lines.push('║ ' + '─'.repeat(30));
         
         if (memory.metadata.oembedType) {
-          lines.push(`║ Type: ${memory.metadata.oembedType}`);
+          lines.push('║ Type: ' + memory.metadata.oembedType);
         }
         if (memory.metadata.oembedTitle) {
-          lines.push(`║ Title: ${memory.metadata.oembedTitle}`);
+          lines.push('║ Title: ' + memory.metadata.oembedTitle);
         }
         if (memory.metadata.oembedAuthor) {
-          lines.push(`║ Author: ${memory.metadata.oembedAuthor}`);
+          lines.push('║ Author: ' + memory.metadata.oembedAuthor);
         }
         if (memory.metadata.oembedProvider) {
-          lines.push(`║ Provider: ${memory.metadata.oembedProvider}`);
+          lines.push('║ Provider: ' + memory.metadata.oembedProvider);
         }
       }
 
@@ -153,7 +156,7 @@ function formatMemory(memory, index) {
         lines.push('║ ' + '─'.repeat(30));
         const descLines = memory.metadata.description.match(/.{1,45}/g) || [''];
         descLines.forEach(line => {
-          lines.push(`║ ${line}`);
+          lines.push('║ ' + line);
         });
       }
     }
@@ -167,7 +170,7 @@ function formatMemory(memory, index) {
     contentLines.forEach(line => {
       const wrappedLines = line.match(/.{1,50}/g) || [''];
       wrappedLines.forEach(wrapped => {
-        lines.push(`║ ${wrapped}`);
+        lines.push('║ ' + wrapped);
       });
     });
   }
@@ -183,7 +186,7 @@ async function displayMemories(memories) {
     return;
   }
 
-  console.log(`\n${memories.length} Pending ${memories.length === 1 ? 'Memory' : 'Memories'}:\n');
+  console.log('\n' + memories.length + ' Pending ' + (memories.length === 1 ? 'Memory' : 'Memories') + ':\n');
   
   memories.forEach((memory, index) => {
     console.log(formatMemory(memory, index));
@@ -248,7 +251,7 @@ async function moderateMemories() {
             const memory = memories[index];
             memory.status = action === 'a' ? 'approved' : 'rejected';
             await memory.save();
-            console.log(`\nMemory #${index + 1} ${action === 'a' ? 'approved' : 'rejected'}!\n`);
+            console.log('\nMemory #' + (index + 1) + ' ' + (action === 'a' ? 'approved' : 'rejected') + '!\n');
             await refreshMemories();
           } catch (error) {
             console.error('\nError updating memory:', error.message);
