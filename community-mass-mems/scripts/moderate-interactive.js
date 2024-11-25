@@ -171,8 +171,19 @@ function formatMemory(memory, index) {
   return lines.join('\n');
 }
 
-// Show menu options
-function showMenu() {
+// Display memories
+async function displayMemories(memories) {
+  if (memories.length === 0) {
+    console.log('\nNo pending memories to moderate.');
+    return;
+  }
+
+  console.log(`\n${memories.length} Pending ${memories.length === 1 ? 'Memory' : 'Memories'}:\n`);
+  
+  memories.forEach((memory, index) => {
+    console.log(formatMemory(memory, index));
+  });
+
   console.log('\nCommands:');
   console.log('  r - Refresh list');
   console.log('  q - Quit');
@@ -193,16 +204,7 @@ async function moderateMemories() {
       memories = await Memory.find({ status: 'pending' }).sort({ createdAt: -1 });
       console.clear();
       console.log('\n=== Community Mass Memories - Moderation Console ===\n');
-      
-      if (memories.length === 0) {
-        console.log('No pending memories to moderate! 🎉\n');
-      } else {
-        console.log(`${memories.length} Pending Memories:\n`);
-        memories.forEach((memory, index) => {
-          console.log(formatMemory(memory, index));
-        });
-      }
-      showMenu();
+      await displayMemories(memories);
     }
 
     // Initial load
@@ -239,7 +241,6 @@ async function moderateMemories() {
         }
       } else if (input) {
         console.log('\nInvalid command! Try again.\n');
-        showMenu();
       }
     });
 

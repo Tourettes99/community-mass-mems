@@ -28,10 +28,10 @@ const transporter = nodemailer.createTransport({
 
 // Media file extensions
 const MEDIA_EXTENSIONS = {
-  images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff'],
-  videos: ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mkv'],
-  audio: ['mp3', 'wav', 'aac', 'm4a', 'opus', 'wma', 'flac'],
-  documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
+  images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff', 'avif'],
+  videos: ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mkv', '3gp'],
+  audio: ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac', 'wma', 'aiff'],
+  documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv', 'md', 'json']
 };
 
 let conn = null;
@@ -98,34 +98,108 @@ const getUrlMetadata = async (urlString) => {
       updatedAt: formatDate(new Date())
     };
 
-    // Try to fetch rich metadata first
+    // Check if it's a direct file link first
+    if (extension && Object.values(MEDIA_EXTENSIONS).flat().includes(extension)) {
+      metadata.type = Object.keys(MEDIA_EXTENSIONS).find(type => 
+        MEDIA_EXTENSIONS[type].includes(extension)
+      ).slice(0, -1); // Remove 's' from end (images -> image)
+      metadata.mediaType = metadata.type;
+      metadata.fileType = extension;
+      metadata.contentUrl = urlString;
+      metadata.title = decodeURIComponent(pathname.split('/').pop());
+      metadata.isDirectFile = true;
+
+      // For images, use the URL as the thumbnail
+      if (metadata.type === 'image') {
+        metadata.thumbnailUrl = urlString;
+      }
+
+      // Try to get file size and MIME type
+      try {
+        const response = await fetch(urlString, { method: 'HEAD' });
+        const contentType = response.headers.get('content-type');
+        const contentLength = response.headers.get('content-length');
+        
+        if (contentType) metadata.mimeType = contentType;
+        if (contentLength) metadata.fileSize = parseInt(contentLength);
+      } catch (error) {
+        console.error('Error getting file metadata:', error);
+      }
+    }
+
+    // Try to fetch rich metadata for all URLs (even direct files might have OpenGraph data)
     try {
       const unfurled = await unfurl(urlString);
       
-      // Merge unfurled metadata
       if (unfurled) {
-        metadata.title = unfurled.title;
-        metadata.description = unfurled.description;
+        // Basic metadata
+        if (!metadata.title) metadata.title = unfurled.title;
+        if (!metadata.description) metadata.description = unfurled.description;
         
+        // OpenGraph metadata
         if (unfurled.open_graph) {
-          metadata.ogTitle = unfurled.open_graph.title;
-          metadata.ogDescription = unfurled.open_graph.description;
-          metadata.ogImage = unfurled.open_graph.image 
-            ? unfurled.open_graph.image.url 
-            : null;
-          metadata.ogType = unfurled.open_graph.type;
+          const og = unfurled.open_graph;
+          metadata.ogTitle = og.title;
+          metadata.ogDescription = og.description;
+          metadata.ogType = og.type;
+          
+          if (og.image) {
+            metadata.ogImage = typeof og.image === 'string' ? og.image : og.image.url;
+            if (og.image.width) metadata.ogImageWidth = og.image.width;
+            if (og.image.height) metadata.ogImageHeight = og.image.height;
+            if (og.image.type) metadata.ogImageType = og.image.type;
+          }
+
+          if (og.video) {
+            metadata.ogVideo = typeof og.video === 'string' ? og.video : og.video.url;
+            if (og.video.width) metadata.ogVideoWidth = og.video.width;
+            if (og.video.height) metadata.ogVideoHeight = og.video.height;
+            if (og.video.type) metadata.ogVideoType = og.video.type;
+          }
+
+          if (og.audio) {
+            metadata.ogAudio = typeof og.audio === 'string' ? og.audio : og.audio.url;
+            if (og.audio.type) metadata.ogAudioType = og.audio.type;
+          }
         }
         
+        // Twitter Card metadata
         if (unfurled.twitter_card) {
-          metadata.twitterTitle = unfurled.twitter_card.title;
-          metadata.twitterDescription = unfurled.twitter_card.description;
-          metadata.twitterImage = unfurled.twitter_card.image;
-          metadata.twitterCard = unfurled.twitter_card.card;
+          const twitter = unfurled.twitter_card;
+          metadata.twitterTitle = twitter.title;
+          metadata.twitterDescription = twitter.description;
+          metadata.twitterImage = twitter.image;
+          metadata.twitterCard = twitter.card;
+          if (twitter.player) {
+            metadata.twitterPlayer = twitter.player;
+            metadata.twitterPlayerWidth = twitter.player_width;
+            metadata.twitterPlayerHeight = twitter.player_height;
+          }
         }
         
-        // Use favicon if available
+        // Oembed metadata
+        if (unfurled.oEmbed) {
+          const oembed = unfurled.oEmbed;
+          metadata.oembedType = oembed.type;
+          metadata.oembedTitle = oembed.title;
+          metadata.oembedAuthor = oembed.author_name;
+          metadata.oembedProvider = oembed.provider_name;
+          metadata.oembedThumbnail = oembed.thumbnail_url;
+          metadata.oembedWidth = oembed.width;
+          metadata.oembedHeight = oembed.height;
+          metadata.oembedHtml = oembed.html;
+        }
+        
+        // Favicon and icons
         if (unfurled.favicon) {
           metadata.favicon = unfurled.favicon;
+        }
+        if (unfurled.icons && unfurled.icons.length > 0) {
+          metadata.icons = unfurled.icons.map(icon => ({
+            url: icon.url,
+            type: icon.type,
+            size: icon.sizes
+          }));
         }
       }
     } catch (unfurlError) {
@@ -133,62 +207,34 @@ const getUrlMetadata = async (urlString) => {
       // Continue with basic metadata if unfurling fails
     }
 
-    // Determine content type from extension
-    if (MEDIA_EXTENSIONS.images.includes(extension)) {
-      metadata.type = 'image';
-      metadata.mediaType = 'image';
-      metadata.fileType = extension;
-    } else if (MEDIA_EXTENSIONS.videos.includes(extension)) {
-      metadata.type = 'video';
-      metadata.mediaType = 'video';
-      metadata.fileType = extension;
-    } else if (MEDIA_EXTENSIONS.audio.includes(extension)) {
-      metadata.type = 'audio';
-      metadata.mediaType = 'audio';
-      metadata.fileType = extension;
-    } else if (MEDIA_EXTENSIONS.documents.includes(extension)) {
-      metadata.type = 'document';
-      metadata.mediaType = 'document';
-      metadata.fileType = extension;
-    }
-
-    // Additional metadata for media URLs
-    if (metadata.type !== 'url') {
-      metadata.contentUrl = urlString;
-      if (!metadata.title) {
-        metadata.title = pathname.split('/').pop() || 'Untitled';
-      }
-    }
-
     // Platform-specific metadata
     if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
       metadata.platform = 'youtube';
       metadata.type = 'video';
       
-      // Extract video ID
       const videoId = domain.includes('youtu.be') 
         ? pathname.slice(1)
         : url.searchParams.get('v');
       if (videoId) {
         metadata.videoId = videoId;
-        // Use hqdefault as it's the most reliably available thumbnail
         metadata.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        metadata.embedUrl = `https://www.youtube.com/embed/${videoId}`;
       }
     } else if (domain.includes('vimeo.com')) {
       metadata.platform = 'vimeo';
       metadata.type = 'video';
       
-      // Extract video ID
       const videoId = pathname.split('/').pop();
       if (videoId) {
         metadata.videoId = videoId;
+        metadata.embedUrl = `https://player.vimeo.com/video/${videoId}`;
         try {
           const vimeoResponse = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`);
           const vimeoData = await vimeoResponse.json();
           if (vimeoData && vimeoData[0]) {
             metadata.thumbnailUrl = vimeoData[0].thumbnail_large;
-            metadata.title = metadata.title || vimeoData[0].title;
-            metadata.description = metadata.description || vimeoData[0].description;
+            if (!metadata.title) metadata.title = vimeoData[0].title;
+            if (!metadata.description) metadata.description = vimeoData[0].description;
           }
         } catch (error) {
           console.error('Error fetching Vimeo metadata:', error);
@@ -197,9 +243,31 @@ const getUrlMetadata = async (urlString) => {
     } else if (domain.includes('spotify.com')) {
       metadata.platform = 'spotify';
       metadata.type = 'audio';
+      // Extract Spotify URI for embedding
+      const spotifyPath = pathname.split('/');
+      if (spotifyPath.length >= 3) {
+        const type = spotifyPath[1]; // track, album, playlist
+        const id = spotifyPath[2];
+        metadata.spotifyType = type;
+        metadata.spotifyId = id;
+        metadata.embedUrl = `https://open.spotify.com/embed/${type}/${id}`;
+      }
     } else if (domain.includes('soundcloud.com')) {
       metadata.platform = 'soundcloud';
       metadata.type = 'audio';
+    } else if (domain.includes('twitter.com') || domain.includes('x.com')) {
+      metadata.platform = 'twitter';
+      metadata.type = 'social';
+      const tweetPath = pathname.split('/');
+      if (tweetPath.length >= 4 && tweetPath[2] === 'status') {
+        metadata.tweetId = tweetPath[3];
+      }
+    } else if (domain.includes('instagram.com')) {
+      metadata.platform = 'instagram';
+      metadata.type = 'social';
+      if (pathname.includes('/p/')) {
+        metadata.postId = pathname.split('/p/')[1].split('/')[0];
+      }
     }
 
     return metadata;
@@ -293,17 +361,26 @@ exports.handler = async (event, context) => {
       type: metadata.type,
       status: 'pending', // Set status to pending
       metadata: {
+        ...metadata, // Include all metadata fields
         title: metadata.title || url,
         description: metadata.description,
-        thumbnailUrl: metadata.thumbnail,
-        mediaType: metadata.type,
+        thumbnailUrl: metadata.thumbnailUrl,
+        mediaType: metadata.mediaType,
         platform: metadata.platform,
         contentUrl: metadata.contentUrl,
         fileType: metadata.fileType,
         domain: metadata.domain,
         isSecure: metadata.isSecure,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        videoId: metadata.videoId,
+        ogTitle: metadata.ogTitle,
+        ogDescription: metadata.ogDescription,
+        ogImage: metadata.ogImage,
+        ogType: metadata.ogType,
+        twitterTitle: metadata.twitterTitle,
+        twitterDescription: metadata.twitterDescription,
+        twitterImage: metadata.twitterImage,
+        twitterCard: metadata.twitterCard,
+        favicon: metadata.favicon
       }
     });
 
