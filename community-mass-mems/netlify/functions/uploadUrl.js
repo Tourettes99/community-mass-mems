@@ -190,6 +190,8 @@ exports.handler = async (event, context) => {
       tags: Array.isArray(tags) ? tags : [],
       metadata: type === 'url' ? await getUrlMetadata(url) : {
         type: 'text',
+        title: content?.slice(0, 50) + (content?.length > 50 ? '...' : ''),
+        description: content,
         createdAt: formatDate(new Date()),
         updatedAt: formatDate(new Date())
       },
