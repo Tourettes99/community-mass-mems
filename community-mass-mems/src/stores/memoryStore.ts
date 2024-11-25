@@ -41,7 +41,7 @@ const useMemoryStore = create<MemoryStore>()((set) => ({
   
   updateMemory: (updatedMemory) => set((state) => ({
     memories: state.memories.map((memory) => 
-      memory.id === updatedMemory.id ? updatedMemory : memory
+      (memory.id === updatedMemory.id || memory._id === updatedMemory._id) ? updatedMemory : memory
     ).sort((a, b) => 
       getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
     )
