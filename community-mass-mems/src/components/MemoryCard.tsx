@@ -107,7 +107,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {(memory.metadata.thumbnailUrl || memory.metadata.ogImage) && (
+      {(memory.metadata.thumbnailUrl || memory.metadata.ogImage || memory.metadata.twitterImage) && (
         <CardMedia
           component="img"
           sx={{
@@ -115,8 +115,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             objectFit: 'cover',
             backgroundColor: '#f5f5f5'
           }}
-          image={memory.metadata.thumbnailUrl || memory.metadata.ogImage}
-          alt={memory.metadata.title || 'Memory thumbnail'}
+          image={memory.metadata.thumbnailUrl || memory.metadata.ogImage || memory.metadata.twitterImage}
+          alt={memory.metadata.title || memory.metadata.ogTitle || memory.metadata.twitterTitle || 'Memory thumbnail'}
         />
       )}
       <CardContent sx={{ flexGrow: 1 }}>
@@ -142,7 +142,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             lineHeight: 1.2,
             maxHeight: '2.4em'
           }}>
-            {memory.metadata.title || 'Untitled Memory'}
+            {memory.metadata.title || memory.metadata.ogTitle || memory.metadata.twitterTitle || 'Untitled Memory'}
           </Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" paragraph>
