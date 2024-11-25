@@ -1,16 +1,14 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Memory = require('./models/Memory');
+const path = require('path');
 const busboy = require('busboy');
 
 let conn = null;
 
 const connectDb = async () => {
   if (conn == null) {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is not set');
-    }
-    conn = await mongoose.connect(process.env.MONGODB_URI, {
+    conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0', {
       serverSelectionTimeoutMS: 5000
     });
   }
@@ -54,28 +52,14 @@ const processFormData = async (event) => {
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
-  // Handle OPTIONS request for CORS
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
-      body: ''
-    };
-  }
-
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       headers: {
         'Allow': 'POST',
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
+        'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ message: 'Method Not Allowed' })
+      body: 'Method Not Allowed'
     };
   }
 
@@ -94,6 +78,9 @@ exports.handler = async (event, context) => {
     }
 
     const file = formData.files[0];
+    const fileExtension = path.extname(file.filename);
+    
+    // Save file directly in response
     const fileUrl = `data:${file.mimeType};base64,${file.content.toString('base64')}`;
 
     // Save to MongoDB
@@ -107,7 +94,7 @@ exports.handler = async (event, context) => {
       url: fileUrl,
       metadata: {
         fileName: file.filename,
-        format: file.mimeType
+        format: fileExtension.substring(1)
       }
     });
 
@@ -129,7 +116,7 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ message: 'Error uploading file', error: error.message })
+      body: JSON.stringify({ message: 'Error uploading file' })
     };
   }
 };

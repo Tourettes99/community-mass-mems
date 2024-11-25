@@ -4,12 +4,12 @@ const memorySchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['url', 'text', 'image', 'video', 'audio', 'document']
+    enum: ['image', 'gif', 'audio', 'url', 'text']
   },
   url: {
     type: String,
     required: function() {
-      return this.type === 'url' || this.type === 'image' || this.type === 'video' || this.type === 'audio' || this.type === 'document';
+      return ['image', 'gif', 'audio', 'url'].includes(this.type);
     }
   },
   content: {
@@ -18,74 +18,37 @@ const memorySchema = new mongoose.Schema({
       return this.type === 'text';
     }
   },
-  tags: {
-    type: [String],
-    default: []
-  },
   metadata: {
+    fileName: String,
+    format: String,
+    siteName: String,
     title: String,
     description: String,
     thumbnailUrl: String,
-    mediaType: String,
-    platform: String,
-    contentUrl: String,
-    fileType: String,
-    domain: String,
-    isSecure: Boolean,
-    createdAt: {
-      type: Date,
-      default: Date.now
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now
-    }
+    createdAt: Date
   },
   votes: {
-    up: {
-      type: Number,
-      default: 0
-    },
-    down: {
-      type: Number,
-      default: 0
-    }
-  }
+    up: { type: Number, default: 0 },
+    down: { type: Number, default: 0 }
+  },
+  tags: [String]
 }, {
   timestamps: true,
   toJSON: {
-    virtuals: true,
     transform: function(doc, ret) {
-      // Format dates as ISO strings
-      if (ret.metadata) {
-        ret.metadata.createdAt = ret.metadata.createdAt ? new Date(ret.metadata.createdAt).toISOString() : null;
-        ret.metadata.updatedAt = ret.metadata.updatedAt ? new Date(ret.metadata.updatedAt).toISOString() : null;
-      }
-      // Remove MongoDB-specific fields
+      ret.id = ret._id;
       delete ret.__v;
       return ret;
     }
-  },
-  toObject: {
-    virtuals: true
   }
 });
 
-// Update metadata timestamps before saving
+// Ensure either url or content is provided based on type
 memorySchema.pre('save', function(next) {
-  if (this.isModified()) {
-    const now = new Date();
-    if (!this.metadata) {
-      this.metadata = {};
-    }
-    if (this.isNew) {
-      this.metadata.createdAt = now;
-    }
-    this.metadata.updatedAt = now;
+  if ((this.type !== 'text' && !this.url) || (this.type === 'text' && !this.content)) {
+    next(new Error('Either url or content must be provided based on memory type'));
   }
   next();
 });
 
-const Memory = mongoose.model('Memory', memorySchema);
-
-module.exports = Memory;
+module.exports = mongoose.model('Memory', memorySchema);
