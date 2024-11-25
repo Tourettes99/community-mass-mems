@@ -29,6 +29,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     localStorage.getItem(`vote_${memory.id || memory._id}`)
   );
   const [faviconError, setFaviconError] = React.useState(false);
+  const [showFavicon, setShowFavicon] = React.useState(true);
 
   const isValidUrl = (urlString: string): boolean => {
     try {
@@ -41,6 +42,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   const handleFaviconError = () => {
     setFaviconError(true);
+    setShowFavicon(false);
   };
 
   const shouldShowFavicon = memory.metadata.favicon && 
@@ -123,11 +125,41 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
   };
 
   const renderContent = () => {
+    const favicon = memory.metadata?.favicon;
+    const title = memory.metadata?.title || memory.url || 'No title';
+
+    const renderFavicon = showFavicon && favicon && (
+      <img 
+        src={favicon}
+        alt=""
+        onError={handleFaviconError}
+        style={{ 
+          width: 16, 
+          height: 16, 
+          objectFit: 'contain',
+          marginRight: 8,
+          flexShrink: 0
+        }} 
+      />
+    );
+
+    const renderTitle = (
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        {renderFavicon}
+        <Typography variant="subtitle1">
+          {title}
+        </Typography>
+      </Box>
+    );
+
     if (!memory.url) {
       return (
-        <Typography variant="body1" color="text.secondary">
-          {memory.content || 'No content available'}
-        </Typography>
+        <>
+          {renderTitle}
+          <Typography variant="body1" color="text.secondary">
+            {memory.content || 'No content available'}
+          </Typography>
+        </>
       );
     }
 
@@ -140,22 +172,25 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         
       if (videoId) {
         return (
-          <Box sx={{ position: 'relative', paddingTop: '56.25%', width: '100%' }}>
-            <iframe
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                border: 'none'
-              }}
-              src={`https://www.youtube.com/embed/${videoId}`}
-              title={memory.metadata?.title || 'YouTube video'}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </Box>
+          <>
+            {renderTitle}
+            <Box sx={{ position: 'relative', paddingTop: '56.25%', width: '100%' }}>
+              <iframe
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  border: 'none'
+                }}
+                src={`https://www.youtube.com/embed/${videoId}`}
+                title={memory.metadata?.title || 'YouTube video'}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </Box>
+          </>
         );
       }
     }
@@ -164,21 +199,24 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     const isDirectFile = /\.(jpeg|jpg|gif|png|webp)$/i.test(memory.url);
     if (isDirectFile) {
       return (
-        <Box 
-          component="img"
-          src={memory.url}
-          alt={memory.metadata?.title || 'Memory image'}
-          sx={{
-            width: '100%',
-            height: 'auto',
-            maxHeight: '300px',
-            objectFit: 'contain',
-            borderRadius: 1
-          }}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            e.currentTarget.src = memory.metadata?.ogImage || memory.metadata?.twitterImage || '/placeholder.png';
-          }}
-        />
+        <>
+          {renderTitle}
+          <Box 
+            component="img"
+            src={memory.url}
+            alt={memory.metadata?.title || 'Memory image'}
+            sx={{
+              width: '100%',
+              height: 'auto',
+              maxHeight: '300px',
+              objectFit: 'contain',
+              borderRadius: 1
+            }}
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              e.currentTarget.src = memory.metadata?.ogImage || memory.metadata?.twitterImage || '/placeholder.png';
+            }}
+          />
+        </>
       );
     }
 
@@ -186,6 +224,51 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     const thumbnail = memory.metadata?.ogImage || memory.metadata?.twitterImage;
     if (thumbnail) {
       return (
+        <>
+          {renderTitle}
+          <Box
+            component="a"
+            href={memory.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{ 
+              display: 'block',
+              textDecoration: 'none',
+              color: 'inherit'
+            }}
+          >
+            <Box
+              component="img"
+              src={thumbnail}
+              alt={memory.metadata?.title || 'Memory thumbnail'}
+              sx={{
+                width: '100%',
+                height: 'auto',
+                maxHeight: '300px',
+                objectFit: 'contain',
+                borderRadius: 1
+              }}
+              onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                e.currentTarget.src = '/placeholder.png';
+              }}
+            />
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {memory.metadata?.title || memory.url}
+            </Typography>
+            {memory.metadata?.description && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {memory.metadata.description}
+              </Typography>
+            )}
+          </Box>
+        </>
+      );
+    }
+
+    // Fallback for other content
+    return (
+      <>
+        {renderTitle}
         <Box
           component="a"
           href={memory.url}
@@ -197,55 +280,16 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             color: 'inherit'
           }}
         >
-          <Box
-            component="img"
-            src={thumbnail}
-            alt={memory.metadata?.title || 'Memory thumbnail'}
-            sx={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: '300px',
-              objectFit: 'contain',
-              borderRadius: 1
-            }}
-            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-              e.currentTarget.src = '/placeholder.png';
-            }}
-          />
-          <Typography variant="body2" sx={{ mt: 1 }}>
+          <Typography variant="body1">
             {memory.metadata?.title || memory.url}
           </Typography>
           {memory.metadata?.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {memory.metadata.description}
             </Typography>
           )}
         </Box>
-      );
-    }
-
-    // Fallback for other content
-    return (
-      <Box
-        component="a"
-        href={memory.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        sx={{ 
-          display: 'block',
-          textDecoration: 'none',
-          color: 'inherit'
-        }}
-      >
-        <Typography variant="body1">
-          {memory.metadata?.title || memory.url}
-        </Typography>
-        {memory.metadata?.description && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {memory.metadata.description}
-          </Typography>
-        )}
-      </Box>
+      </>
     );
   };
 
