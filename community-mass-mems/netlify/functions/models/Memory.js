@@ -50,6 +50,11 @@ const memorySchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
+  },
+  userVotes: {
+    type: Map,
+    of: String,
+    default: new Map()
   }
 }, {
   timestamps: true,

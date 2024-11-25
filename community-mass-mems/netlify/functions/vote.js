@@ -44,14 +44,14 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { memoryId, voteType } = JSON.parse(event.body);
+    const { memoryId, voteType, userId } = JSON.parse(event.body);
 
     // Validate input
-    if (!memoryId) {
+    if (!memoryId || !userId) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ message: 'Memory ID is required' })
+        body: JSON.stringify({ message: 'Memory ID and User ID are required' })
       };
     }
 
@@ -75,11 +75,37 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Update the appropriate vote count
-    const updateField = `votes.${voteType}`;
+    // Get current user's vote
+    const currentVote = memory.userVotes.get(userId);
+    let updateQuery = {};
+
+    if (!currentVote) {
+      // New vote
+      updateQuery = {
+        $inc: { [`votes.${voteType}`]: 1 },
+        $set: { [`userVotes.${userId}`]: voteType }
+      };
+    } else if (currentVote === voteType) {
+      // Undo vote
+      updateQuery = {
+        $inc: { [`votes.${voteType}`]: -1 },
+        $unset: { [`userVotes.${userId}`]: "" }
+      };
+    } else {
+      // Change vote (e.g., from up to down)
+      updateQuery = {
+        $inc: {
+          [`votes.${currentVote}`]: -1,
+          [`votes.${voteType}`]: 1
+        },
+        $set: { [`userVotes.${userId}`]: voteType }
+      };
+    }
+
+    // Update the memory with the new vote
     const updatedMemory = await Memory.findByIdAndUpdate(
       memoryId,
-      { $inc: { [updateField]: 1 } },
+      updateQuery,
       { 
         new: true,
         runValidators: true
@@ -91,7 +117,8 @@ exports.handler = async (event, context) => {
       headers,
       body: JSON.stringify({
         message: 'Vote recorded successfully',
-        votes: updatedMemory.votes
+        votes: updatedMemory.votes,
+        userVote: updatedMemory.userVotes.get(userId) || null
       })
     };
 
