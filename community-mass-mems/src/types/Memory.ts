@@ -5,6 +5,8 @@ export interface Memory {
   url?: string;
   content?: string;
   tags: string[];
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
   metadata: {
     title?: string;
     description?: string;
