@@ -1,5 +1,5 @@
 [build]
-  base = "community-mass-mems"
+  base = "."
   command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
   publish = "build"
 
