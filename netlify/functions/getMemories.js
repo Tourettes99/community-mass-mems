@@ -6,19 +6,20 @@ let conn = null;
 
 const connectDb = async () => {
   if (conn == null) {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is not set');
+    const MONGODB_URI = process.env.REACT_APP_MONGODB_URI;
+    if (!MONGODB_URI) {
+      throw new Error('REACT_APP_MONGODB_URI environment variable is not set');
     }
     
     try {
-      conn = await mongoose.connect(process.env.MONGODB_URI, {
+      conn = await mongoose.connect(MONGODB_URI, {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
         connectTimeoutMS: 10000,
         useNewUrlParser: true,
         useUnifiedTopology: true
       });
-      console.log('Successfully connected to MongoDB');
+      console.log('Successfully connected to MongoDB memories database');
     } catch (err) {
       console.error('MongoDB connection error:', err);
       throw err;
