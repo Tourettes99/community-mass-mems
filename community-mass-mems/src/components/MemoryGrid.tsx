@@ -1,12 +1,14 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { Grid, Box, useTheme, Fade, CircularProgress, Typography, Alert } from '@mui/material';
 import MemoryCard from './MemoryCard';
+import TagFilter from './TagFilter';
 import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
 
 const MemoryGrid: React.FC = () => {
   const theme = useTheme();
   const { memories, loading, error, setMemories, setLoading, setError } = useMemoryStore();
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const fetchMemories = useCallback(async (isBackground = false) => {
     if (!isBackground) {
@@ -41,6 +43,23 @@ const MemoryGrid: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [fetchMemories]);
 
+  // Get all unique tags from memories
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    memories.forEach(memory => {
+      memory.tags?.forEach(tag => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [memories]);
+
+  // Filter memories based on selected tags
+  const filteredMemories = useMemo(() => {
+    if (selectedTags.length === 0) return memories;
+    return memories.filter(memory => 
+      selectedTags.every(tag => memory.tags?.includes(tag))
+    );
+  }, [memories, selectedTags]);
+
   if (error) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
@@ -60,15 +79,27 @@ const MemoryGrid: React.FC = () => {
           No memories yet. Be the first to share one!
         </Typography>
       ) : (
-        <Fade in={true}>
-          <Grid container spacing={3}>
-            {memories.map((memory) => (
-              <Grid item xs={12} sm={6} md={4} key={memory._id}>
-                <MemoryCard memory={memory} />
-              </Grid>
-            ))}
-          </Grid>
-        </Fade>
+        <>
+          <TagFilter
+            availableTags={availableTags}
+            selectedTags={selectedTags}
+            onTagsChange={setSelectedTags}
+          />
+          <Fade in={true}>
+            <Grid container spacing={3}>
+              {filteredMemories.map((memory) => (
+                <Grid item xs={12} sm={6} md={4} key={memory._id}>
+                  <MemoryCard memory={memory} />
+                </Grid>
+              ))}
+            </Grid>
+          </Fade>
+          {filteredMemories.length === 0 && (
+            <Typography variant="body1" align="center" color="text.secondary" sx={{ mt: 4 }}>
+              No memories found with the selected tags.
+            </Typography>
+          )}
+        </>
       )}
     </Box>
   );
