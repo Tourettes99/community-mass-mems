@@ -321,10 +321,6 @@ exports.handler = async (event, context) => {
 
     // Send notification email
     try {
-      // Create a simple token for moderation links
-      const moderationToken = Buffer.from(`${memory._id}:${process.env.EMAIL_USER}`).toString('base64');
-      const baseUrl = process.env.REACT_APP_API_URL || 'https://community-mass-mems.onrender.com';
-
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: process.env.EMAIL_USER,
@@ -335,43 +331,43 @@ URL: ${url}
 Title: ${metadata.title || 'No title'}
 Description: ${metadata.description || 'No description'}
 Type: ${metadata.type}
+Memory ID: ${memory._id}
 Submitted at: ${new Date().toLocaleString()}
 
-To moderate this submission, use one of these links:
+To moderate this submission:
 
-Approve:
-curl -X POST ${baseUrl}/.netlify/functions/moderate-memory \\
-  -H "Content-Type: application/json" \\
-  -d '{"action":"approve","memoryId":"${memory._id}","token":"${moderationToken}"}'
+1. Open terminal in the project directory
+2. Run one of these commands:
 
-Reject:
-curl -X POST ${baseUrl}/.netlify/functions/moderate-memory \\
-  -H "Content-Type: application/json" \\
-  -d '{"action":"reject","memoryId":"${memory._id}","token":"${moderationToken}"}'`,
+To approve:
+node scripts/moderate.js moderate ${memory._id} approve
+
+To reject:
+node scripts/moderate.js moderate ${memory._id} reject
+
+To list all pending submissions:
+node scripts/moderate.js list`,
         html: `
           <h2>New memory submitted for review</h2>
           <p><strong>URL:</strong> ${url}</p>
           <p><strong>Title:</strong> ${metadata.title || 'No title'}</p>
           <p><strong>Description:</strong> ${metadata.description || 'No description'}</p>
           <p><strong>Type:</strong> ${metadata.type}</p>
+          <p><strong>Memory ID:</strong> <code>${memory._id}</code></p>
           <p><strong>Submitted at:</strong> ${new Date().toLocaleString()}</p>
-          <div style="margin-top: 20px;">
-            <form action="${baseUrl}/.netlify/functions/moderate-memory" method="POST" style="display:inline;">
-              <input type="hidden" name="action" value="approve">
-              <input type="hidden" name="memoryId" value="${memory._id}">
-              <input type="hidden" name="token" value="${moderationToken}">
-              <button type="submit" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
-                Approve
-              </button>
-            </form>
-            <form action="${baseUrl}/.netlify/functions/moderate-memory" method="POST" style="display:inline;">
-              <input type="hidden" name="action" value="reject">
-              <input type="hidden" name="memoryId" value="${memory._id}">
-              <input type="hidden" name="token" value="${moderationToken}">
-              <button type="submit" style="background-color: #f44336; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
-                Reject
-              </button>
-            </form>
+          <div style="margin-top: 20px; background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
+            <h3>Moderation Instructions:</h3>
+            <p>1. Open terminal in the project directory</p>
+            <p>2. Run one of these commands:</p>
+            <pre style="background-color: #2d2d2d; color: #ffffff; padding: 10px; border-radius: 3px;">
+# To approve:
+node scripts/moderate.js moderate ${memory._id} approve
+
+# To reject:
+node scripts/moderate.js moderate ${memory._id} reject
+
+# To list all pending submissions:
+node scripts/moderate.js list</pre>
           </div>
         `
       });
