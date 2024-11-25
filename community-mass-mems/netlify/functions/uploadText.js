@@ -4,10 +4,9 @@ const Memory = require('./models/Memory');
 const nodemailer = require('nodemailer'); // Import nodemailer
 
 let conn = null;
+// Create transporter for sending emails
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE, // or 'STARTTLS'
+  service: 'gmail',  // Use Gmail service
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD
