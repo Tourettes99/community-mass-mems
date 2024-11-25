@@ -6,7 +6,6 @@ import {
   Box,
   Chip,
   IconButton,
-  CardActions,
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -124,9 +123,9 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     const favicon = memory.metadata?.favicon;
     const title = memory.metadata?.title || memory.url || 'No title';
 
-    const renderFavicon = showFavicon && favicon && (
+    const renderFavicon = shouldShowFavicon && (
       <img 
-        src={favicon}
+        src={memory.metadata?.favicon}
         alt=""
         onError={handleFaviconError}
         style={{ 
