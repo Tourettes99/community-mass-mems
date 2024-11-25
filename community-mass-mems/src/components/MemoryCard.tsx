@@ -2,18 +2,14 @@ import React from 'react';
 import {
   Card,
   CardContent,
-  CardMedia,
   Typography,
   Box,
   Chip,
   IconButton,
   CardActions,
-  Link,
-  Tooltip
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
 

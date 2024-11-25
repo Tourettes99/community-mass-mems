@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
-import { CssBaseline, Container, Box, Snackbar, Alert } from '@mui/material';
+import { CssBaseline, Container, Snackbar, Alert } from '@mui/material';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useTheme } from './contexts/ThemeContext';
 import { getTheme } from './theme';
