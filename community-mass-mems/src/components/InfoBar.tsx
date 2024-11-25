@@ -1,5 +1,5 @@
 import React from 'react';
-import { Paper, Typography, Box } from '@mui/material';
+import { Paper, Typography, } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 
 const InfoBar: React.FC = () => {
