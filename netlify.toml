@@ -1,7 +1,7 @@
 [build]
   base = "community-mass-mems"
   command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
-  publish = "community-mass-mems/build"
+  publish = "build"
 
 [build.environment]
   NODE_VERSION = "20.11.1"
