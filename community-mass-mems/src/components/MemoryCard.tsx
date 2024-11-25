@@ -86,6 +86,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       // Create updated memory with new votes while preserving all other properties
       const updatedMemory: Memory = {
         ...memory,
+        id: memory.id || memory._id, // Ensure we have a consistent ID
         votes: { ...votes },
         userVotes: new Map(Object.entries(userVotes || {}))
       };
