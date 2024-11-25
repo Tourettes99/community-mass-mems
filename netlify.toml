@@ -38,14 +38,49 @@ for = "/*"
 [headers.values]
 Content-Security-Policy = """
   default-src 'self';
-  img-src 'self' data: http: https:;
-  media-src 'self' data: http: https:;
-  object-src 'self' http: https:;
-  frame-src 'self' http: https:;
-  connect-src 'self' http: https:;
-  style-src 'self' 'unsafe-inline' https:;
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+  img-src 'self' data: blob: http: https: *.tiktokcdn.com *.fbcdn.net;
+  media-src 'self' data: blob: http: https: *.tiktokcdn.com;
+  object-src 'none';
+  frame-src 'self' 
+    https://www.youtube.com 
+    https://youtube.com
+    https://www.facebook.com 
+    https://platform.twitter.com
+    https://syndication.twitter.com
+    https://www.instagram.com
+    https://www.tiktok.com
+    https://player.vimeo.com
+    https://www.pinterest.com;
+  connect-src 'self' 
+    https://*.facebook.com 
+    https://*.fbcdn.net
+    https://api.twitter.com
+    https://syndication.twitter.com
+    https://cdn.syndication.twimg.com
+    https://api.instagram.com
+    https://graph.instagram.com
+    https://api.tiktok.com
+    https://www.tiktok.com
+    https://api.pinterest.com
+    https://api.vimeo.com
+    http: https:;
+  style-src 'self' 'unsafe-inline' 
+    https://platform.twitter.com
+    https://ton.twimg.com
+    https://www.tiktok.com
+    https://www.instagram.com
+    https://www.facebook.com
+    https:;
+  script-src 'self' 'unsafe-inline' 'unsafe-eval'
+    https://connect.facebook.net
+    https://platform.twitter.com
+    https://www.instagram.com
+    https://www.tiktok.com
+    https://assets.pinterest.com
+    https://player.vimeo.com
+    https:;
   font-src 'self' data: https:;
+  worker-src 'self' blob:;
 """
 X-Frame-Options = "DENY"
 X-Content-Type-Options = "nosniff"
