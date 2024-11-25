@@ -1,11 +1,11 @@
 [build]
-  base = "community-mass-mems"
-  command = "npm install && CI=false npm run build"
+  base = "."
+  command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
   publish = "build"
 
 [build.environment]
-  NODE_VERSION = "18.17.0"
-  NPM_VERSION = "9.6.7"
+  NODE_VERSION = "20.11.1"
+  NPM_VERSION = "10.2.4"
   CI = "false"
   NODE_ENV = "production"
   NETLIFY = "true"
