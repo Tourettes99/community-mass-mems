@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -18,6 +18,8 @@ import {
   VideoLibrary as VideoIcon,
   Article as ArticleIcon,
   Link as LinkIcon,
+  ThumbUp as ThumbUpIcon,
+  ThumbDown as ThumbDownIcon,
 } from '@mui/icons-material';
 
 const MemoryCard = ({ memory }) => {
@@ -26,7 +28,8 @@ const MemoryCard = ({ memory }) => {
   const {
     url,
     type,
-    metadata = {}
+    metadata = {},
+    votes = { up: 0, down: 0 }
   } = memory;
 
   const {
@@ -38,6 +41,10 @@ const MemoryCard = ({ memory }) => {
     previewType,
     mediaType,
   } = metadata;
+
+  const [voteState, setVoteState] = useState({ up: false, down: false });
+  const [voteCount, setVoteCount] = useState({ up: votes.up || 0, down: votes.down || 0 });
+  const [isVoting, setIsVoting] = useState(false);
 
   const getMediaIcon = () => {
     switch (mediaType || type) {
@@ -85,6 +92,45 @@ const MemoryCard = ({ memory }) => {
     return null;
   };
 
+  const handleVote = async (voteType) => {
+    if (isVoting) return;
+    
+    try {
+      setIsVoting(true);
+      const response = await fetch('/.netlify/functions/vote-memory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          memoryId: memory._id,
+          vote: voteType === 'up' ? 1 : -1
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to vote');
+      }
+
+      // Toggle vote state
+      setVoteState(prev => ({
+        up: voteType === 'up' ? !prev.up : false,
+        down: voteType === 'down' ? !prev.down : false
+      }));
+
+      // Update vote count
+      setVoteCount(prev => ({
+        up: voteType === 'up' ? prev.up + (voteState.up ? -1 : 1) : prev.up,
+        down: voteType === 'down' ? prev.down + (voteState.down ? -1 : 1) : prev.down
+      }));
+
+    } catch (error) {
+      console.error('Error voting:', error);
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
   // Don't render empty cards
   if (!url && !description && !title) return null;
 
@@ -107,14 +153,39 @@ const MemoryCard = ({ memory }) => {
       <CardContent>
         <Stack spacing={1}>
           {siteName && (
-            <Chip
-              label={siteName}
-              size="small"
-              icon={getMediaIcon()}
-              sx={{ alignSelf: 'flex-start' }}
-            />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Chip
+                label={siteName}
+                size="small"
+                icon={getMediaIcon()}
+                sx={{ alignSelf: 'flex-start' }}
+              />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <IconButton 
+                  size="small" 
+                  onClick={() => handleVote('up')}
+                  color={voteState.up ? 'primary' : 'default'}
+                  disabled={isVoting}
+                >
+                  <ThumbUpIcon fontSize="small" />
+                </IconButton>
+                <Typography variant="body2" color="text.secondary">
+                  {voteCount.up}
+                </Typography>
+                <IconButton 
+                  size="small" 
+                  onClick={() => handleVote('down')}
+                  color={voteState.down ? 'error' : 'default'}
+                  disabled={isVoting}
+                >
+                  <ThumbDownIcon fontSize="small" />
+                </IconButton>
+                <Typography variant="body2" color="text.secondary">
+                  {voteCount.down}
+                </Typography>
+              </Box>
+            </Box>
           )}
-          
           {title && (
             <Link
               href={url}
@@ -143,7 +214,6 @@ const MemoryCard = ({ memory }) => {
               </Typography>
             </Link>
           )}
-          
           {description && (
             <Typography
               variant="body2"

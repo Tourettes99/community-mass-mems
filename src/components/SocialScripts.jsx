@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { convertToOrange } from '../utils/colorUtils';
 import { normalizeFileUrl, isAllowedDomain, toDataUrl } from '../utils/urlUtils';
 
@@ -22,6 +22,7 @@ const ALLOWED_DOMAINS = [
 const EMBED_SCRIPTS = {
   twitter: {
     src: 'https://platform.twitter.com/widgets.js',
+    id: 'twitter-script',
     process: async () => {
       window.twttr?.widgets?.load();
       // Convert Twitter icons to orange
@@ -48,6 +49,7 @@ const EMBED_SCRIPTS = {
   },
   instagram: {
     src: 'https://www.instagram.com/embed.js',
+    id: 'instagram-script',
     process: async () => {
       window.instgrm?.Embeds?.process();
       const svgs = document.querySelectorAll('.instagram-media svg');
@@ -73,6 +75,7 @@ const EMBED_SCRIPTS = {
   },
   facebook: {
     src: 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v12.0',
+    id: 'facebook-script',
     process: async () => {
       window.FB?.XFBML?.parse();
       const svgs = document.querySelectorAll('.fb-post svg');
@@ -98,6 +101,7 @@ const EMBED_SCRIPTS = {
   },
   tiktok: {
     src: 'https://www.tiktok.com/embed.js',
+    id: 'tiktok-script',
     process: async () => {
       const svgs = document.querySelectorAll('.tiktok-embed svg');
       for (const svg of svgs) {
@@ -122,6 +126,7 @@ const EMBED_SCRIPTS = {
   },
   pinterest: {
     src: 'https://assets.pinterest.com/js/pinit.js',
+    id: 'pinterest-script',
     process: async () => {
       const svgs = document.querySelectorAll('[data-pin-do] svg');
       for (const svg of svgs) {
@@ -146,110 +151,80 @@ const EMBED_SCRIPTS = {
   }
 };
 
-const SocialScripts = () => {
-  const loadScript = useCallback((config, key) => {
+const loadScript = (src, id, nonce) => {
+  return new Promise((resolve, reject) => {
     try {
-      const existingScript = document.querySelector(`script[src="${config.src}"]`);
-      if (existingScript) {
-        return Promise.resolve();
+      // Check if script already exists
+      if (document.getElementById(id)) {
+        resolve();
+        return;
       }
 
-      if (!isAllowedDomain(config.src, ALLOWED_DOMAINS)) {
-        console.error(`Script from ${config.src} is not allowed`);
-        return Promise.reject(new Error(`Script from ${config.src} is not allowed`));
-      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.id = id;
+      if (nonce) script.nonce = nonce;
+      script.async = true;
+      script.defer = true;
+      
+      script.onload = () => {
+        console.log(`Loaded script: ${id}`);
+        resolve();
+      };
+      
+      script.onerror = (error) => {
+        console.error(`Error loading script ${id}:`, error);
+        // Remove failed script
+        script.remove();
+        reject(error);
+      };
 
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = config.src;
-        script.async = true;
-        script.defer = true;
-        if (key === 'facebook') {
-          script.crossOrigin = 'anonymous';
-          // Generate a random nonce for additional security
-          const nonce = Math.random().toString(36).substring(2);
-          script.nonce = nonce;
-        }
-
-        script.onload = () => {
-          // Add a small delay to ensure the social media widgets are fully initialized
-          setTimeout(() => {
-            resolve();
-          }, 100);
-        };
-        script.onerror = () => reject(new Error(`Failed to load ${key} script`));
-        document.body.appendChild(script);
-      });
+      document.body.appendChild(script);
     } catch (error) {
-      console.error(`Error loading ${key} script:`, error);
-      return Promise.reject(error);
+      console.error(`Error setting up script ${id}:`, error);
+      reject(error);
     }
-  }, []);
+  });
+};
 
-  const processEmbeds = useCallback(() => {
-    Object.entries(EMBED_SCRIPTS).forEach(([key, config]) => {
-      try {
-        config.process();
-      } catch (error) {
-        console.error(`Error processing ${key} embeds:`, error);
-      }
-    });
-  }, []);
+const SocialScripts = () => {
+  const [loadingScripts, setLoadingScripts] = useState(true);
+  const [errors, setErrors] = useState([]);
 
   useEffect(() => {
     const loadAllScripts = async () => {
       try {
-        // Load scripts sequentially to ensure proper initialization
-        for (const [key, config] of Object.entries(EMBED_SCRIPTS)) {
-          await loadScript(config, key);
-        }
-        processEmbeds();
-      } catch (error) {
-        console.error('Error loading social scripts:', error);
-      }
-    };
-
-    const observer = new MutationObserver((mutations) => {
-      let shouldProcess = false;
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === 1) { // ELEMENT_NODE
-            const selectors = Object.values(EMBED_SCRIPTS).map(config => config.selector);
-            if (
-              selectors.some(selector => 
-                node.matches?.(selector) || 
-                node.querySelector?.(selector)
-              )
-            ) {
-              shouldProcess = true;
-            }
+        setLoadingScripts(true);
+        
+        // Generate nonce for CSP
+        const nonce = Math.random().toString(36).substring(2);
+        
+        // Load scripts in parallel with error handling for each
+        const scriptPromises = EMBED_SCRIPTS.map(async script => {
+          try {
+            await loadScript(script.src, script.id, nonce);
+          } catch (error) {
+            setErrors(prev => [...prev, `Failed to load ${script.id}`]);
+            console.error(`Error loading ${script.id}:`, error);
           }
         });
-      });
 
-      if (shouldProcess) {
-        processEmbeds();
+        await Promise.allSettled(scriptPromises);
+      } catch (error) {
+        console.error('Error in loadAllScripts:', error);
+        setErrors(prev => [...prev, 'Failed to load social scripts']);
+      } finally {
+        setLoadingScripts(false);
       }
-    });
+    };
 
     loadAllScripts();
+  }, []);
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    return () => {
-      observer.disconnect();
-      // Clean up scripts on unmount
-      Object.values(EMBED_SCRIPTS).forEach(config => {
-        const script = document.querySelector(`script[src="${config.src}"]`);
-        if (script?.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-      });
-    };
-  }, [loadScript, processEmbeds]);
+  // Add error boundary
+  if (errors.length > 0) {
+    console.warn('Social script loading errors:', errors);
+  }
 
   return null;
 };
