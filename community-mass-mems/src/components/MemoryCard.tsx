@@ -123,13 +123,20 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
   };
 
   const renderContent = () => {
-    const { url, metadata } = memory;
-    
+    if (!memory.url) {
+      return (
+        <Typography variant="body1" color="text.secondary">
+          {memory.content || 'No content available'}
+        </Typography>
+      );
+    }
+
     // Handle YouTube videos
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const videoId = url.includes('youtube.com') 
-        ? url.split('v=')[1]?.split('&')[0]
-        : url.split('youtu.be/')[1]?.split('?')[0];
+    const isYouTube = memory.url.includes('youtube.com') || memory.url.includes('youtu.be');
+    if (isYouTube) {
+      const videoId = memory.url.includes('youtube.com') 
+        ? memory.url.split('v=')[1]?.split('&')[0]
+        : memory.url.split('youtu.be/')[1]?.split('?')[0];
         
       if (videoId) {
         return (
@@ -144,7 +151,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                 border: 'none'
               }}
               src={`https://www.youtube.com/embed/${videoId}`}
-              title={metadata?.title || 'YouTube video'}
+              title={memory.metadata?.title || 'YouTube video'}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
@@ -154,32 +161,34 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     }
 
     // Handle direct file links
-    const isDirectFile = url.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+    const isDirectFile = /\.(jpeg|jpg|gif|png|webp)$/i.test(memory.url);
     if (isDirectFile) {
       return (
         <Box 
           component="img"
-          src={url}
-          alt={metadata?.title || 'Memory image'}
+          src={memory.url}
+          alt={memory.metadata?.title || 'Memory image'}
           sx={{
             width: '100%',
             height: 'auto',
-            objectFit: 'cover',
+            maxHeight: '300px',
+            objectFit: 'contain',
             borderRadius: 1
           }}
-          onError={(e) => {
-            e.currentTarget.src = metadata?.ogImage || metadata?.twitterImage || '/placeholder.png';
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            e.currentTarget.src = memory.metadata?.ogImage || memory.metadata?.twitterImage || '/placeholder.png';
           }}
         />
       );
     }
 
     // Handle other URLs with thumbnails
-    if (metadata?.ogImage || metadata?.twitterImage) {
+    const thumbnail = memory.metadata?.ogImage || memory.metadata?.twitterImage;
+    if (thumbnail) {
       return (
         <Box
           component="a"
-          href={url}
+          href={memory.url}
           target="_blank"
           rel="noopener noreferrer"
           sx={{ 
@@ -190,21 +199,27 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         >
           <Box
             component="img"
-            src={metadata.ogImage || metadata.twitterImage}
-            alt={metadata?.title || 'Memory thumbnail'}
+            src={thumbnail}
+            alt={memory.metadata?.title || 'Memory thumbnail'}
             sx={{
               width: '100%',
               height: 'auto',
-              objectFit: 'cover',
+              maxHeight: '300px',
+              objectFit: 'contain',
               borderRadius: 1
             }}
-            onError={(e) => {
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
               e.currentTarget.src = '/placeholder.png';
             }}
           />
           <Typography variant="body2" sx={{ mt: 1 }}>
-            {metadata?.title || url}
+            {memory.metadata?.title || memory.url}
           </Typography>
+          {memory.metadata?.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {memory.metadata.description}
+            </Typography>
+          )}
         </Box>
       );
     }
@@ -213,7 +228,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     return (
       <Box
         component="a"
-        href={url}
+        href={memory.url}
         target="_blank"
         rel="noopener noreferrer"
         sx={{ 
@@ -223,11 +238,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         }}
       >
         <Typography variant="body1">
-          {metadata?.title || url}
+          {memory.metadata?.title || memory.url}
         </Typography>
-        {metadata?.description && (
+        {memory.metadata?.description && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {metadata.description}
+            {memory.metadata.description}
           </Typography>
         )}
       </Box>
