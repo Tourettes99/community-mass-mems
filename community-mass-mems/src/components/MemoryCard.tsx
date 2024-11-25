@@ -37,7 +37,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         localStorage.setItem('userId', userId);
       }
 
-      const response = await fetch('/.netlify/functions/vote', {
+      const response = await fetch('/.netlify/functions/vote-memory', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
