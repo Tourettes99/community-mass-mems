@@ -82,16 +82,44 @@ exports.handler = async (event, context) => {
     
     // Send moderation email
     try {
+      // Create a simple token for moderation links
+      const moderationToken = Buffer.from(`${memory._id}:${process.env.EMAIL_USER}`).toString('base64');
+      const baseUrl = process.env.REACT_APP_API_URL || 'https://community-mass-mems.onrender.com';
+      
+      const approveUrl = `${baseUrl}/.netlify/functions/moderate-memory`;
+      const rejectUrl = `${baseUrl}/.netlify/functions/moderate-memory`;
+
       await transporter.sendMail({
-        from: process.env.SENDER_EMAIL,
-        to: process.env.SENDER_EMAIL, // Send to same email for moderation
+        from: process.env.EMAIL_USER,
+        to: process.env.EMAIL_USER,
         subject: 'New Text Memory Submission for Review',
         text: `New text memory submitted for review:
-        
+
 Content: ${content}
+Title: ${memory.metadata.title || 'No title'}
 Submitted at: ${new Date().toLocaleString()}
 
-Please review this submission.`
+To moderate this submission, click one of these links:
+
+APPROVE: ${approveUrl}?action=approve&memoryId=${memory._id}&token=${moderationToken}
+
+REJECT: ${rejectUrl}?action=reject&memoryId=${memory._id}&token=${moderationToken}`,
+        html: `
+          <h2>New text memory submitted for review</h2>
+          <p><strong>Content:</strong> ${content}</p>
+          <p><strong>Title:</strong> ${memory.metadata.title || 'No title'}</p>
+          <p><strong>Submitted at:</strong> ${new Date().toLocaleString()}</p>
+          <div style="margin-top: 20px;">
+            <a href="${approveUrl}?action=approve&memoryId=${memory._id}&token=${moderationToken}" 
+               style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; margin-right: 10px; border-radius: 5px;">
+              Approve
+            </a>
+            <a href="${rejectUrl}?action=reject&memoryId=${memory._id}&token=${moderationToken}" 
+               style="background-color: #f44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+              Reject
+            </a>
+          </div>
+        `
       });
     } catch (emailError) {
       console.error('Error sending moderation email:', emailError);
