@@ -1,11 +1,17 @@
 [build]
-  base = ""
-  command = "npm install --verbose && CI=false npm run build"
+  base = "community-mass-mems"
+  command = """
+    npm config set legacy-peer-deps=true &&
+    npm ci --prefer-offline &&
+    CI=false npm run build
+  """
   publish = "build"
 
 [build.environment]
   NODE_VERSION = "18.17.0"
   NPM_VERSION = "9.6.7"
+  CI = "false"
+  NODE_ENV = "production"
 
 [functions]
   directory = "netlify/functions"
