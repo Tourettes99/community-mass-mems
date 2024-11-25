@@ -46,13 +46,17 @@ const formatMemory = (memory) => {
         ...memory.metadata,
         createdAt: formatDate(memory.createdAt),
         updatedAt: formatDate(memory.updatedAt)
+      },
+      votes: {
+        up: memory.votes?.up || 0,
+        down: memory.votes?.down || 0
       }
     };
     delete formatted.__v;
     return formatted;
   } catch (error) {
     console.error('Error formatting memory:', error);
-    return memory;
+    return null;
   }
 };
 
