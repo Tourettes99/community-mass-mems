@@ -75,10 +75,13 @@
                     throw new Error('Missing required parameters');
                 }
 
+                console.log('Sending moderation request:', { action, memoryId, token });
+
                 const response = await fetch('/.netlify/functions/moderate-memory', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         action: action,
@@ -87,7 +90,9 @@
                     })
                 });
 
+                console.log('Response status:', response.status);
                 const result = await response.json();
+                console.log('Response data:', result);
                 
                 if (response.ok) {
                     updateMessage(`Memory successfully ${action}ed!`, false, true);
@@ -95,6 +100,7 @@
                     updateMessage(`Error: ${result.error || 'Failed to process moderation'}`, true);
                 }
             } catch (error) {
+                console.error('Moderation error:', error);
                 updateMessage(error.message || 'Error: Failed to connect to the server', true);
             }
             document.querySelector('.spinner').style.display = 'none';
