@@ -1,29 +1,80 @@
 import React, { useEffect, useCallback } from 'react';
+import { convertToOrange } from '../utils/colorUtils';
 
 const EMBED_SCRIPTS = {
   twitter: {
     src: 'https://platform.twitter.com/widgets.js',
-    process: () => window.twttr?.widgets?.load(),
+    process: () => {
+      window.twttr?.widgets?.load();
+      // Convert Twitter icons to orange
+      document.querySelectorAll('.twitter-tweet svg').forEach(async (svg) => {
+        const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
+        const orangeUrl = await convertToOrange(svgUrl);
+        const img = document.createElement('img');
+        img.src = orangeUrl;
+        svg.parentNode.replaceChild(img, svg);
+      });
+    },
     selector: '.twitter-tweet'
   },
   instagram: {
     src: 'https://www.instagram.com/embed.js',
-    process: () => window.instgrm?.Embeds?.process(),
+    process: () => {
+      window.instgrm?.Embeds?.process();
+      // Convert Instagram icons to orange
+      document.querySelectorAll('.instagram-media svg').forEach(async (svg) => {
+        const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
+        const orangeUrl = await convertToOrange(svgUrl);
+        const img = document.createElement('img');
+        img.src = orangeUrl;
+        svg.parentNode.replaceChild(img, svg);
+      });
+    },
     selector: '.instagram-media'
   },
   facebook: {
     src: 'https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v12.0',
-    process: () => window.FB?.XFBML?.parse(),
+    process: () => {
+      window.FB?.XFBML?.parse();
+      // Convert Facebook icons to orange
+      document.querySelectorAll('.fb-post svg').forEach(async (svg) => {
+        const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
+        const orangeUrl = await convertToOrange(svgUrl);
+        const img = document.createElement('img');
+        img.src = orangeUrl;
+        svg.parentNode.replaceChild(img, svg);
+      });
+    },
     selector: '.fb-post'
   },
   tiktok: {
     src: 'https://www.tiktok.com/embed.js',
-    process: () => {}, // TikTok handles its own processing
+    process: () => {
+      // TikTok handles its own processing
+      // Convert TikTok icons to orange
+      document.querySelectorAll('.tiktok-embed svg').forEach(async (svg) => {
+        const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
+        const orangeUrl = await convertToOrange(svgUrl);
+        const img = document.createElement('img');
+        img.src = orangeUrl;
+        svg.parentNode.replaceChild(img, svg);
+      });
+    },
     selector: '.tiktok-embed'
   },
   pinterest: {
     src: 'https://assets.pinterest.com/js/pinit.js',
-    process: () => {}, // Pinterest handles its own processing
+    process: () => {
+      // Pinterest handles its own processing
+      // Convert Pinterest icons to orange
+      document.querySelectorAll('[data-pin-do] svg').forEach(async (svg) => {
+        const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.outerHTML)}`;
+        const orangeUrl = await convertToOrange(svgUrl);
+        const img = document.createElement('img');
+        img.src = orangeUrl;
+        svg.parentNode.replaceChild(img, svg);
+      });
+    },
     selector: '[data-pin-do]'
   }
 };
@@ -48,7 +99,12 @@ const SocialScripts = () => {
           script.nonce = nonce;
         }
 
-        script.onload = resolve;
+        script.onload = () => {
+          // Add a small delay to ensure the social media widgets are fully initialized
+          setTimeout(() => {
+            resolve();
+          }, 100);
+        };
         script.onerror = () => reject(new Error(`Failed to load ${key} script`));
         document.body.appendChild(script);
       });
@@ -71,11 +127,10 @@ const SocialScripts = () => {
   useEffect(() => {
     const loadAllScripts = async () => {
       try {
-        await Promise.all(
-          Object.entries(EMBED_SCRIPTS).map(([key, config]) => 
-            loadScript(config, key)
-          )
-        );
+        // Load scripts sequentially to ensure proper initialization
+        for (const [key, config] of Object.entries(EMBED_SCRIPTS)) {
+          await loadScript(config, key);
+        }
         processEmbeds();
       } catch (error) {
         console.error('Error loading social scripts:', error);
