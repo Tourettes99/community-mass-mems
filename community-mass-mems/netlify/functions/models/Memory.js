@@ -22,6 +22,17 @@ const memorySchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  status: {
+    type: String,
+    required: true,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
+  },
+  submittedAt: {
+    type: Date,
+    required: true,
+    default: Date.now
+  },
   metadata: {
     title: String,
     description: String,
@@ -39,7 +50,16 @@ const memorySchema = new mongoose.Schema({
     updatedAt: {
       type: Date,
       default: Date.now
-    }
+    },
+    favicon: String,
+    ogTitle: String,
+    ogDescription: String,
+    ogImage: String,
+    ogType: String,
+    twitterTitle: String,
+    twitterDescription: String,
+    twitterImage: String,
+    twitterCard: String
   },
   votes: {
     up: {

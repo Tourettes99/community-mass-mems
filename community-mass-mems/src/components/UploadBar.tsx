@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -14,10 +14,14 @@ import {
   DialogContent,
   DialogActions,
   useTheme,
+  LinearProgress,
+  Typography,
+  Alert,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import { RAL_2005 } from '../theme';
+import { WeeklyStats } from '../types/Memory';
 
 interface UploadBarProps {
   onUpload: (type: string, content: string, tags: string[]) => Promise<void>;
@@ -30,6 +34,30 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>({
+    postsThisWeek: 0,
+    weeklyLimit: 35,
+    nextReset: '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchWeeklyStats();
+    const interval = setInterval(fetchWeeklyStats, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchWeeklyStats = async () => {
+    try {
+      const response = await fetch('/.netlify/functions/get-weekly-stats');
+      if (response.ok) {
+        const stats = await response.json();
+        setWeeklyStats(stats);
+      }
+    } catch (error) {
+      console.error('Error fetching weekly stats:', error);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!content) {
@@ -37,14 +65,27 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
       return;
     }
 
+    if (weeklyStats.postsThisWeek >= weeklyStats.weeklyLimit) {
+      setError('Weekly post limit reached. Please try again after Sunday reset.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
       const type = content.startsWith('http') ? 'url' : 'text';
       await onUpload(type, content, tags);
       setContent('');
       setTags([]);
       setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload memory');
+      // Show success message
+      alert('Your post has been submitted for moderation. It will be reviewed within 3 days.');
+      fetchWeeklyStats(); // Refresh stats after successful upload
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to upload memory');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -75,6 +116,9 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
     }
   };
 
+  const progressPercentage = (weeklyStats.postsThisWeek / weeklyStats.weeklyLimit) * 100;
+  const remainingPosts = weeklyStats.weeklyLimit - weeklyStats.postsThisWeek;
+
   return (
     <AppBar 
       position="static" 
@@ -89,6 +133,33 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
       }}
     >
       <Toolbar sx={{ flexWrap: 'wrap', gap: 2, py: 2 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1 }}>
+            Weekly Community Posts
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <LinearProgress 
+              variant="determinate" 
+              value={progressPercentage}
+              sx={{
+                height: 10,
+                borderRadius: 5,
+                flexGrow: 1,
+                mr: 2,
+                backgroundColor: 'rgba(255, 87, 34, 0.1)',
+                '& .MuiLinearProgress-bar': {
+                  backgroundColor: '#ff5722', // RAL 2005 bright orange
+                }
+              }}
+            />
+            <Typography variant="body2" color="textSecondary">
+              {weeklyStats.postsThisWeek}/{weeklyStats.weeklyLimit}
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            {remainingPosts} posts remaining this week • Resets {weeklyStats.nextReset}
+          </Typography>
+        </Box>
         <TextField
           fullWidth
           placeholder="Enter URL or text..."
@@ -97,6 +168,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
           onKeyPress={handleKeyPress}
           error={!!error}
           helperText={error}
+          disabled={loading || weeklyStats.postsThisWeek >= weeklyStats.weeklyLimit}
           sx={{ 
             flexGrow: 1,
             '& .MuiOutlinedInput-root': {
@@ -130,6 +202,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
           <Button
             variant="contained"
             onClick={handleSubmit}
+            disabled={loading || !content.trim() || weeklyStats.postsThisWeek >= weeklyStats.weeklyLimit}
             sx={{
               backgroundColor: RAL_2005,
               color: '#ffffff',
@@ -261,6 +334,14 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
           <Button onClick={() => setIsTagDialogOpen(false)}>Done</Button>
         </DialogActions>
       </Dialog>
+
+      {error && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {loading && <LinearProgress sx={{ mt: 2 }} />}
     </AppBar>
   );
 };

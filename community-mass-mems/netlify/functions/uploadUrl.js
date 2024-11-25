@@ -3,6 +3,16 @@ const mongoose = require('mongoose');
 const Memory = require('./models/Memory');
 const unfurl = require('unfurl.js');
 const fetch = require('node-fetch');
+const nodemailer = require('nodemailer');
+
+// Create transporter for sending emails
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.MODERATOR_EMAIL,
+    pass: process.env.MODERATOR_EMAIL_PASSWORD
+  }
+});
 
 // Media file extensions
 const MEDIA_EXTENSIONS = {
@@ -193,20 +203,16 @@ const getUrlMetadata = async (urlString) => {
 };
 
 exports.handler = async (event, context) => {
-  context.callbackWaitsForEmptyEventLoop = false;
-
   const headers = {
-    'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    'Content-Type': 'application/json'
   };
 
   if (event.httpMethod === 'OPTIONS') {
     return {
-      statusCode: 204,
-      headers,
-      body: ''
+      statusCode: 200,
+      headers
     };
   }
 
@@ -214,78 +220,90 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ message: 'Method Not Allowed' })
+      body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
 
   try {
-    const { type, url, content, tags = [] } = JSON.parse(event.body);
-
-    // Validate input
-    if (type === 'url' && !url) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ message: 'URL is required for url type memories' })
-      };
-    }
-
-    if (type === 'text' && !content) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ message: 'Content is required for text type memories' })
-      };
-    }
-
-    if (type === 'url' && !validateUrl(url)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ message: 'Invalid URL format' })
-      };
-    }
-
-    // Connect to database
+    const { url } = JSON.parse(event.body);
     await connectDb();
 
-    // Create memory object
-    const memoryData = {
-      type,
-      url: type === 'url' ? url : undefined,
-      content: type === 'text' ? content : undefined,
-      tags: Array.isArray(tags) ? tags : [],
-      metadata: type === 'url' ? await getUrlMetadata(url) : {
-        type: 'text',
-        title: content?.slice(0, 50) + (content?.length > 50 ? '...' : ''),
-        description: content,
-        createdAt: formatDate(new Date()),
-        updatedAt: formatDate(new Date())
-      },
-      votes: {
-        up: 0,
-        down: 0
+    // Check weekly post limit
+    const startOfWeek = new Date();
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Set to Sunday
+
+    const postsThisWeek = await Memory.countDocuments({
+      submittedAt: { $gte: startOfWeek.toISOString() }
+    });
+
+    if (postsThisWeek >= 35) {
+      return {
+        statusCode: 429,
+        headers,
+        body: JSON.stringify({ error: 'Weekly post limit reached' })
+      };
+    }
+
+    // Extract metadata
+    const metadata = await unfurl(url);
+    
+    // Create new memory
+    const memory = new Memory({
+      type: 'url',
+      url,
+      status: 'pending',
+      submittedAt: new Date(),
+      metadata: {
+        title: metadata.title,
+        description: metadata.description,
+        thumbnailUrl: metadata.open_graph?.images?.[0]?.url || metadata.twitter_card?.images?.[0]?.url,
+        favicon: metadata.favicon,
+        ogTitle: metadata.open_graph?.title,
+        ogDescription: metadata.open_graph?.description,
+        ogImage: metadata.open_graph?.images?.[0]?.url,
+        ogType: metadata.open_graph?.type,
+        twitterTitle: metadata.twitter_card?.title,
+        twitterDescription: metadata.twitter_card?.description,
+        twitterImage: metadata.twitter_card?.images?.[0]?.url,
+        twitterCard: metadata.twitter_card?.card,
+        createdAt: new Date()
       }
+    });
+
+    await memory.save();
+
+    // Send moderation email
+    const mailOptions = {
+      from: process.env.MODERATOR_EMAIL,
+      to: process.env.MODERATOR_EMAIL,
+      subject: 'New Memory Submission for Moderation',
+      html: `
+        <h2>New Memory Submission</h2>
+        <p><strong>URL:</strong> ${url}</p>
+        <p><strong>Title:</strong> ${metadata.title || 'No title'}</p>
+        <p><strong>Description:</strong> ${metadata.description || 'No description'}</p>
+        <p><strong>Submitted:</strong> ${new Date().toLocaleString()}</p>
+        <p>Please review within 3 days.</p>
+      `
     };
 
-    const memory = new Memory(memoryData);
-    await memory.save();
+    await transporter.sendMail(mailOptions);
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(memory)
+      body: JSON.stringify({
+        message: 'Memory submitted for moderation',
+        id: memory._id
+      })
     };
   } catch (error) {
-    console.error('Error in uploadUrl:', error);
-
+    console.error('Error uploading URL:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        message: 'Error uploading memory',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      })
+      body: JSON.stringify({ error: 'Failed to upload URL' })
     };
   }
 };
