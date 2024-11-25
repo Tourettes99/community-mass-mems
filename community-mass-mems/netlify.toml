@@ -1,9 +1,5 @@
 [build]
-  command = """
-    npm config set legacy-peer-deps=true &&
-    npm ci --prefer-offline &&
-    CI=false npm run build
-  """
+  command = "chmod +x build.sh && ./build.sh"
   publish = "build"
 
 [build.environment]
@@ -11,6 +7,7 @@
   NPM_VERSION = "9.6.7"
   CI = "false"
   NODE_ENV = "production"
+  NETLIFY = "true"
 
 [functions]
   directory = "netlify/functions"
