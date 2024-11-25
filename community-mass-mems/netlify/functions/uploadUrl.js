@@ -292,11 +292,21 @@ exports.handler = async (event, context) => {
     // Create memory document
     const memory = new Memory({
       url,
-      title: metadata.title || url,
-      description: metadata.description,
       type: metadata.type,
-      thumbnail: metadata.thumbnail,
-      createdAt: new Date()
+      status: 'pending', // Set status to pending
+      metadata: {
+        title: metadata.title || url,
+        description: metadata.description,
+        thumbnailUrl: metadata.thumbnail,
+        mediaType: metadata.type,
+        platform: metadata.platform,
+        contentUrl: metadata.contentUrl,
+        fileType: metadata.fileType,
+        domain: metadata.domain,
+        isSecure: metadata.isSecure,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
     });
 
     // Save to database
@@ -315,16 +325,17 @@ exports.handler = async (event, context) => {
     try {
       await transporter.sendMail({
         from: process.env.SENDER_EMAIL,
-        to: 'rabbitr18450@gmail.com',
-        subject: 'New Memory Submission for Review',
+        to: process.env.SENDER_EMAIL, // Send to same email for moderation
+        subject: 'New URL Memory Submission for Review',
         text: `New memory submitted for review:
         
 URL: ${url}
 Title: ${metadata.title || 'No title'}
 Description: ${metadata.description || 'No description'}
+Type: ${metadata.type}
 Submitted at: ${new Date().toLocaleString()}
 
-Please review this submission.`
+Please review this submission at your moderation dashboard.`
       });
     } catch (error) {
       console.error('Email error:', error);
@@ -335,14 +346,15 @@ Please review this submission.`
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        message: 'URL submitted successfully',
+        message: 'Memory submitted for moderation',
         memory: {
           id: memory._id,
           url,
           title: metadata.title,
           description: metadata.description,
           type: metadata.type,
-          thumbnail: metadata.thumbnail
+          thumbnail: metadata.thumbnail,
+          status: 'pending'
         }
       })
     };

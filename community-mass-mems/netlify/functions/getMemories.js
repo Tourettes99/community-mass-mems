@@ -99,7 +99,8 @@ exports.handler = async (event, context) => {
     // Fetch memories with proper error handling
     let memories;
     try {
-      memories = await Memory.find()
+      // Only fetch approved memories
+      memories = await Memory.find({ status: 'approved' })
         .sort({ createdAt: -1 })
         .lean()
         .exec();
@@ -107,7 +108,7 @@ exports.handler = async (event, context) => {
       // Format memories to ensure proper date handling
       memories = memories.map(formatMemory).filter(Boolean);
       
-      console.log(`Successfully fetched ${memories.length} memories`);
+      console.log(`Successfully fetched ${memories.length} approved memories`);
     } catch (dbError) {
       console.error('Database query error:', dbError);
       throw new Error(`Database query failed: ${dbError.message}`);
