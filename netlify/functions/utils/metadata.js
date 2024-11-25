@@ -25,7 +25,8 @@ async function extractUrlMetadata(url) {
         description: 'Direct image link',
         siteName: new URL(url).hostname,
         mediaType: 'image',
-        image: url,
+        previewUrl: url,
+        previewType: 'image',
         contentType: type?.mime || 'image/jpeg',
         url: url
       };
@@ -44,8 +45,9 @@ async function extractUrlMetadata(url) {
         description: result.description,
         siteName: 'YouTube',
         mediaType: 'video',
-        image: result.open_graph?.images?.[0]?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-        playbackHtml: `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+        previewUrl: result.open_graph?.images?.[0]?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        previewType: 'image',
+        embedHtml: `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
       };
     }
 
@@ -58,8 +60,9 @@ async function extractUrlMetadata(url) {
           description: result.description,
           siteName: 'Twitter',
           mediaType: 'social',
-          image: result.open_graph?.images?.[0]?.url,
-          playbackHtml: `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`
+          previewUrl: result.open_graph?.images?.[0]?.url,
+          previewType: 'image',
+          embedHtml: `<blockquote class="twitter-tweet"><a href="${url}"></a></blockquote>`
         };
       }
     }
@@ -73,8 +76,40 @@ async function extractUrlMetadata(url) {
           description: result.description,
           siteName: 'Instagram',
           mediaType: 'social',
-          image: result.open_graph?.images?.[0]?.url,
-          playbackHtml: `<blockquote class="instagram-media" data-instgrm-permalink="${url}"><a href="${url}"></a></blockquote><script async src="//www.instagram.com/embed.js"></script>`
+          previewUrl: result.open_graph?.images?.[0]?.url,
+          previewType: 'image',
+          embedHtml: `<blockquote class="instagram-media" data-instgrm-permalink="${url}"><a href="${url}"></a></blockquote>`
+        };
+      }
+    }
+
+    // Handle Facebook embeds
+    if (url.includes('facebook.com')) {
+      return {
+        title: result.title,
+        description: result.description,
+        siteName: 'Facebook',
+        mediaType: 'social',
+        previewUrl: result.open_graph?.images?.[0]?.url,
+        previewType: 'image',
+        embedHtml: `<div class="fb-post" data-href="${url}"></div>`
+      };
+    }
+
+    // Handle TikTok embeds
+    if (url.includes('tiktok.com')) {
+      const videoId = url.split('/video/')?.pop()?.split('?')[0];
+      if (videoId) {
+        return {
+          title: result.title,
+          description: result.description,
+          siteName: 'TikTok',
+          mediaType: 'social',
+          previewUrl: result.open_graph?.images?.[0]?.url,
+          previewType: 'image',
+          embedHtml: `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${videoId}">
+            <section><a target="_blank" href="${url}"></a></section>
+          </blockquote>`
         };
       }
     }
@@ -85,7 +120,8 @@ async function extractUrlMetadata(url) {
       description: result.description || 'No description available',
       siteName: result.site_name || new URL(url).hostname,
       mediaType: 'url',
-      image: result.open_graph?.images?.[0]?.url || result.favicon,
+      previewUrl: result.open_graph?.images?.[0]?.url || result.favicon,
+      previewType: 'image',
       url: result.url || url
     };
   } catch (error) {
@@ -94,12 +130,14 @@ async function extractUrlMetadata(url) {
     // Attempt to provide basic metadata even if unfurl fails
     try {
       const urlObj = new URL(url);
+      const isImage = await isImageUrl(url);
       return {
         title: url.split('/').pop() || url,
         description: 'No description available',
         siteName: urlObj.hostname,
-        mediaType: await isImageUrl(url) ? 'image' : 'url',
-        image: await isImageUrl(url) ? url : null,
+        mediaType: isImage ? 'image' : 'url',
+        previewUrl: isImage ? url : null,
+        previewType: isImage ? 'image' : null,
         url: url
       };
     } catch (e) {
@@ -132,6 +170,7 @@ async function extractFileMetadata(buffer, filename) {
       return {
         ...baseMetadata,
         mediaType: 'image',
+        previewType: 'image',
         dimensions: {
           width: dimensions.width,
           height: dimensions.height
@@ -141,11 +180,10 @@ async function extractFileMetadata(buffer, filename) {
     }
 
     if (type?.mime.startsWith('video/')) {
-      // For video files, we could use ffprobe to get more metadata
-      // but for now we'll return basic info
       return {
         ...baseMetadata,
         mediaType: 'video',
+        previewType: 'video',
         format: type.ext
       };
     }
@@ -154,6 +192,7 @@ async function extractFileMetadata(buffer, filename) {
       return {
         ...baseMetadata,
         mediaType: 'audio',
+        previewType: 'audio',
         format: type.ext
       };
     }
@@ -161,6 +200,7 @@ async function extractFileMetadata(buffer, filename) {
     return {
       ...baseMetadata,
       mediaType: 'static',
+      previewType: 'file',
       format: type?.ext || filename.split('.').pop()
     };
   } catch (error) {
@@ -168,6 +208,7 @@ async function extractFileMetadata(buffer, filename) {
     return {
       fileName: filename,
       mediaType: 'static',
+      previewType: 'file',
       size: {
         original: buffer.length
       }
