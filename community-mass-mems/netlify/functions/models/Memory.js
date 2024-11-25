@@ -66,6 +66,9 @@ const memorySchema = new mongoose.Schema({
         ret.metadata.createdAt = ret.metadata.createdAt ? new Date(ret.metadata.createdAt).toISOString() : null;
         ret.metadata.updatedAt = ret.metadata.updatedAt ? new Date(ret.metadata.updatedAt).toISOString() : null;
       }
+      // Transform _id to id
+      ret.id = ret._id.toString();
+      delete ret._id;
       // Remove MongoDB-specific fields
       delete ret.__v;
       return ret;

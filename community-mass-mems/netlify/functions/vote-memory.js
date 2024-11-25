@@ -19,15 +19,18 @@ const connectDb = async () => {
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
+      headers,
       body: ''
     };
   }
@@ -35,86 +38,107 @@ exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: {
-        'Allow': 'POST',
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
+      headers: { ...headers, 'Allow': 'POST' },
       body: JSON.stringify({ message: 'Method Not Allowed' })
     };
   }
 
   try {
-    const { memoryId, vote } = JSON.parse(event.body);
+    const { memoryId, voteType, userId } = JSON.parse(event.body);
 
     // Validate input
-    if (!memoryId) {
+    if (!memoryId || !userId) {
       return {
         statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({ message: 'Memory ID is required' })
+        headers,
+        body: JSON.stringify({ message: 'Memory ID and User ID are required' })
       };
     }
 
-    if (![1, -1].includes(vote)) {
+    if (!['up', 'down'].includes(voteType)) {
       return {
         statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({ message: 'Vote must be either 1 or -1' })
+        headers,
+        body: JSON.stringify({ message: 'Vote type must be either "up" or "down"' })
       };
     }
 
     await connectDb();
 
-    // Find and update the memory
-    const memory = await Memory.findByIdAndUpdate(
+    // Find the memory first
+    const memory = await Memory.findById(memoryId);
+    if (!memory) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ message: 'Memory not found' })
+      };
+    }
+
+    // Initialize votes and userVotes if they don't exist
+    if (!memory.votes) {
+      memory.votes = { up: 0, down: 0 };
+    }
+    if (!memory.userVotes) {
+      memory.userVotes = new Map();
+    }
+
+    // Get current user's vote
+    const currentVote = memory.userVotes.get(userId);
+    let updateQuery = {};
+
+    if (!currentVote) {
+      // New vote
+      updateQuery = {
+        $inc: { [`votes.${voteType}`]: 1 },
+        $set: { [`userVotes.${userId}`]: voteType }
+      };
+    } else if (currentVote === voteType) {
+      // Undo vote
+      updateQuery = {
+        $inc: { [`votes.${voteType}`]: -1 },
+        $unset: { [`userVotes.${userId}`]: "" }
+      };
+    } else {
+      // Change vote (e.g., from up to down)
+      updateQuery = {
+        $inc: {
+          [`votes.${currentVote}`]: -1,
+          [`votes.${voteType}`]: 1
+        },
+        $set: { [`userVotes.${userId}`]: voteType }
+      };
+    }
+
+    // Update the memory with the new vote
+    const updatedMemory = await Memory.findByIdAndUpdate(
       memoryId,
-      { $inc: { votes: vote } },
+      updateQuery,
       { 
         new: true,
         runValidators: true
       }
     );
 
-    if (!memory) {
-      return {
-        statusCode: 404,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({ message: 'Memory not found' })
-      };
-    }
-
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
+      headers,
       body: JSON.stringify({
         message: 'Vote recorded successfully',
-        memory
+        votes: updatedMemory.votes,
+        userVote: updatedMemory.userVotes.get(userId) || null
       })
     };
+
   } catch (error) {
-    console.error('Error voting on memory:', error);
+    console.error('Error in vote function:', error);
+    
     return {
-      statusCode: error.name === 'CastError' ? 400 : 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({ 
-        message: error.name === 'CastError' ? 'Invalid Memory ID format' : 'Error voting on memory',
-        error: error.message
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        message: 'Internal server error while recording vote',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };
   }
