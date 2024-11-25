@@ -31,5 +31,5 @@ export interface Memory {
     up: number;
     down: number;
   };
-  userVotes?: Map<string, string>;
+  userVotes: Map<string, string>;
 }
