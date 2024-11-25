@@ -48,16 +48,71 @@ function formatMemory(memory, index) {
   }
 
   if (memory.url) {
+    lines.push('║');
     lines.push(`║ URL: ${memory.url}`);
-    if (memory.metadata?.type === 'image') {
-      lines.push('║ Type: Image from URL');
-    } else if (memory.metadata?.type === 'webpage') {
-      lines.push('║ Type: Web Page');
+    
+    // Show URL metadata
+    if (memory.metadata) {
+      lines.push('║');
+      lines.push('║ URL METADATA:');
+      lines.push('║ ' + '─'.repeat(30));
+
+      if (memory.metadata.type) {
+        lines.push(`║   Type: ${memory.metadata.type}`);
+      }
+
+      if (memory.metadata.image) {
+        lines.push(`║   Image: ${memory.metadata.image}`);
+      }
+
+      if (memory.metadata.description) {
+        lines.push('║   Description:');
+        // Wrap description text
+        const descLines = memory.metadata.description.match(/.{1,45}/g) || [''];
+        descLines.forEach(line => {
+          lines.push(`║     ${line}`);
+        });
+      }
+
+      // Additional OpenGraph metadata if available
+      if (memory.metadata.ogTitle && memory.metadata.ogTitle !== memory.metadata.title) {
+        lines.push(`║   OG Title: ${memory.metadata.ogTitle}`);
+      }
+
+      if (memory.metadata.ogDescription && memory.metadata.ogDescription !== memory.metadata.description) {
+        lines.push('║   OG Description:');
+        const ogDescLines = memory.metadata.ogDescription.match(/.{1,45}/g) || [''];
+        ogDescLines.forEach(line => {
+          lines.push(`║     ${line}`);
+        });
+      }
+
+      if (memory.metadata.ogImage && memory.metadata.ogImage !== memory.metadata.image) {
+        lines.push(`║   OG Image: ${memory.metadata.ogImage}`);
+      }
+
+      if (memory.metadata.siteName) {
+        lines.push(`║   Site Name: ${memory.metadata.siteName}`);
+      }
+
+      // Show any additional metadata fields
+      const skipFields = ['type', 'image', 'description', 'ogTitle', 'ogDescription', 'ogImage', 'siteName', 'title'];
+      Object.entries(memory.metadata).forEach(([key, value]) => {
+        if (!skipFields.includes(key) && value) {
+          if (typeof value === 'string') {
+            lines.push(`║   ${key}: ${value}`);
+          } else if (typeof value === 'object' && value !== null) {
+            lines.push(`║   ${key}: ${JSON.stringify(value)}`);
+          }
+        }
+      });
     }
   }
 
   if (memory.content) {
-    lines.push('║ Content:');
+    lines.push('║');
+    lines.push('║ CONTENT:');
+    lines.push('║ ' + '─'.repeat(30));
     // Split content into lines and wrap them
     const contentLines = memory.content.split('\n');
     contentLines.forEach(line => {
@@ -67,11 +122,6 @@ function formatMemory(memory, index) {
         lines.push(`║   ${wrapped}`);
       });
     });
-  }
-
-  if (memory.metadata?.description) {
-    lines.push('║');
-    lines.push(`║ Description: ${memory.metadata.description}`);
   }
 
   lines.push('╚════════════════════════════════════════════════════════════');
