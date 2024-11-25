@@ -17,6 +17,15 @@ export interface Memory {
     isSecure?: boolean;
     createdAt?: string;
     updatedAt?: string;
+    favicon?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    ogImage?: string;
+    ogType?: string;
+    twitterTitle?: string;
+    twitterDescription?: string;
+    twitterImage?: string;
+    twitterCard?: string;
   };
   votes: {
     up: number;
