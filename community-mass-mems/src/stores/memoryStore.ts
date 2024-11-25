@@ -39,13 +39,19 @@ const useMemoryStore = create<MemoryStore>()((set) => ({
     )
   })),
   
-  updateMemory: (updatedMemory) => set((state) => ({
-    memories: state.memories.map((memory) => 
-      (memory.id === updatedMemory.id || memory._id === updatedMemory._id) ? updatedMemory : memory
-    ).sort((a, b) => 
-      getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
-    )
-  })),
+  updateMemory: (updatedMemory) => set((state) => {
+    const newMemories = state.memories.map((memory) => 
+      (memory.id === updatedMemory.id || memory._id === updatedMemory._id) 
+        ? { ...memory, ...updatedMemory }
+        : memory
+    );
+    
+    return {
+      memories: newMemories.sort((a, b) => 
+        getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
+      )
+    };
+  }),
 
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error })

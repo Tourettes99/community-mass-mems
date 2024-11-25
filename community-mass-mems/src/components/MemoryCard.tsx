@@ -72,7 +72,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         throw new Error(error.message || 'Failed to vote');
       }
 
-      const { votes, userVote } = await response.json();
+      const result = await response.json();
+      const { votes, userVote } = result;
       
       if (userVote) {
         localStorage.setItem(`vote_${memory.id || memory._id}`, userVote);
@@ -82,11 +83,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       
       setUserVote(userVote);
       
-      // Create updated memory with new votes
-      const updatedMemory = {
+      // Create updated memory with new votes while preserving all other properties
+      const updatedMemory: Memory = {
         ...memory,
-        votes,
-        userVotes: memory.userVotes instanceof Map ? memory.userVotes : new Map()
+        votes: { ...votes },
+        userVotes: new Map(memory.userVotes || [])
       };
 
       // Update the userVotes map
@@ -96,6 +97,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         updatedMemory.userVotes.delete(userId);
       }
 
+      // Update the memory in the store
       updateMemory(updatedMemory);
     } catch (error) {
       console.error('Error voting:', error);
