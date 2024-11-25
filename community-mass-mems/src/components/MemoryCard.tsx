@@ -6,6 +6,7 @@ import {
   Box,
   Chip,
   IconButton,
+  CardActions,
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
