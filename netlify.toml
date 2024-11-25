@@ -15,14 +15,9 @@ publish = "build"
 functions = "netlify/functions"
 
 [build.environment]
-NODE_VERSION = "18.16.0"
+NODE_VERSION = "18.17.0"
 NODE_ENV = "production"
 CI = "false"
-
-[[redirects]]
-from = "/.netlify/functions/*"
-to = "/.netlify/functions/:splat"
-status = 200
 
 [[redirects]]
 from = "/api/*"
@@ -49,91 +44,28 @@ Content-Security-Policy = """
     https://platform.twitter.com
     https://syndication.twitter.com
     https://www.instagram.com
-    https://www.tiktok.com
     https://player.vimeo.com
-    https://www.pinterest.com;
+    https://w.soundcloud.com
+    https://open.spotify.com;
+  style-src 'self' 'unsafe-inline';
+  script-src 'self' 'unsafe-inline' 'unsafe-eval'
+    https://www.youtube.com
+    https://s.ytimg.com
+    https://platform.twitter.com
+    https://cdn.syndication.twimg.com;
   connect-src 'self' 
-    https://*.facebook.com 
-    https://*.fbcdn.net
     https://api.twitter.com
     https://syndication.twitter.com
-    https://cdn.syndication.twimg.com
-    https://api.instagram.com
-    https://graph.instagram.com
-    https://api.tiktok.com
-    https://www.tiktok.com
-    https://api.pinterest.com
+    https://platform.twitter.com
+    https://vimeo.com
     https://api.vimeo.com
-    http: https:;
-  style-src 'self' 'unsafe-inline' 
-    https://platform.twitter.com
-    https://ton.twimg.com
-    https://www.tiktok.com
-    https://www.instagram.com
-    https://www.facebook.com
-    https:;
-  script-src 'self' 'unsafe-inline' 'unsafe-eval'
-    https://connect.facebook.net
-    https://platform.twitter.com
-    https://www.instagram.com
-    https://www.tiktok.com
-    https://assets.pinterest.com
-    https://player.vimeo.com
-    https:;
-  font-src 'self' data: https:;
-  worker-src 'self' blob:;
+    https://w.soundcloud.com
+    https://api.soundcloud.com
+    https://open.spotify.com
+    https://api.spotify.com
+    data: blob: http: https:;
 """
 X-Frame-Options = "DENY"
 X-Content-Type-Options = "nosniff"
 Referrer-Policy = "strict-origin-when-cross-origin"
 Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-
-[[headers]]
-for = "/*.jpg"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.jpeg"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.png"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.gif"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.webp"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.svg"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.ico"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.js"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.css"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-
-[[headers]]
-for = "/*.woff2"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
