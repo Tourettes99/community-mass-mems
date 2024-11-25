@@ -19,12 +19,10 @@ if (process.env.SENDGRID_API_KEY) {
 
 // Create transporter for sending emails
 const transporter = nodemailer.createTransport({
-  host: "smtp-mail.outlook.com",
-  port: 587,
-  secure: false,
+  service: 'gmail',  // Use Gmail service
   auth: {
-    user: process.env.SENDER_EMAIL,
-    pass: process.env.SENDER_PASSWORD
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
   }
 });
 
@@ -324,8 +322,8 @@ exports.handler = async (event, context) => {
     // Send notification email
     try {
       await transporter.sendMail({
-        from: process.env.SENDER_EMAIL,
-        to: process.env.SENDER_EMAIL, // Send to same email for moderation
+        from: process.env.EMAIL_USER,
+        to: process.env.EMAIL_USER, // Send to same email for moderation
         subject: 'New URL Memory Submission for Review',
         text: `New memory submitted for review:
         
