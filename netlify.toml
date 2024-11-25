@@ -2,7 +2,7 @@
 external_node_modules = ["sharp", "fluent-ffmpeg", "mongodb-client-encryption", "bson", "aws4", "mongoose", "file-type", "image-size", "unfurl.js", "page-metadata-parser", "domino", "node-fetch", "busboy", "cors", "dotenv", "express", "path"]
 included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
 node_bundler = "esbuild"
-directory = "netlify/functions"
+directory = "community-mass-mems/netlify/functions"
 
 [functions."*"]
 timeout = 30
@@ -10,9 +10,9 @@ memory = 1024
 
 [build]
 base = "community-mass-mems"
-command = "npm run build"
-publish = "build"
-functions = "netlify/functions"
+command = "npm install && CI=false npm run build"
+publish = "community-mass-mems/build"
+functions = "community-mass-mems/netlify/functions"
 
 [build.environment]
 NODE_VERSION = "18.16.0"
@@ -114,30 +114,26 @@ for = "/*.webp"
 Cache-Control = "public, max-age=31536000"
 
 [[headers]]
-for = "/*.mp4"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-Content-Type = "video/mp4"
-
-[[headers]]
-for = "/*.webm"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-Content-Type = "video/webm"
-
-[[headers]]
-for = "/*.mp3"
-[headers.values]
-Cache-Control = "public, max-age=31536000"
-Content-Type = "audio/mpeg"
-
-[[headers]]
-for = "/*.wav"
+for = "/*.svg"
 [headers.values]
 Cache-Control = "public, max-age=31536000"
 
 [[headers]]
-for = "/*.pdf"
+for = "/*.ico"
 [headers.values]
 Cache-Control = "public, max-age=31536000"
-Content-Type = "application/pdf"
+
+[[headers]]
+for = "/*.js"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+for = "/*.css"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+for = "/*.woff2"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
