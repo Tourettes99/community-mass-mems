@@ -1,5 +1,4 @@
 [build]
-  base = "community-mass-mems"
   command = """
     npm config set legacy-peer-deps=true &&
     npm ci --prefer-offline &&
