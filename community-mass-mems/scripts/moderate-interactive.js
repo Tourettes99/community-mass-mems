@@ -2,35 +2,13 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const readline = require('readline');
+const Memory = require('../netlify/functions/models/Memory'); // Use the proper Memory model
 
 // Create readline interface
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
-
-// Define Memory Schema
-const memorySchema = new mongoose.Schema({
-  content: String,
-  url: String,
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
-  },
-  metadata: {
-    title: String,
-    description: String,
-    type: String,
-    image: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const Memory = mongoose.model('Memory', memorySchema);
 
 // Format memory details with more context
 function formatMemory(memory, index) {
@@ -58,33 +36,38 @@ function formatMemory(memory, index) {
       lines.push('║ URL METADATA');
       lines.push('║ ' + '─'.repeat(30));
 
-      // Platform-specific info (YouTube, Vimeo, etc.)
+      // Platform-specific info
       if (memory.metadata.platform) {
         lines.push(`║ Platform: ${memory.metadata.platform.toUpperCase()}`);
         if (memory.metadata.videoId) {
           lines.push(`║ Video ID: ${memory.metadata.videoId}`);
         }
-        if (memory.metadata.thumbnailUrl) {
-          lines.push(`║ Thumbnail: ${memory.metadata.thumbnailUrl}`);
+        if (memory.metadata.embedUrl) {
+          lines.push(`║ Embed URL: ${memory.metadata.embedUrl}`);
         }
       }
 
-      // Basic metadata
-      if (memory.metadata.type) {
-        lines.push(`║ Type: ${memory.metadata.type}`);
+      // File info for direct files
+      if (memory.metadata.isDirectFile) {
+        lines.push(`║ File Type: ${memory.metadata.fileType}`);
+        if (memory.metadata.mimeType) {
+          lines.push(`║ MIME Type: ${memory.metadata.mimeType}`);
+        }
+        if (memory.metadata.fileSize) {
+          lines.push(`║ Size: ${(memory.metadata.fileSize / 1024).toFixed(2)} KB`);
+        }
       }
+
+      // Media info
       if (memory.metadata.mediaType) {
         lines.push(`║ Media Type: ${memory.metadata.mediaType}`);
       }
-      if (memory.metadata.fileType) {
-        lines.push(`║ File Type: ${memory.metadata.fileType}`);
-      }
-      if (memory.metadata.domain) {
-        lines.push(`║ Domain: ${memory.metadata.domain}`);
+      if (memory.metadata.thumbnailUrl) {
+        lines.push(`║ Thumbnail: ${memory.metadata.thumbnailUrl}`);
       }
 
       // OpenGraph Data
-      if (memory.metadata.ogTitle || memory.metadata.ogDescription || memory.metadata.ogImage || memory.metadata.ogType) {
+      if (memory.metadata.ogTitle || memory.metadata.ogDescription || memory.metadata.ogImage) {
         lines.push('║');
         lines.push('║ OPENGRAPH DATA');
         lines.push('║ ' + '─'.repeat(30));
@@ -108,7 +91,7 @@ function formatMemory(memory, index) {
       }
 
       // Twitter Card Data
-      if (memory.metadata.twitterTitle || memory.metadata.twitterDescription || memory.metadata.twitterImage || memory.metadata.twitterCard) {
+      if (memory.metadata.twitterTitle || memory.metadata.twitterDescription || memory.metadata.twitterImage) {
         lines.push('║');
         lines.push('║ TWITTER CARD DATA');
         lines.push('║ ' + '─'.repeat(30));
@@ -131,6 +114,26 @@ function formatMemory(memory, index) {
         }
       }
 
+      // oEmbed Data
+      if (memory.metadata.oembedType || memory.metadata.oembedTitle) {
+        lines.push('║');
+        lines.push('║ OEMBED DATA');
+        lines.push('║ ' + '─'.repeat(30));
+        
+        if (memory.metadata.oembedType) {
+          lines.push(`║ Type: ${memory.metadata.oembedType}`);
+        }
+        if (memory.metadata.oembedTitle) {
+          lines.push(`║ Title: ${memory.metadata.oembedTitle}`);
+        }
+        if (memory.metadata.oembedAuthor) {
+          lines.push(`║ Author: ${memory.metadata.oembedAuthor}`);
+        }
+        if (memory.metadata.oembedProvider) {
+          lines.push(`║ Provider: ${memory.metadata.oembedProvider}`);
+        }
+      }
+
       // Description (if not shown in OG/Twitter data)
       if (memory.metadata.description && 
           memory.metadata.description !== memory.metadata.ogDescription && 
@@ -143,12 +146,6 @@ function formatMemory(memory, index) {
           lines.push(`║ ${line}`);
         });
       }
-
-      // Favicon
-      if (memory.metadata.favicon) {
-        lines.push('║');
-        lines.push(`║ Favicon: ${memory.metadata.favicon}`);
-      }
     }
   }
 
@@ -156,10 +153,8 @@ function formatMemory(memory, index) {
     lines.push('║');
     lines.push('║ CONTENT');
     lines.push('║ ' + '─'.repeat(30));
-    // Split content into lines and wrap them
     const contentLines = memory.content.split('\n');
     contentLines.forEach(line => {
-      // Wrap long lines
       const wrappedLines = line.match(/.{1,50}/g) || [''];
       wrappedLines.forEach(wrapped => {
         lines.push(`║ ${wrapped}`);
@@ -210,31 +205,22 @@ async function moderateMemories() {
     // Initial load
     await refreshMemories();
 
-    // Handle commands
     rl.on('line', async (input) => {
       input = input.trim().toLowerCase();
       
       if (input === 'q') {
         rl.close();
-        return;
-      }
-      
-      if (input === 'r') {
+      } else if (input === 'r') {
         await refreshMemories();
-        return;
-      }
-      
-      // Parse commands like "1a" or "2r"
-      const match = input.match(/^(\d+)([ar])$/);
-      if (match) {
-        const index = parseInt(match[1]) - 1;
-        const action = match[2] === 'a' ? 'approve' : 'reject';
+      } else if (input.match(/^\d+[ar]$/)) {
+        const index = parseInt(input.slice(0, -1)) - 1;
+        const action = input.slice(-1);
         
         if (index >= 0 && index < memories.length) {
           const memory = memories[index];
-          memory.status = action === 'approve' ? 'approved' : 'rejected';
+          memory.status = action === 'a' ? 'approved' : 'rejected';
           await memory.save();
-          console.log(`\nMemory #${index + 1} has been ${action}d! ✅\n`);
+          console.log(`\nMemory #${index + 1} ${action === 'a' ? 'approved' : 'rejected'}!\n`);
           await refreshMemories();
         } else {
           console.log('\nInvalid memory number! Try again.\n');
@@ -246,12 +232,12 @@ async function moderateMemories() {
 
     rl.on('close', async () => {
       await mongoose.disconnect();
+      console.log('\nGoodbye! 👋\n');
       process.exit(0);
     });
-
   } catch (error) {
-    console.error('Error:', error.message);
-    rl.close();
+    console.error('Error:', error);
+    process.exit(1);
   }
 }
 
