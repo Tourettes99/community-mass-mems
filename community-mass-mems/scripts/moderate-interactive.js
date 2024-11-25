@@ -21,10 +21,29 @@ function formatMemory(memory, index) {
     lines.push('║ Title: ' + memory.metadata.title);
   }
 
-  // URL
+  // URL or Content
   if (memory.url) {
     lines.push('║');
     lines.push('║ URL: ' + memory.url);
+  } else if (memory.content) {
+    lines.push('║');
+    lines.push('║ CONTENT');
+    lines.push('║ ' + '─'.repeat(30));
+    const contentLines = memory.content.split('\n');
+    contentLines.forEach(line => {
+      const wrappedLines = line.match(/.{1,50}/g) || [''];
+      wrappedLines.forEach(wrapped => {
+        lines.push('║ ' + wrapped);
+      });
+    });
+  }
+
+  // Tags
+  if (memory.tags && memory.tags.length > 0) {
+    lines.push('║');
+    lines.push('║ TAGS');
+    lines.push('║ ' + '─'.repeat(30));
+    lines.push('║ ' + memory.tags.join(', '));
   }
 
   // Metadata section

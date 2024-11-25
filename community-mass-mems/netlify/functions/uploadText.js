@@ -1,9 +1,7 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const Memory = require('./models/Memory');
-const nodemailer = require('nodemailer'); // Import nodemailer
+const mongoose = require('mongodb').MongoClient;
+const nodemailer = require('nodemailer');
 
-let conn = null;
 // Create transporter for sending emails
 const transporter = nodemailer.createTransport({
   service: 'gmail',  // Use Gmail service
@@ -12,18 +10,6 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASSWORD
   }
 });
-
-const connectDb = async () => {
-  if (conn == null) {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is not set');
-    }
-    conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
-    });
-  }
-  return conn;
-};
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -53,8 +39,9 @@ exports.handler = async (event, context) => {
     };
   }
 
+  let client;
   try {
-    const { content } = JSON.parse(event.body);
+    const { content, tags } = JSON.parse(event.body);
     if (!content) {
       return {
         statusCode: 400,
@@ -66,26 +53,42 @@ exports.handler = async (event, context) => {
       };
     }
 
-    await connectDb();
-    const memory = new Memory({
-      type: 'text',
-      content: content, // Store in content field instead of url
-      status: 'pending',
-      metadata: {
-        format: 'text/plain',
-        title: content.slice(0, 50) + (content.length > 50 ? '...' : ''), // Create a title from content
-        description: content
-      }
+    // Connect to MongoDB
+    client = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 10000,
+      family: 4
     });
 
-    await memory.save();
+    const db = client.db('memories');
+    const collection = db.collection('memories');
+
+    // Create memory document
+    const memory = {
+      type: 'text',
+      content: content,
+      tags: Array.isArray(tags) ? tags : [],
+      status: 'pending',
+      metadata: {
+        type: 'text',
+        format: 'text/plain',
+        title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
+        description: content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      votes: { up: 0, down: 0 },
+      userVotes: {},
+      submittedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Save to database
+    const result = await collection.insertOne(memory);
     
     // Send notification email
     try {
-      // Create a simple token for moderation links
-      const moderationToken = Buffer.from(`${memory._id}:${process.env.EMAIL_USER}`).toString('base64');
-      const baseUrl = process.env.REACT_APP_API_URL || 'https://community-mass-mems.onrender.com';
-
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: process.env.EMAIL_USER,
@@ -94,66 +97,45 @@ exports.handler = async (event, context) => {
 
 Content: ${content}
 Title: ${memory.metadata.title || 'No title'}
+Tags: ${memory.tags.join(', ') || 'No tags'}
 Submitted at: ${new Date().toLocaleString()}
 
-To moderate this submission, use one of these links:
+ID: ${result.insertedId}
 
-Approve:
-curl -X POST ${baseUrl}/.netlify/functions/moderate-memory \\
-  -H "Content-Type: application/json" \\
-  -d '{"action":"approve","memoryId":"${memory._id}","token":"${moderationToken}"}'
-
-Reject:
-curl -X POST ${baseUrl}/.netlify/functions/moderate-memory \\
-  -H "Content-Type: application/json" \\
-  -d '{"action":"reject","memoryId":"${memory._id}","token":"${moderationToken}"}'`,
-        html: `
-          <h2>New text memory submitted for review</h2>
-          <p><strong>Content:</strong> ${content}</p>
-          <p><strong>Title:</strong> ${memory.metadata.title || 'No title'}</p>
-          <p><strong>Submitted at:</strong> ${new Date().toLocaleString()}</p>
-          <div style="margin-top: 20px;">
-            <form action="${baseUrl}/.netlify/functions/moderate-memory" method="POST" style="display:inline;">
-              <input type="hidden" name="action" value="approve">
-              <input type="hidden" name="memoryId" value="${memory._id}">
-              <input type="hidden" name="token" value="${moderationToken}">
-              <button type="submit" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
-                Approve
-              </button>
-            </form>
-            <form action="${baseUrl}/.netlify/functions/moderate-memory" method="POST" style="display:inline;">
-              <input type="hidden" name="action" value="reject">
-              <input type="hidden" name="memoryId" value="${memory._id}">
-              <input type="hidden" name="token" value="${moderationToken}">
-              <button type="submit" style="background-color: #f44336; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
-                Reject
-              </button>
-            </form>
-          </div>
-        `
+You can review this submission in the moderation console.`
       });
     } catch (emailError) {
-      console.error('Error sending moderation email:', emailError);
+      console.error('Error sending email:', emailError);
       // Continue even if email fails
     }
-    
+
     return {
-      statusCode: 201,
+      statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify(memory)
+      body: JSON.stringify({
+        message: 'Memory submitted successfully',
+        id: result.insertedId
+      })
     };
   } catch (error) {
-    console.error('Error uploading text:', error);
+    console.error('Error:', error);
     return {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ message: 'Error uploading text', error: error.message })
+      body: JSON.stringify({ 
+        message: 'Error submitting memory',
+        error: error.message 
+      })
     };
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 };
