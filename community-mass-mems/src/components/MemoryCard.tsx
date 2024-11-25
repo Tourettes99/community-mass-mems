@@ -23,9 +23,19 @@ interface MemoryCardProps {
 
 const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
   const updateMemory = useMemoryStore(state => state.updateMemory);
+  const [userVote, setUserVote] = React.useState<string | null>(
+    localStorage.getItem(`vote_${memory._id}`)
+  );
 
   const handleVote = async (type: 'up' | 'down') => {
     try {
+      // Generate a persistent user ID if not exists
+      let userId = localStorage.getItem('userId');
+      if (!userId) {
+        userId = 'user_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('userId', userId);
+      }
+
       const response = await fetch('/.netlify/functions/vote', {
         method: 'POST',
         headers: {
@@ -33,7 +43,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         },
         body: JSON.stringify({
           memoryId: memory._id,
-          voteType: type
+          voteType: type,
+          userId
         }),
       });
 
@@ -41,7 +52,16 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
         throw new Error('Failed to vote');
       }
 
-      const { votes } = await response.json();
+      const { votes, userVote } = await response.json();
+      
+      // Update local storage with user's vote
+      if (userVote) {
+        localStorage.setItem(`vote_${memory._id}`, userVote);
+      } else {
+        localStorage.removeItem(`vote_${memory._id}`);
+      }
+      
+      setUserVote(userVote);
       updateMemory({ ...memory, votes });
     } catch (error) {
       console.error('Error voting:', error);
@@ -52,16 +72,13 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
     if (!dateString) return 'No date available';
     
     try {
-      // First try parsing as ISO string
       const date = new Date(dateString);
       
-      // Validate the date
       if (isNaN(date.getTime())) {
         console.warn('Invalid date string:', dateString);
         return 'Invalid date';
       }
 
-      // Format the date
       return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
         month: 'short',
@@ -109,16 +126,24 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory }) => {
       </CardContent>
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         <Box>
-          <Tooltip title="Like">
-            <IconButton onClick={() => handleVote('up')} size="small">
+          <Tooltip title={userVote === 'up' ? 'Undo like' : 'Like'}>
+            <IconButton 
+              onClick={() => handleVote('up')} 
+              size="small"
+              color={userVote === 'up' ? 'primary' : 'default'}
+            >
               <ThumbUpIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Typography variant="body2" component="span" sx={{ mx: 1 }}>
             {memory.votes.up}
           </Typography>
-          <Tooltip title="Dislike">
-            <IconButton onClick={() => handleVote('down')} size="small">
+          <Tooltip title={userVote === 'down' ? 'Undo dislike' : 'Dislike'}>
+            <IconButton 
+              onClick={() => handleVote('down')} 
+              size="small"
+              color={userVote === 'down' ? 'error' : 'default'}
+            >
               <ThumbDownIcon fontSize="small" />
             </IconButton>
           </Tooltip>
