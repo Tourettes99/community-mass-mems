@@ -97,6 +97,13 @@ const MemoryCard = ({ memory }) => {
     
     try {
       setIsVoting(true);
+      
+      let userId = localStorage.getItem('userId');
+      if (!userId) {
+        userId = 'user_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('userId', userId);
+      }
+
       const response = await fetch('/.netlify/functions/vote-memory', {
         method: 'POST',
         headers: {
@@ -104,7 +111,8 @@ const MemoryCard = ({ memory }) => {
         },
         body: JSON.stringify({
           memoryId: memory.id || memory._id,
-          vote: voteType === 'up' ? 1 : -1
+          voteType,
+          userId
         })
       });
 
@@ -112,17 +120,16 @@ const MemoryCard = ({ memory }) => {
         throw new Error('Failed to vote');
       }
 
-      // Toggle vote state
+      const data = await response.json();
+      
+      // Update vote state based on server response
       setVoteState(prev => ({
-        up: voteType === 'up' ? !prev.up : false,
-        down: voteType === 'down' ? !prev.down : false
+        up: data.userVote === 'up',
+        down: data.userVote === 'down'
       }));
 
-      // Update vote count
-      setVoteCount(prev => ({
-        up: voteType === 'up' ? prev.up + (voteState.up ? -1 : 1) : prev.up,
-        down: voteType === 'down' ? prev.down + (voteState.down ? -1 : 1) : prev.down
-      }));
+      // Update vote count from server
+      setVoteCount(data.votes);
 
     } catch (error) {
       console.error('Error voting:', error);
