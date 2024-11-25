@@ -1,6 +1,8 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Memory = require('./models/Memory');
+const unfurl = require('unfurl.js');
+const fetch = require('node-fetch');
 
 // Media file extensions
 const MEDIA_EXTENSIONS = {
@@ -74,6 +76,41 @@ const getUrlMetadata = async (urlString) => {
       updatedAt: formatDate(new Date())
     };
 
+    // Try to fetch rich metadata first
+    try {
+      const unfurled = await unfurl(urlString);
+      
+      // Merge unfurled metadata
+      if (unfurled) {
+        metadata.title = unfurled.title;
+        metadata.description = unfurled.description;
+        
+        if (unfurled.open_graph) {
+          metadata.ogTitle = unfurled.open_graph.title;
+          metadata.ogDescription = unfurled.open_graph.description;
+          metadata.ogImage = unfurled.open_graph.image 
+            ? unfurled.open_graph.image.url 
+            : null;
+          metadata.ogType = unfurled.open_graph.type;
+        }
+        
+        if (unfurled.twitter_card) {
+          metadata.twitterTitle = unfurled.twitter_card.title;
+          metadata.twitterDescription = unfurled.twitter_card.description;
+          metadata.twitterImage = unfurled.twitter_card.image;
+          metadata.twitterCard = unfurled.twitter_card.card;
+        }
+        
+        // Use favicon if available
+        if (unfurled.favicon) {
+          metadata.favicon = unfurled.favicon;
+        }
+      }
+    } catch (unfurlError) {
+      console.error('Error unfurling URL:', unfurlError);
+      // Continue with basic metadata if unfurling fails
+    }
+
     // Determine content type from extension
     if (MEDIA_EXTENSIONS.images.includes(extension)) {
       metadata.type = 'image';
@@ -96,16 +133,44 @@ const getUrlMetadata = async (urlString) => {
     // Additional metadata for media URLs
     if (metadata.type !== 'url') {
       metadata.contentUrl = urlString;
-      metadata.title = pathname.split('/').pop() || 'Untitled';
+      if (!metadata.title) {
+        metadata.title = pathname.split('/').pop() || 'Untitled';
+      }
     }
 
     // Platform-specific metadata
     if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
       metadata.platform = 'youtube';
       metadata.type = 'video';
+      
+      // Extract video ID
+      const videoId = domain.includes('youtu.be') 
+        ? pathname.slice(1)
+        : url.searchParams.get('v');
+      if (videoId) {
+        metadata.videoId = videoId;
+        metadata.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+      }
     } else if (domain.includes('vimeo.com')) {
       metadata.platform = 'vimeo';
       metadata.type = 'video';
+      
+      // Extract video ID
+      const videoId = pathname.split('/').pop();
+      if (videoId) {
+        metadata.videoId = videoId;
+        try {
+          const vimeoResponse = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`);
+          const vimeoData = await vimeoResponse.json();
+          if (vimeoData && vimeoData[0]) {
+            metadata.thumbnailUrl = vimeoData[0].thumbnail_large;
+            metadata.title = metadata.title || vimeoData[0].title;
+            metadata.description = metadata.description || vimeoData[0].description;
+          }
+        } catch (error) {
+          console.error('Error fetching Vimeo metadata:', error);
+        }
+      }
     } else if (domain.includes('spotify.com')) {
       metadata.platform = 'spotify';
       metadata.type = 'audio';
@@ -119,6 +184,7 @@ const getUrlMetadata = async (urlString) => {
     console.error('Error getting URL metadata:', error);
     return {
       type: 'url',
+      url: urlString,
       createdAt: formatDate(new Date()),
       updatedAt: formatDate(new Date())
     };
