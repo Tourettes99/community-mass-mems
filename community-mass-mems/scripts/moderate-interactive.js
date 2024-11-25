@@ -4,6 +4,16 @@ const mongoose = require('mongoose');
 const readline = require('readline');
 const Memory = require('../netlify/functions/models/Memory'); // Use the proper Memory model
 
+// Configure Mongoose
+mongoose.set('strictQuery', false);
+const mongooseOptions = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 30000, // Increase timeout to 30 seconds
+  socketTimeoutMS: 45000, // Increase socket timeout
+  family: 4 // Use IPv4, skip trying IPv6
+};
+
 // Create readline interface
 const rl = readline.createInterface({
   input: process.stdin,
@@ -173,7 +183,7 @@ async function displayMemories(memories) {
     return;
   }
 
-  console.log(`\n${memories.length} Pending ${memories.length === 1 ? 'Memory' : 'Memories'}:\n`);
+  console.log(`\n${memories.length} Pending ${memories.length === 1 ? 'Memory' : 'Memories'}:\n');
   
   memories.forEach((memory, index) => {
     console.log(formatMemory(memory, index));
@@ -189,17 +199,34 @@ async function displayMemories(memories) {
 
 async function moderateMemories() {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('\n=== Community Mass Memories - Moderation Console ===\n');
+    // Connect to MongoDB with better error handling
+    console.log('\nConnecting to MongoDB...');
+    try {
+      await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
+      console.log('Connected to MongoDB successfully!\n');
+    } catch (dbError) {
+      console.error('\nFailed to connect to MongoDB:');
+      console.error('- Check if your MongoDB connection string is correct in .env');
+      console.error('- Ensure you have network connectivity');
+      console.error('- Verify MongoDB server is running');
+      console.error('\nError details:', dbError.message);
+      process.exit(1);
+    }
+
+    console.log('=== Community Mass Memories - Moderation Console ===\n');
 
     let memories = [];
     
     async function refreshMemories() {
-      memories = await Memory.find({ status: 'pending' }).sort({ createdAt: -1 });
-      console.clear();
-      console.log('\n=== Community Mass Memories - Moderation Console ===\n');
-      await displayMemories(memories);
+      try {
+        memories = await Memory.find({ status: 'pending' }).sort({ createdAt: -1 });
+        console.clear();
+        console.log('\n=== Community Mass Memories - Moderation Console ===\n');
+        await displayMemories(memories);
+      } catch (error) {
+        console.error('\nError fetching memories:', error.message);
+        console.log('\nPress r to retry or q to quit\n');
+      }
     }
 
     // Initial load
@@ -217,11 +244,16 @@ async function moderateMemories() {
         const action = input.slice(-1);
         
         if (index >= 0 && index < memories.length) {
-          const memory = memories[index];
-          memory.status = action === 'a' ? 'approved' : 'rejected';
-          await memory.save();
-          console.log(`\nMemory #${index + 1} ${action === 'a' ? 'approved' : 'rejected'}!\n`);
-          await refreshMemories();
+          try {
+            const memory = memories[index];
+            memory.status = action === 'a' ? 'approved' : 'rejected';
+            await memory.save();
+            console.log(`\nMemory #${index + 1} ${action === 'a' ? 'approved' : 'rejected'}!\n`);
+            await refreshMemories();
+          } catch (error) {
+            console.error('\nError updating memory:', error.message);
+            console.log('\nPress r to refresh or q to quit\n');
+          }
         } else {
           console.log('\nInvalid memory number! Try again.\n');
         }
@@ -231,15 +263,37 @@ async function moderateMemories() {
     });
 
     rl.on('close', async () => {
-      await mongoose.disconnect();
-      console.log('\nGoodbye! 👋\n');
+      try {
+        await mongoose.disconnect();
+        console.log('\nDisconnected from MongoDB');
+        console.log('Goodbye! 👋\n');
+      } catch (error) {
+        console.error('\nError disconnecting:', error.message);
+      }
       process.exit(0);
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('\nUnexpected error:', error.message);
+    try {
+      await mongoose.disconnect();
+    } catch (disconnectError) {
+      // Ignore disconnect errors
+    }
     process.exit(1);
   }
 }
+
+// Handle process termination
+process.on('SIGINT', async () => {
+  console.log('\nReceived SIGINT. Cleaning up...');
+  try {
+    await mongoose.disconnect();
+    console.log('Disconnected from MongoDB');
+  } catch (error) {
+    // Ignore disconnect errors
+  }
+  process.exit(0);
+});
 
 // Start the moderation process
 moderateMemories();
