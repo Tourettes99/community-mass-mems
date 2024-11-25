@@ -45,8 +45,8 @@ const formatMemory = (memory) => {
       ...memory,
       metadata: {
         ...memory.metadata,
-        createdAt: formatDate(memory.createdAt),
-        updatedAt: formatDate(memory.updatedAt)
+        createdAt: formatDate(memory.metadata?.createdAt || memory.createdAt),
+        updatedAt: formatDate(memory.metadata?.updatedAt || memory.updatedAt)
       },
       votes: {
         up: memory.votes?.up || 0,
