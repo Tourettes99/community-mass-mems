@@ -122,64 +122,133 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     }
   };
 
-  return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {(memory.metadata.thumbnailUrl || memory.metadata.ogImage || memory.metadata.twitterImage) && (
-        <CardMedia
-          component="img"
-          sx={{
-            height: 200,
-            objectFit: 'cover',
-            backgroundColor: '#f5f5f5'
-          }}
-          image={memory.metadata.thumbnailUrl || memory.metadata.ogImage || memory.metadata.twitterImage}
-          alt={memory.metadata.title || memory.metadata.ogTitle || memory.metadata.twitterTitle || 'Memory thumbnail'}
-        />
-      )}
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
-          {shouldShowFavicon && (
-            <img 
-              src={memory.metadata.favicon}
-              alt=""
-              onError={handleFaviconError}
-              style={{ 
-                width: 16, 
-                height: 16, 
-                objectFit: 'contain',
-                marginRight: 8,
-                flexShrink: 0
-              }} 
+  const renderContent = () => {
+    const { url, metadata } = memory;
+    
+    // Handle YouTube videos
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const videoId = url.includes('youtube.com') 
+        ? url.split('v=')[1]?.split('&')[0]
+        : url.split('youtu.be/')[1]?.split('?')[0];
+        
+      if (videoId) {
+        return (
+          <Box sx={{ position: 'relative', paddingTop: '56.25%', width: '100%' }}>
+            <iframe
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                border: 'none'
+              }}
+              src={`https://www.youtube.com/embed/${videoId}`}
+              title={metadata?.title || 'YouTube video'}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
             />
-          )}
-          <Typography variant="h6" component="h2" sx={{ 
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            lineHeight: 1.2,
-            maxHeight: '2.4em'
-          }}>
-            {memory.metadata.title || memory.metadata.ogTitle || memory.metadata.twitterTitle || 'Untitled Memory'}
+          </Box>
+        );
+      }
+    }
+
+    // Handle direct file links
+    const isDirectFile = url.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+    if (isDirectFile) {
+      return (
+        <Box 
+          component="img"
+          src={url}
+          alt={metadata?.title || 'Memory image'}
+          sx={{
+            width: '100%',
+            height: 'auto',
+            objectFit: 'cover',
+            borderRadius: 1
+          }}
+          onError={(e) => {
+            e.currentTarget.src = metadata?.ogImage || metadata?.twitterImage || '/placeholder.png';
+          }}
+        />
+      );
+    }
+
+    // Handle other URLs with thumbnails
+    if (metadata?.ogImage || metadata?.twitterImage) {
+      return (
+        <Box
+          component="a"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          sx={{ 
+            display: 'block',
+            textDecoration: 'none',
+            color: 'inherit'
+          }}
+        >
+          <Box
+            component="img"
+            src={metadata.ogImage || metadata.twitterImage}
+            alt={metadata?.title || 'Memory thumbnail'}
+            sx={{
+              width: '100%',
+              height: 'auto',
+              objectFit: 'cover',
+              borderRadius: 1
+            }}
+            onError={(e) => {
+              e.currentTarget.src = '/placeholder.png';
+            }}
+          />
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            {metadata?.title || url}
           </Typography>
         </Box>
-        <Typography variant="body2" color="text.secondary" paragraph>
-          {memory.metadata.description || (memory.type === 'text' ? memory.content : '')}
+      );
+    }
+
+    // Fallback for other content
+    return (
+      <Box
+        component="a"
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        sx={{ 
+          display: 'block',
+          textDecoration: 'none',
+          color: 'inherit'
+        }}
+      >
+        <Typography variant="body1">
+          {metadata?.title || url}
         </Typography>
-        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {memory.tags?.map((tag, index) => (
+        {metadata?.description && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {metadata.description}
+          </Typography>
+        )}
+      </Box>
+    );
+  };
+
+  return (
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CardContent sx={{ flexGrow: 1 }}>
+        {renderContent()}
+        <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {memory.tags?.map((tag) => (
             <Chip
-              key={index}
+              key={tag}
               label={tag}
               size="small"
-              onClick={() => onTagClick(tag)}
-              className={selectedTags.includes(tag) ? 'active' : ''}
               sx={{
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                backgroundColor: 'rgba(255, 87, 34, 0.1)',
+                color: '#ff5722',
                 '&:hover': {
-                  transform: 'translateY(-1px)',
+                  backgroundColor: 'rgba(255, 87, 34, 0.2)',
                 },
               }}
             />
@@ -190,45 +259,22 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         </Typography>
       </CardContent>
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-        <Box>
-          <Tooltip title={userVote === 'up' ? 'Undo like' : 'Like'}>
-            <IconButton 
-              onClick={() => handleVote('up')} 
-              size="small"
-              color={userVote === 'up' ? 'primary' : 'default'}
-            >
-              <ThumbUpIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Typography variant="body2" component="span" sx={{ mx: 1 }}>
-            {memory.votes.up}
-          </Typography>
-          <Tooltip title={userVote === 'down' ? 'Undo dislike' : 'Dislike'}>
-            <IconButton 
-              onClick={() => handleVote('down')} 
-              size="small"
-              color={userVote === 'down' ? 'error' : 'default'}
-            >
-              <ThumbDownIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Typography variant="body2" component="span" sx={{ ml: 1 }}>
-            {memory.votes.down}
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <IconButton
+            onClick={() => handleVote('up')}
+            color={userVote === 'up' ? 'primary' : 'default'}
+          >
+            <ThumbUpIcon />
+          </IconButton>
+          <Typography>{memory.votes.up}</Typography>
+          <IconButton
+            onClick={() => handleVote('down')}
+            color={userVote === 'down' ? 'primary' : 'default'}
+          >
+            <ThumbDownIcon />
+          </IconButton>
+          <Typography>{memory.votes.down}</Typography>
         </Box>
-        {memory.url && (
-          <Tooltip title="Open in new tab">
-            <IconButton 
-              component={Link} 
-              href={memory.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              size="small"
-            >
-              <OpenInNewIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
       </CardActions>
     </Card>
   );
