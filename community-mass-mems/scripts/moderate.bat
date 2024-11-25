@@ -1,12 +1,19 @@
 @echo off
-cd %~dp0\..
 title Community Mass Memories - Moderation Console
 
-:: Install required packages if not already installed
-npm install
+cd %~dp0\..
 
-:: Run the interactive moderation script
+echo Installing dependencies...
+call npm install
+
+echo Starting moderation console...
 node scripts/moderate-interactive.js
 
-:: Keep the window open if there was an error
-pause
+if errorlevel 1 (
+    echo Error occurred while running the script
+    echo Press any key to exit...
+    pause > nul
+) else (
+    echo Press any key to exit...
+    pause > nul
+)

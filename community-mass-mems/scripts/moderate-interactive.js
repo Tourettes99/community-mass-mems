@@ -2,19 +2,8 @@
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const mongoose = require('mongoose');
+const { MongoClient, ObjectId } = require('mongodb');
 const readline = require('readline');
-const Memory = require('../netlify/functions/models/Memory'); // Use the proper Memory model
-
-// Configure Mongoose
-mongoose.set('strictQuery', false);
-const mongooseOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 30000,
-  socketTimeoutMS: 45000,
-  family: 4
-};
 
 // Format memory details with more context
 function formatMemory(memory, index) {
@@ -194,34 +183,35 @@ async function displayMemories(memories) {
 }
 
 async function moderateMemories() {
-  try {
-    // Connect to MongoDB with better error handling
-    console.log('\nConnecting to MongoDB...');
-    try {
-      await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
-      console.log('Connected to MongoDB successfully!\n');
-    } catch (dbError) {
-      console.error('\nFailed to connect to MongoDB:');
-      console.error('- Check if your MongoDB connection string is correct in .env');
-      console.error('- Ensure you have network connectivity');
-      console.error('- Verify MongoDB server is running');
-      console.error('\nError details:', dbError.message);
-      process.exit(1);
-    }
+  const client = new MongoClient(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 10000,
+    family: 4
+  });
 
+  try {
+    // Connect to MongoDB
+    console.log('\nConnecting to MongoDB...');
+    await client.connect();
+    console.log('Connected successfully!\n');
+
+    const db = client.db('memories');
+    const collection = db.collection('memories');
+    
     console.log('=== Community Mass Memories - Moderation Console ===\n');
 
     let memories = [];
     
     async function refreshMemories() {
       try {
-        memories = await Memory.find({ status: 'pending' }).sort({ createdAt: -1 });
+        console.log('\nFetching pending memories...');
+        memories = await collection.find({ status: 'pending' }).sort({ createdAt: -1 }).toArray();
         console.clear();
         console.log('\n=== Community Mass Memories - Moderation Console ===\n');
         await displayMemories(memories);
       } catch (error) {
         console.error('\nError fetching memories:', error.message);
-        console.log('\nPress r to retry or q to quit\n');
+        console.error('\nPlease check your connection and try again.\n');
       }
     }
 
@@ -247,8 +237,10 @@ async function moderateMemories() {
         if (index >= 0 && index < memories.length) {
           try {
             const memory = memories[index];
-            memory.status = action === 'a' ? 'approved' : 'rejected';
-            await memory.save();
+            await collection.updateOne(
+              { _id: ObjectId(memory._id) },
+              { $set: { status: action === 'a' ? 'approved' : 'rejected' } }
+            );
             console.log('\nMemory #' + (index + 1) + ' ' + (action === 'a' ? 'approved' : 'rejected') + '!\n');
             await refreshMemories();
           } catch (error) {
@@ -265,7 +257,7 @@ async function moderateMemories() {
 
     rl.on('close', async () => {
       try {
-        await mongoose.disconnect();
+        await client.close();
         console.log('\nDisconnected from MongoDB');
         console.log('Goodbye! 👋\n');
       } catch (error) {
@@ -276,7 +268,7 @@ async function moderateMemories() {
   } catch (error) {
     console.error('\nUnexpected error:', error.message);
     try {
-      await mongoose.disconnect();
+      await client.close();
     } catch (disconnectError) {
       // Ignore disconnect errors
     }
@@ -288,7 +280,7 @@ async function moderateMemories() {
 process.on('SIGINT', async () => {
   console.log('\nReceived SIGINT. Cleaning up...');
   try {
-    await mongoose.disconnect();
+    await client.close();
     console.log('Disconnected from MongoDB');
   } catch (error) {
     // Ignore disconnect errors
