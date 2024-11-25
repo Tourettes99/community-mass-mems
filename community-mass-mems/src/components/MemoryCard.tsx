@@ -63,7 +63,18 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       }
       
       setUserVote(userVote);
-      updateMemory({ ...memory, votes });
+      // Update memory while preserving all existing properties
+      const updatedMemory = {
+        ...memory,
+        votes,
+        userVotes: memory.userVotes || new Map()
+      };
+      if (userVote) {
+        updatedMemory.userVotes.set(userId, userVote);
+      } else {
+        updatedMemory.userVotes.delete(userId);
+      }
+      updateMemory(updatedMemory);
     } catch (error) {
       console.error('Error voting:', error);
       // Don't throw the error, just log it
@@ -96,19 +107,44 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {memory.metadata.thumbnailUrl && (
+      {(memory.metadata.thumbnailUrl || memory.metadata.ogImage) && (
         <CardMedia
           component="img"
-          height="140"
-          image={memory.metadata.thumbnailUrl}
+          sx={{
+            height: 200,
+            objectFit: 'cover',
+            backgroundColor: '#f5f5f5'
+          }}
+          image={memory.metadata.thumbnailUrl || memory.metadata.ogImage}
           alt={memory.metadata.title || 'Memory thumbnail'}
-          sx={{ objectFit: 'cover' }}
         />
       )}
       <CardContent sx={{ flexGrow: 1 }}>
-        <Typography variant="h6" component="h2" gutterBottom>
-          {memory.metadata.title || 'Untitled Memory'}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
+          {memory.metadata.favicon && (
+            <img 
+              src={memory.metadata.favicon} 
+              alt="Site favicon"
+              style={{ 
+                width: 16, 
+                height: 16, 
+                objectFit: 'contain',
+                marginRight: 8
+              }} 
+            />
+          )}
+          <Typography variant="h6" component="h2" sx={{ 
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: 1.2,
+            maxHeight: '2.4em'
+          }}>
+            {memory.metadata.title || 'Untitled Memory'}
+          </Typography>
+        </Box>
         <Typography variant="body2" color="text.secondary" paragraph>
           {memory.metadata.description || (memory.type === 'text' ? memory.content : '')}
         </Typography>
