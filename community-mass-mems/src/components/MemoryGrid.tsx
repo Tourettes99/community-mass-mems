@@ -1,7 +1,6 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { Grid, Box, useTheme, Fade, CircularProgress, Typography, Alert, Chip, Stack } from '@mui/material';
 import MemoryCard from './MemoryCard';
-import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
 
 const MemoryGrid: React.FC = () => {
