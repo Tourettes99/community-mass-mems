@@ -1,7 +1,6 @@
-Connecting to MongoDB...
-Connected to MongoDB successfully!
+#!/usr/bin/env node
 
-=== Community Mass Memories - Moderation Console ===const path = require('path');
+const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const readline = require('readline');
@@ -12,16 +11,10 @@ mongoose.set('strictQuery', false);
 const mongooseOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 30000, // Increase timeout to 30 seconds
-  socketTimeoutMS: 45000, // Increase socket timeout
-  family: 4 // Use IPv4, skip trying IPv6
+  serverSelectionTimeoutMS: 30000,
+  socketTimeoutMS: 45000,
+  family: 4
 };
-
-// Create readline interface
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
 
 // Format memory details with more context
 function formatMemory(memory, index) {
@@ -234,6 +227,11 @@ async function moderateMemories() {
 
     // Initial load
     await refreshMemories();
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
 
     rl.on('line', async (input) => {
       input = input.trim().toLowerCase();
