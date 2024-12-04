@@ -32,7 +32,17 @@ const PatreonBar = () => {
             },
           }}
         >
-          <i className="fa-brands fa-patreon" style={{ fontSize: '28px' }} />
+          <i 
+            className="fa-brands fa-patreon" 
+            style={{ 
+              fontSize: '28px',
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }} 
+          />
         </IconButton>
       </Tooltip>
     </Box>
