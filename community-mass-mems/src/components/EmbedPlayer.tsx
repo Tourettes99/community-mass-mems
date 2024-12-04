@@ -100,6 +100,30 @@ const EmbedPlayer: React.FC<EmbedPlayerProps> = ({ type, url, title, metadata })
         };
       }
 
+      // Discord attachments
+      if (domain.includes('cdn.discordapp.com') || domain.includes('media.discordapp.net')) {
+        const fileExtension = url.split('.').pop()?.toLowerCase();
+        if (fileExtension) {
+          // Handle videos
+          if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
+            return {
+              html: `<video controls style="width:100%; height:100%; max-height:400px;">
+                <source src="${url}" type="video/${fileExtension}">
+                Your browser does not support the video tag.
+              </video>`,
+              aspectRatio: '56.25%'
+            };
+          }
+          // Handle images
+          if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+            return {
+              html: `<img src="${url}" alt="${title || 'Discord attachment'}" style="width:100%; height:100%; object-fit:contain;">`,
+              aspectRatio: '56.25%'
+            };
+          }
+        }
+      }
+
       // Discord messages/channels
       if (domain.includes('discord.com')) {
         const messageMatch = url.match(/channels\/(\d+)\/(\d+)\/(\d+)/);
