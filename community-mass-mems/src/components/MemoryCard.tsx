@@ -154,8 +154,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     // Handle Discord attachments
     const isDiscordAttachment = memory.url.includes('cdn.discordapp.com') || memory.url.includes('media.discordapp.net');
     if (isDiscordAttachment) {
-      const fileExtension = memory.url.split('.').pop()?.toLowerCase();
+      const fileExtension = memory.url.split('.').pop()?.toLowerCase()?.split('?')[0];
       if (fileExtension) {
+        const isVideo = ['mp4', 'webm', 'mov'].includes(fileExtension);
+        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+        
         return (
           <>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -164,11 +167,34 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                 {title}
               </Typography>
             </Box>
-            <EmbedPlayer 
-              type={['mp4', 'webm', 'mov'].includes(fileExtension) ? 'video' : 'url'} 
-              url={memory.url} 
-              title={title}
-            />
+            {isVideo ? (
+              <Box sx={{ width: '100%', maxHeight: '400px' }}>
+                <video
+                  controls
+                  style={{ width: '100%', height: '100%', maxHeight: '400px' }}
+                  src={memory.url}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </Box>
+            ) : isImage ? (
+              <Box
+                component="img"
+                src={memory.url}
+                alt={title}
+                sx={{
+                  width: '100%',
+                  height: 'auto',
+                  maxHeight: '400px',
+                  objectFit: 'contain',
+                  borderRadius: 1
+                }}
+              />
+            ) : (
+              <Typography variant="body1" color="text.secondary">
+                Unsupported file type
+              </Typography>
+            )}
           </>
         );
       }
