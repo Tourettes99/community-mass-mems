@@ -11,6 +11,7 @@ import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
+import EmbedPlayer from './EmbedPlayer';
 
 interface MemoryCardProps {
   memory: Memory;
@@ -148,6 +149,29 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           </Typography>
         </>
       );
+    }
+
+    // Handle Discord attachments
+    const isDiscordAttachment = memory.url.includes('cdn.discordapp.com') || memory.url.includes('media.discordapp.net');
+    if (isDiscordAttachment) {
+      const fileExtension = memory.url.split('.').pop()?.toLowerCase();
+      if (fileExtension) {
+        return (
+          <>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              {renderFavicon}
+              <Typography variant="subtitle1">
+                {title}
+              </Typography>
+            </Box>
+            <EmbedPlayer 
+              type={['mp4', 'webm', 'mov'].includes(fileExtension) ? 'video' : 'url'} 
+              url={memory.url} 
+              title={title}
+            />
+          </>
+        );
+      }
     }
 
     // Handle YouTube videos
