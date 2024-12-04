@@ -19,12 +19,15 @@ const PatreonBar = () => {
           rel="noopener noreferrer"
           sx={{
             bgcolor: '#FF424D',
-            width: 56,
-            height: 56,
+            width: { xs: 48, sm: 56 },
+            height: { xs: 48, sm: 56 },
             borderRadius: '12px',
             color: 'white',
             boxShadow: 3,
             transition: 'all 0.2s ease-in-out',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             '&:hover': {
               bgcolor: '#FF424D',
               transform: 'translateY(-2px)',
@@ -32,16 +35,18 @@ const PatreonBar = () => {
             },
           }}
         >
-          <i 
-            className="fa-brands fa-patreon" 
-            style={{ 
-              fontSize: '28px',
-              width: '28px',
-              height: '28px',
+          <Box
+            component="i"
+            className="fa-brands fa-patreon"
+            sx={{
+              fontSize: { xs: '24px', sm: '28px' },
+              width: '1em',
+              height: '1em',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
-            }} 
+              justifyContent: 'center',
+              lineHeight: 1,
+            }}
           />
         </IconButton>
       </Tooltip>
