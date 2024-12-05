@@ -183,12 +183,13 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           sx={{ 
             fontSize: '1.1rem',
             fontWeight: 500,
-            lineHeight: 1.2,
+            lineHeight: 1.3,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical'
+            WebkitLineClamp: 1,
+            WebkitBoxOrient: 'vertical',
+            width: '100%'
           }}
         >
           {title}
@@ -344,9 +345,10 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     display: '-webkit-box',
-                    WebkitLineClamp: 3,
+                    WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
-                    mb: 1
+                    mb: 1,
+                    lineHeight: 1.4
                   }}
                 >
                   {memory.metadata.description}
@@ -359,7 +361,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   sx={{ 
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 0.5
+                    gap: 0.5,
+                    mt: 'auto'
                   }}
                 >
                   {memory.metadata.siteName}
