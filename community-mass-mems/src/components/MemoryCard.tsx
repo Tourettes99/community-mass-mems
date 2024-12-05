@@ -184,8 +184,9 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       );
     }
 
-    if (['image', 'video', 'audio'].includes(memory.metadata?.mediaType || '')) {
-      const mediaContent = memory.metadata.mediaType === 'video' ? (
+    if (memory.metadata && ['image', 'video', 'audio'].includes(memory.metadata.mediaType || '')) {
+      const mediaType = memory.metadata.mediaType;
+      const mediaContent = mediaType === 'video' ? (
         <video
           controls
           style={{ width: '100%', maxHeight: '400px' }}
@@ -193,7 +194,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         >
           Your browser does not support the video tag.
         </video>
-      ) : memory.metadata.mediaType === 'audio' ? (
+      ) : mediaType === 'audio' ? (
         <audio
           controls
           style={{ width: '100%' }}
