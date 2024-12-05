@@ -318,16 +318,16 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               '&:hover': {
                 backgroundColor: 'action.hover'
               },
-              borderRadius: '8px'
+              borderRadius: '8px',
+              maxWidth: '400px'
             }}
           >
             {memory.metadata?.previewUrl && (
-              <Box sx={{ width: '30%', minWidth: '200px', position: 'relative' }}>
+              <Box sx={{ width: '120px', position: 'relative' }}>
                 <CardMedia
                   component="img"
                   sx={{ 
-                    height: '100%',
-                    minHeight: '160px',
+                    height: '100px',
                     objectFit: 'cover'
                   }}
                   image={memory.metadata.previewUrl}
@@ -335,20 +335,43 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                 />
               </Box>
             )}
-            <CardContent sx={{ flex: 1, p: 2 }}>
-              {renderHeader}
+            <CardContent sx={{ flex: 1, p: 1.5 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                mb: 0.5,
+                gap: 0.5
+              }}>
+                {renderFavicon}
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontSize: '0.9rem',
+                    fontWeight: 500,
+                    lineHeight: 1.2,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 1,
+                    WebkitBoxOrient: 'vertical'
+                  }}
+                >
+                  {title}
+                </Typography>
+              </Box>
               {memory.metadata?.description && (
                 <Typography 
                   variant="body2" 
                   color="text.secondary"
                   sx={{
+                    fontSize: '0.8rem',
+                    lineHeight: 1.3,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
-                    mb: 1,
-                    lineHeight: 1.4
+                    mb: 0.5
                   }}
                 >
                   {memory.metadata.description}
@@ -362,7 +385,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                     display: 'flex',
                     alignItems: 'center',
                     gap: 0.5,
-                    mt: 'auto'
+                    fontSize: '0.75rem'
                   }}
                 >
                   {memory.metadata.siteName}
