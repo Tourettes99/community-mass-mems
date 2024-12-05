@@ -35,6 +35,8 @@ export interface Memory {
     twitterImage?: string;
     twitterCard?: string;
     embedHtml?: string;
+    height?: number;
+    width?: number;
   };
   votes: {
     up: number;
