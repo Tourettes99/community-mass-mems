@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const memorySchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['image', 'gif', 'audio', 'url'],
+    enum: ['image', 'gif', 'audio', 'video', 'url'],
     required: true
   },
   url: {
@@ -11,13 +11,24 @@ const memorySchema = new mongoose.Schema({
     required: true
   },
   metadata: {
+    title: String,
+    description: String,
     fileName: String,
     resolution: String,
     format: String,
     fps: Number,
     duration: String,
     siteName: String,
-    description: String
+    mediaType: String,
+    platform: String,
+    embedHtml: String,
+    thumbnailUrl: String,
+    previewUrl: String,
+    width: Number,
+    height: Number,
+    isDiscordCdn: Boolean,
+    expiresAt: Date,
+    favicon: String
   },
   createdAt: {
     type: Date,
