@@ -14,7 +14,8 @@ async function extractUrlMetadata(url) {
         ...oEmbedData,
         url,
         mediaType: oEmbedData.type || 'rich',
-        previewType: oEmbedData.type || 'rich'
+        previewType: oEmbedData.type || 'rich',
+        previewUrl: oEmbedData.thumbnail_url || oEmbedData.previewUrl
       };
     }
 
@@ -24,20 +25,25 @@ async function extractUrlMetadata(url) {
       ogs({ url, fetchOptions: { timeout: 10000 } })
     ]);
 
+    const ogImage = ogsData?.result?.ogImage?.[0];
+    const unfurlImage = unfurlData?.open_graph?.images?.[0];
+
     // Merge all metadata sources with priority
     return {
-      title: ogsData?.ogTitle || unfurlData.title || url,
-      description: ogsData?.ogDescription || unfurlData.description || '',
-      siteName: ogsData?.ogSiteName || unfurlData.site_name || new URL(url).hostname,
-      mediaType: determineMediaType(url, unfurlData, ogsData),
-      previewUrl: ogsData?.ogImage?.[0]?.url || unfurlData.open_graph?.images?.[0]?.url,
+      title: ogsData?.result?.ogTitle || unfurlData.title || url,
+      description: ogsData?.result?.ogDescription || unfurlData.description || '',
+      siteName: ogsData?.result?.ogSiteName || unfurlData.site_name || new URL(url).hostname,
+      mediaType: determineMediaType(url, unfurlData, ogsData?.result),
+      previewUrl: ogImage?.url || unfurlImage?.url || unfurlData.favicon,
       previewType: 'image',
       favicon: unfurlData.favicon,
       url: url,
-      embedHtml: generateEmbedHtml(url, unfurlData, ogsData),
+      embedHtml: generateEmbedHtml(url, unfurlData, ogsData?.result),
+      height: ogImage?.height || unfurlImage?.height,
+      width: ogImage?.width || unfurlImage?.width,
       meta: {
         ...unfurlData,
-        ...ogsData
+        ...ogsData?.result
       }
     };
   } catch (error) {

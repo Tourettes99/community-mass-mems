@@ -243,7 +243,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           underline="none"
           sx={{ color: 'inherit' }}
         >
-          <Card sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Card sx={{ display: 'flex', flexDirection: 'column', '&:hover': { boxShadow: 6 } }}>
             {memory.metadata?.previewUrl && (
               <CardMedia
                 component="img"
@@ -253,18 +253,22 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   objectFit: 'cover'
                 }}
                 image={memory.metadata.previewUrl}
-                alt={title}
+                alt={memory.metadata?.title || 'Preview image'}
                 onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
             )}
             <CardContent>
-              <Typography variant="body1" component="div" gutterBottom>
+              <Typography variant="h6" component="div" gutterBottom>
+                {memory.metadata?.title || memory.url}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
                 {memory.metadata?.description || 'No description available'}
               </Typography>
               {memory.metadata?.siteName && (
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                  {renderFavicon}
                   {memory.metadata.siteName}
                 </Typography>
               )}
