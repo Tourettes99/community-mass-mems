@@ -154,7 +154,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             sx={{
               position: 'relative',
               width: '100%',
-              ...(memory.metadata.height && memory.metadata.width
+              ...(memory.metadata?.height && memory.metadata?.width
                 ? { paddingTop: `${(memory.metadata.height / memory.metadata.width) * 100}%` }
                 : { paddingTop: '56.25%' }) // Default 16:9 ratio
             }}
@@ -172,10 +172,10 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   border: 'none'
                 }
               }}
-              dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
+              dangerouslySetInnerHTML={{ __html: memory.metadata?.embedHtml || '' }}
             />
           </Box>
-          {memory.metadata.description && (
+          {memory.metadata?.description && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {memory.metadata.description}
             </Typography>
@@ -224,7 +224,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         <>
           {renderHeader}
           {mediaContent}
-          {memory.metadata.description && (
+          {memory.metadata?.description && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {memory.metadata.description}
             </Typography>

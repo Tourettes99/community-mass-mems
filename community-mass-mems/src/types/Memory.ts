@@ -37,6 +37,7 @@ export interface Memory {
     embedHtml?: string;
     height?: number;
     width?: number;
+    previewUrl?: string;
   };
   votes: {
     up: number;
