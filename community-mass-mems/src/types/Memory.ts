@@ -38,6 +38,7 @@ export interface Memory {
     height?: number;
     width?: number;
     previewUrl?: string;
+    siteName?: string;
   };
   votes: {
     up: number;
