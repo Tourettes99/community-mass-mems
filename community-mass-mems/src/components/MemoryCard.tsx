@@ -15,6 +15,23 @@ import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
 import EmbedPlayer from './EmbedPlayer';
 
+const detectDiscordMediaType = (url: string): string => {
+  if (!url) return 'rich';
+  
+  const extension = url.split('.').pop()?.toLowerCase();
+  if (!extension) return 'rich';
+
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
+    return 'image';
+  } else if (['mp4', 'webm', 'mov'].includes(extension)) {
+    return 'video';
+  } else if (['mp3', 'ogg', 'wav'].includes(extension)) {
+    return 'audio';
+  }
+  
+  return 'rich';
+};
+
 interface MemoryCardProps {
   memory: Memory;
   selectedTags: string[];
@@ -97,18 +114,30 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     
     try {
       const date = new Date(dateString);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
       
       if (isNaN(date.getTime())) {
-        console.warn('Invalid date string:', dateString);
         return 'Invalid date';
+      }
+
+      if (diffInSeconds < 60) {
+        return 'just now';
+      } else if (diffInSeconds < 3600) {
+        const minutes = Math.floor(diffInSeconds / 60);
+        return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+      } else if (diffInSeconds < 86400) {
+        const hours = Math.floor(diffInSeconds / 3600);
+        return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+      } else if (diffInSeconds < 604800) {
+        const days = Math.floor(diffInSeconds / 86400);
+        return `${days} ${days === 1 ? 'day' : 'days'} ago`;
       }
 
       return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: 'numeric'
       }).format(date);
     } catch (error) {
       console.error('Error formatting date:', error, dateString);
@@ -118,9 +147,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   const renderContent = () => {
     const title = memory.metadata?.title || memory.url || 'No title';
-    const showFavicon = memory.metadata?.favicon && 
-      isValidUrl(memory.metadata.favicon) && 
-      !faviconError;
+    const isDiscordCdn = memory.url?.includes('cdn.discordapp.com');
+    const isForbesArticle = memory.url?.includes('forbes.com');
+    
+    const mediaType = memory.metadata?.mediaType || (isDiscordCdn && memory.url ? detectDiscordMediaType(memory.url) : 'rich');
+    const showFavicon = memory.metadata?.favicon && isValidUrl(memory.metadata.favicon) && !faviconError;
 
     const renderFavicon = showFavicon && (
       <img 
@@ -128,25 +159,41 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         alt=""
         onError={handleFaviconError}
         style={{ 
-          width: 16, 
-          height: 16, 
+          width: 20, 
+          height: 20, 
           objectFit: 'contain',
           marginRight: 8,
-          flexShrink: 0
+          flexShrink: 0,
+          borderRadius: '4px'
         }} 
       />
     );
 
     const renderHeader = (
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        mb: 1,
+        gap: 1
+      }}>
         {renderFavicon}
-        <Typography variant="subtitle1">
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            fontSize: '1.1rem',
+            fontWeight: 500,
+            lineHeight: 1.2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical'
+          }}
+        >
           {title}
         </Typography>
       </Box>
     );
-
-    const mediaType = memory.metadata?.mediaType || 'rich';
 
     // Handle rich embeds (social media, etc)
     if (mediaType === 'rich' && memory.metadata?.embedHtml) {
@@ -157,9 +204,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             sx={{
               position: 'relative',
               width: '100%',
+              borderRadius: '8px',
+              overflow: 'hidden',
               ...(memory.metadata?.height && memory.metadata?.width
                 ? { paddingTop: `${(memory.metadata.height / memory.metadata.width) * 100}%` }
-                : { paddingTop: '56.25%' }) // Default 16:9 ratio
+                : { paddingTop: '56.25%' })
             }}
           >
             <Box
@@ -183,7 +232,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     }
 
     // Handle article-type content
-    if (mediaType === 'article') {
+    if (mediaType === 'article' || isForbesArticle) {
       return (
         <Link 
           href={memory.url} 
@@ -192,6 +241,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
           sx={{ 
             textDecoration: 'none', 
             color: 'inherit',
+            display: 'block',
             '&:hover': {
               textDecoration: 'none'
             }
@@ -201,30 +251,55 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             variant="outlined" 
             sx={{ 
               display: 'flex', 
-              flexDirection: 'column',
+              flexDirection: memory.metadata?.previewUrl ? 'row' : 'column',
               '&:hover': {
                 backgroundColor: 'action.hover'
-              }
+              },
+              borderRadius: '8px'
             }}
           >
             {memory.metadata?.previewUrl && (
-              <CardMedia
-                component="img"
-                height="200"
-                image={memory.metadata.previewUrl}
-                alt={title}
-                sx={{ objectFit: 'cover' }}
-              />
+              <Box sx={{ width: '30%', minWidth: '200px', position: 'relative' }}>
+                <CardMedia
+                  component="img"
+                  sx={{ 
+                    height: '100%',
+                    minHeight: '160px',
+                    objectFit: 'cover'
+                  }}
+                  image={memory.metadata.previewUrl}
+                  alt={title}
+                />
+              </Box>
             )}
-            <CardContent sx={{ flex: 1 }}>
+            <CardContent sx={{ flex: 1, p: 2 }}>
               {renderHeader}
               {memory.metadata?.description && (
-                <Typography variant="body2" color="text.secondary">
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    mb: 1
+                  }}
+                >
                   {memory.metadata.description}
                 </Typography>
               )}
               {memory.metadata?.siteName && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                <Typography 
+                  variant="caption" 
+                  color="text.secondary" 
+                  sx={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5
+                  }}
+                >
                   {memory.metadata.siteName}
                 </Typography>
               )}
@@ -239,33 +314,47 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       return (
         <>
           {renderHeader}
-          {mediaType === 'video' ? (
-            <video
-              controls
-              style={{ width: '100%', maxHeight: '400px' }}
-              src={memory.url}
-            >
-              Your browser does not support the video tag.
-            </video>
-          ) : mediaType === 'audio' ? (
-            <audio
-              controls
-              style={{ width: '100%' }}
-              src={memory.url}
-            >
-              Your browser does not support the audio tag.
-            </audio>
-          ) : (
-            <img
-              src={memory.url}
-              alt={title}
-              style={{ 
-                width: '100%', 
-                maxHeight: '400px',
-                objectFit: 'contain' 
-              }}
-            />
-          )}
+          <Box sx={{ 
+            borderRadius: '8px', 
+            overflow: 'hidden',
+            backgroundColor: 'action.hover',
+            mb: 2
+          }}>
+            {mediaType === 'video' ? (
+              <video
+                controls
+                style={{ 
+                  width: '100%', 
+                  maxHeight: '500px',
+                  borderRadius: '8px'
+                }}
+                src={memory.url}
+              >
+                Your browser does not support the video tag.
+              </video>
+            ) : mediaType === 'audio' ? (
+              <Box sx={{ p: 2 }}>
+                <audio
+                  controls
+                  style={{ width: '100%' }}
+                  src={memory.url}
+                >
+                  Your browser does not support the audio tag.
+                </audio>
+              </Box>
+            ) : (
+              <img
+                src={memory.url}
+                alt={title}
+                style={{ 
+                  width: '100%', 
+                  maxHeight: '500px',
+                  objectFit: 'contain',
+                  borderRadius: '8px'
+                }}
+              />
+            )}
+          </Box>
           {memory.metadata?.description && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {memory.metadata.description}
@@ -281,7 +370,13 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         href={memory.url} 
         target="_blank" 
         rel="noopener noreferrer"
-        sx={{ textDecoration: 'none', color: 'inherit' }}
+        sx={{ 
+          textDecoration: 'none', 
+          color: 'inherit',
+          '&:hover': {
+            textDecoration: 'underline'
+          }
+        }}
       >
         {renderHeader}
       </Link>
@@ -289,47 +384,94 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
   };
 
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardContent sx={{ flexGrow: 1 }}>
+    <Card 
+      sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        borderRadius: '12px',
+        '&:hover': {
+          boxShadow: 3
+        },
+        transition: 'box-shadow 0.2s'
+      }}
+    >
+      <CardContent sx={{ flexGrow: 1, p: 3 }}>
         {renderContent()}
-        <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        
+        <Box sx={{ 
+          mt: 2, 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 1 
+        }}>
           {memory.tags?.map((tag) => (
             <Chip
               key={tag}
               label={tag}
               size="small"
+              onClick={() => onTagClick(tag)}
               sx={{
-                backgroundColor: 'rgba(255, 87, 34, 0.1)',
-                color: '#ff5722',
+                borderRadius: '16px',
+                backgroundColor: selectedTags.includes(tag) ? 'primary.main' : 'action.selected',
+                color: selectedTags.includes(tag) ? 'primary.contrastText' : 'text.primary',
                 '&:hover': {
-                  backgroundColor: 'rgba(255, 87, 34, 0.2)',
+                  backgroundColor: selectedTags.includes(tag) ? 'primary.dark' : 'action.hover'
                 },
+                transition: 'all 0.2s'
               }}
             />
           ))}
         </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-          Created: {formatDate(memory.metadata?.createdAt)}
-        </Typography>
-      </CardContent>
-      <Box sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton
-            onClick={() => handleVote('up')}
-            color={userVote === 'up' ? 'primary' : 'default'}
+
+        <Box sx={{ 
+          mt: 2,
+          pt: 2,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <IconButton
+                size="small"
+                onClick={() => handleVote('up')}
+                color={userVote === 'up' ? 'primary' : 'default'}
+              >
+                <ThumbUpIcon fontSize="small" />
+              </IconButton>
+              <Typography variant="body2" sx={{ mx: 1 }}>
+                {memory.votes?.up || 0}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <IconButton
+                size="small"
+                onClick={() => handleVote('down')}
+                color={userVote === 'down' ? 'error' : 'default'}
+              >
+                <ThumbDownIcon fontSize="small" />
+              </IconButton>
+              <Typography variant="body2" sx={{ mx: 1 }}>
+                {memory.votes?.down || 0}
+              </Typography>
+            </Box>
+          </Box>
+          
+          <Typography 
+            variant="caption" 
+            color="text.secondary"
+            sx={{ 
+              display: 'flex',
+              alignItems: 'center'
+            }}
           >
-            <ThumbUpIcon />
-          </IconButton>
-          <Typography>{memory.votes?.up || 0}</Typography>
-          <IconButton
-            onClick={() => handleVote('down')}
-            color={userVote === 'down' ? 'primary' : 'default'}
-          >
-            <ThumbDownIcon />
-          </IconButton>
-          <Typography>{memory.votes?.down || 0}</Typography>
+            {formatDate(memory.submittedAt)}
+          </Typography>
         </Box>
-      </Box>
+      </CardContent>
     </Card>
   );
 };
