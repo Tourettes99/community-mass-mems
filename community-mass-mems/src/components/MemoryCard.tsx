@@ -147,11 +147,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   const renderContent = () => {
     const title = memory.metadata?.title || memory.url || 'No title';
-    const isDiscordCdn = memory.metadata?.isDiscordCdn;
+    const isDiscordCdn = memory.url?.includes('cdn.discordapp.com') || memory.url?.includes('media.discordapp.net');
     const isForbesArticle = memory.url?.includes('forbes.com');
     
     // Determine media type
-    const mediaType = memory.metadata?.mediaType || memory.type || (isDiscordCdn && memory.url ? detectDiscordMediaType(memory.url) : 'rich');
+    const mediaType = memory.metadata?.mediaType || (isDiscordCdn ? detectDiscordMediaType(memory.url || '') : memory.type) || 'rich';
     const showFavicon = memory.metadata?.favicon && isValidUrl(memory.metadata.favicon) && !faviconError;
 
     const renderFavicon = showFavicon && (
@@ -199,7 +199,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
     // Handle Discord CDN content
     if (isDiscordCdn && memory.url) {
-      const fileExtension = memory.url.split('.').pop()?.toLowerCase();
+      const fileExtension = memory.url.split('.').pop()?.split('?')[0]?.toLowerCase();
       const exParam = new URLSearchParams(memory.url.split('?')[1]).get('ex');
       const isExpired = exParam && (parseInt(exParam, 16) * 1000 < Date.now());
       
@@ -209,7 +209,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             {renderHeader}
             <Box sx={{ 
               width: '100%', 
-              minHeight: '200px',
+              minHeight: '100px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -235,7 +235,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               pt: '56.25%',
               bgcolor: 'background.paper',
               borderRadius: 1,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              maxHeight: '300px'
             }}>
               <video
                 controls
@@ -247,7 +248,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   left: 0,
                   width: '100%',
                   height: '100%',
-                  background: '#000'
+                  background: '#000',
+                  maxHeight: '300px'
                 }}
               >
                 <source src={memory.url} type={`video/${fileExtension}`} />
