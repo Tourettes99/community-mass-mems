@@ -107,7 +107,12 @@ const EmbedPlayer: React.FC<EmbedPlayerProps> = ({ type, url, title, metadata })
           // Handle videos
           if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
             return {
-              html: `<video controls style="width:100%; height:100%; max-height:400px;">
+              html: `<video 
+                controls 
+                preload="metadata"
+                playsinline
+                style="width:100%; height:100%; max-height:400px; background: #000;"
+              >
                 <source src="${url}" type="video/${fileExtension}">
                 Your browser does not support the video tag.
               </video>`,
