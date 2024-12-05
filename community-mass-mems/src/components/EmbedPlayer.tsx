@@ -16,31 +16,88 @@ interface EmbedPlayerProps {
 const EmbedPlayer: React.FC<EmbedPlayerProps> = ({ type, url, title, metadata }) => {
   const audioRef = useRef<HTMLDivElement>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
+  const fallbackAudioRef = useRef<HTMLAudioElement>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
 
   useEffect(() => {
     if (type === 'audio' && audioRef.current) {
-      waveSurferRef.current = WaveSurfer.create({
-        container: audioRef.current,
-        waveColor: '#4a90e2',
-        progressColor: '#2196f3',
-        cursorColor: '#2196f3',
-        barWidth: 2,
-        barRadius: 3,
-        responsive: true,
-        height: 60,
-      });
+      try {
+        waveSurferRef.current = WaveSurfer.create({
+          container: audioRef.current,
+          waveColor: '#4a90e2',
+          progressColor: '#2196f3',
+          cursorColor: '#2196f3',
+          barWidth: 2,
+          barRadius: 3,
+          responsive: true,
+          height: 60,
+          backend: 'WebAudio',
+        });
 
-      waveSurferRef.current.load(url);
-      waveSurferRef.current.on('ready', () => setIsLoading(false));
+        waveSurferRef.current.load(url);
+        
+        waveSurferRef.current.on('ready', () => {
+          setIsLoading(false);
+          setError(null);
+        });
 
-      return () => {
-        if (waveSurferRef.current) {
-          waveSurferRef.current.destroy();
-        }
-      };
+        waveSurferRef.current.on('error', (err) => {
+          console.error('WaveSurfer error:', err);
+          setError('Failed to load audio');
+          setUseFallback(true);
+        });
+
+        return () => {
+          if (waveSurferRef.current) {
+            waveSurferRef.current.destroy();
+          }
+        };
+      } catch (err) {
+        console.error('Failed to initialize WaveSurfer:', err);
+        setError('Failed to initialize audio player');
+        setUseFallback(true);
+      }
     }
   }, [url, type]);
+
+  if (error && useFallback) {
+    return (
+      <Box sx={{ width: '100%', my: 2 }}>
+        <audio 
+          ref={fallbackAudioRef}
+          controls
+          style={{ width: '100%' }}
+          onError={(e) => {
+            console.error('Audio element error:', e);
+            setError('Failed to play audio');
+          }}
+        >
+          <source src={url} type="audio/mpeg" />
+          <source src={url} type="audio/wav" />
+          <source src={url} type="audio/ogg" />
+          Your browser does not support the audio element.
+        </audio>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ color: 'error.main', my: 2 }}>
+        {error}
+      </Box>
+    );
+  }
+
+  if (isLoading && type === 'audio') {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+        <CircularProgress size={24} />
+      </Box>
+    );
+  }
 
   const getUrlEmbed = () => {
     if (!url) return null;
@@ -259,14 +316,6 @@ const EmbedPlayer: React.FC<EmbedPlayerProps> = ({ type, url, title, metadata })
       return null;
     }
   };
-
-  if (isLoading && type === 'audio') {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-        <CircularProgress size={24} />
-      </Box>
-    );
-  }
 
   switch (type) {
     case 'video':
