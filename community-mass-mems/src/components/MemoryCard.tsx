@@ -225,6 +225,37 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
         );
       }
 
+      // Handle images
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '')) {
+        return (
+          <>
+            {renderHeader}
+            <Box sx={{ 
+              width: '100%',
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              overflow: 'hidden',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}>
+              <img
+                src={memory.url}
+                alt={title}
+                style={{ 
+                  width: '100%',
+                  height: 'auto',
+                  maxHeight: '300px',
+                  objectFit: 'contain'
+                }}
+                loading="lazy"
+              />
+            </Box>
+          </>
+        );
+      }
+
+      // Handle videos
       if (['mp4', 'webm', 'mov'].includes(fileExtension || '')) {
         return (
           <>
