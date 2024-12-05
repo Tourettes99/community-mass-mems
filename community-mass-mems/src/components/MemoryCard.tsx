@@ -6,6 +6,8 @@ import {
   Box,
   Chip,
   IconButton,
+  Link,
+  CardMedia
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -135,213 +137,139 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       />
     );
 
-    if (!memory.url) {
+    const renderHeader = (
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        {renderFavicon}
+        <Typography variant="subtitle1">
+          {title}
+        </Typography>
+      </Box>
+    );
+
+    if (memory.metadata?.embedHtml) {
       return (
         <>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            {renderFavicon}
-            <Typography variant="subtitle1">
-              {title}
-            </Typography>
-          </Box>
-          <Typography variant="body1" color="text.secondary">
-            {memory.content || 'No content available'}
-          </Typography>
-        </>
-      );
-    }
-
-    // Handle Discord attachments
-    const isDiscordAttachment = memory.url.includes('cdn.discordapp.com') || memory.url.includes('media.discordapp.net');
-    if (isDiscordAttachment) {
-      const fileExtension = memory.url.split('.').pop()?.toLowerCase()?.split('?')[0];
-      if (fileExtension) {
-        const isVideo = ['mp4', 'webm', 'mov'].includes(fileExtension);
-        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
-        
-        return (
-          <>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              {renderFavicon}
-              <Typography variant="subtitle1">
-                {title}
-              </Typography>
-            </Box>
-            {isVideo ? (
-              <Box sx={{ width: '100%', maxHeight: '400px' }}>
-                <video
-                  controls
-                  style={{ width: '100%', height: '100%', maxHeight: '400px' }}
-                  src={memory.url}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </Box>
-            ) : isImage ? (
-              <Box
-                component="img"
-                src={memory.url}
-                alt={title}
-                sx={{
-                  width: '100%',
-                  height: 'auto',
-                  maxHeight: '400px',
-                  objectFit: 'contain',
-                  borderRadius: 1
-                }}
-              />
-            ) : (
-              <Typography variant="body1" color="text.secondary">
-                Unsupported file type
-              </Typography>
-            )}
-          </>
-        );
-      }
-    }
-
-    // Handle YouTube videos
-    const isYouTube = memory.url.includes('youtube.com') || memory.url.includes('youtu.be');
-    if (isYouTube) {
-      const videoId = memory.url.includes('youtube.com') 
-        ? memory.url.split('v=')[1]?.split('&')[0]
-        : memory.url.split('youtu.be/')[1]?.split('?')[0];
-        
-      if (videoId) {
-        return (
-          <>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              {renderFavicon}
-              <Typography variant="subtitle1">
-                {title}
-              </Typography>
-            </Box>
-            <Box sx={{ position: 'relative', paddingTop: '56.25%', width: '100%' }}>
-              <iframe
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  border: 'none'
-                }}
-                src={`https://www.youtube.com/embed/${videoId}`}
-                title={memory.metadata?.title ?? 'YouTube video'}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </Box>
-          </>
-        );
-      }
-    }
-
-    // Handle direct file links
-    const isDirectFile = /\.(jpeg|jpg|gif|png|webp)$/i.test(memory.url);
-    if (isDirectFile) {
-      return (
-        <>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            {renderFavicon}
-            <Typography variant="subtitle1">
-              {title}
-            </Typography>
-          </Box>
-          <Box 
-            component="img"
-            src={memory.url}
-            alt={memory.metadata?.title ?? 'Image'}
-            sx={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: '300px',
-              objectFit: 'contain',
-              borderRadius: 1
-            }}
-            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-              e.currentTarget.src = memory.metadata?.ogImage ?? memory.metadata?.twitterImage ?? '/placeholder.png';
-            }}
-          />
-        </>
-      );
-    }
-
-    // Handle other URLs with thumbnails
-    const thumbnail = memory.metadata?.ogImage ?? memory.metadata?.twitterImage;
-    if (thumbnail) {
-      return (
-        <>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            {renderFavicon}
-            <Typography variant="subtitle1">
-              {title}
-            </Typography>
-          </Box>
+          {renderHeader}
           <Box
-            component="a"
-            href={memory.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            sx={{ 
-              display: 'block',
-              textDecoration: 'none',
-              color: 'inherit'
+            sx={{
+              position: 'relative',
+              width: '100%',
+              ...(memory.metadata.height && memory.metadata.width
+                ? { paddingTop: `${(memory.metadata.height / memory.metadata.width) * 100}%` }
+                : { paddingTop: '56.25%' }) // Default 16:9 ratio
             }}
           >
             <Box
-              component="img"
-              src={thumbnail}
-              alt={memory.metadata?.title ?? 'Thumbnail'}
               sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
                 width: '100%',
-                height: 'auto',
-                maxHeight: '300px',
-                objectFit: 'contain',
-                borderRadius: 1
+                height: '100%',
+                '& iframe': {
+                  width: '100%',
+                  height: '100%',
+                  border: 'none'
+                }
               }}
-              onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                e.currentTarget.src = '/placeholder.png';
-              }}
+              dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
             />
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              {memory.metadata?.title ?? memory.url}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {memory.metadata?.description ?? 'No description available'}
-            </Typography>
           </Box>
+          {memory.metadata.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {memory.metadata.description}
+            </Typography>
+          )}
         </>
       );
     }
 
-    // Fallback for other content
+    if (['image', 'video', 'audio'].includes(memory.metadata?.mediaType || '')) {
+      const mediaContent = memory.metadata.mediaType === 'video' ? (
+        <video
+          controls
+          style={{ width: '100%', maxHeight: '400px' }}
+          src={memory.url}
+        >
+          Your browser does not support the video tag.
+        </video>
+      ) : memory.metadata.mediaType === 'audio' ? (
+        <audio
+          controls
+          style={{ width: '100%' }}
+          src={memory.url}
+        >
+          Your browser does not support the audio tag.
+        </audio>
+      ) : (
+        <Box
+          component="img"
+          src={memory.url}
+          alt={title}
+          sx={{
+            width: '100%',
+            height: 'auto',
+            maxHeight: '400px',
+            objectFit: 'contain',
+            borderRadius: 1
+          }}
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            e.currentTarget.src = memory.metadata?.previewUrl || '/placeholder.png';
+          }}
+        />
+      );
+
+      return (
+        <>
+          {renderHeader}
+          {mediaContent}
+          {memory.metadata.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {memory.metadata.description}
+            </Typography>
+          )}
+        </>
+      );
+    }
+
     return (
       <>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          {renderFavicon}
-          <Typography variant="subtitle1">
-            {title}
-          </Typography>
-        </Box>
-        <Box
-          component="a"
+        {renderHeader}
+        <Link
           href={memory.url}
           target="_blank"
           rel="noopener noreferrer"
-          sx={{ 
-            display: 'block',
-            textDecoration: 'none',
-            color: 'inherit'
-          }}
+          underline="none"
+          sx={{ color: 'inherit' }}
         >
-          <Typography variant="body1">
-            {memory.metadata?.title ?? memory.url}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {memory.metadata?.description ?? 'No description available'}
-          </Typography>
-        </Box>
+          <Card sx={{ display: 'flex', flexDirection: 'column' }}>
+            {memory.metadata?.previewUrl && (
+              <CardMedia
+                component="img"
+                sx={{
+                  width: '100%',
+                  height: 200,
+                  objectFit: 'cover'
+                }}
+                image={memory.metadata.previewUrl}
+                alt={title}
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            )}
+            <CardContent>
+              <Typography variant="body1" component="div" gutterBottom>
+                {memory.metadata?.description || 'No description available'}
+              </Typography>
+              {memory.metadata?.siteName && (
+                <Typography variant="body2" color="text.secondary">
+                  {memory.metadata.siteName}
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
       </>
     );
   };
