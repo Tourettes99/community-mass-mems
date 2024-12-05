@@ -43,10 +43,11 @@ const formatMemory = (memory) => {
   try {
     const formatted = {
       ...memory,
+      submittedAt: formatDate(memory.submittedAt),
       metadata: {
         ...memory.metadata,
-        createdAt: formatDate(memory.metadata?.createdAt || memory.createdAt),
-        updatedAt: formatDate(memory.metadata?.updatedAt || memory.updatedAt)
+        createdAt: formatDate(memory.submittedAt),
+        updatedAt: formatDate(memory.updatedAt)
       },
       votes: {
         up: memory.votes?.up || 0,
@@ -101,7 +102,7 @@ exports.handler = async (event, context) => {
     try {
       // Only fetch approved memories
       memories = await Memory.find({ status: 'approved' })
-        .sort({ createdAt: -1 })
+        .sort({ submittedAt: -1 })
         .lean()
         .exec();
       
