@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import Script from 'next/script';
+import { Helmet } from 'react-helmet';
 
 const SocialScripts: React.FC = () => {
   useEffect(() => {
@@ -20,32 +20,32 @@ const SocialScripts: React.FC = () => {
   }, []);
 
   return (
-    <>
+    <Helmet>
       {/* Twitter/X */}
-      <Script
+      <script 
+        async 
         src="https://platform.twitter.com/widgets.js"
-        strategy="lazyOnload"
       />
 
       {/* Facebook */}
-      <Script
+      <script 
+        async 
         src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0"
-        strategy="lazyOnload"
         nonce="social_script"
       />
 
       {/* Instagram */}
-      <Script
+      <script 
+        async 
         src="//www.instagram.com/embed.js"
-        strategy="lazyOnload"
       />
 
       {/* TikTok */}
-      <Script
+      <script 
+        async 
         src="https://www.tiktok.com/embed.js"
-        strategy="lazyOnload"
       />
-    </>
+    </Helmet>
   );
 };
 
