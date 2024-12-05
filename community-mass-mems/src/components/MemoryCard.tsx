@@ -151,7 +151,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     const isForbesArticle = memory.url?.includes('forbes.com');
     
     // Determine media type
-    const mediaType = memory.metadata?.mediaType || memory.type || (isDiscordCdn ? detectDiscordMediaType(memory.url) : 'rich');
+    const mediaType = memory.metadata?.mediaType || memory.type || (isDiscordCdn && memory.url ? detectDiscordMediaType(memory.url) : 'rich');
     const showFavicon = memory.metadata?.favicon && isValidUrl(memory.metadata.favicon) && !faviconError;
 
     const renderFavicon = showFavicon && (
