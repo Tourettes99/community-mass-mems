@@ -147,10 +147,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   const renderContent = () => {
     const title = memory.metadata?.title || memory.url || 'No title';
-    const isDiscordCdn = memory.url?.includes('cdn.discordapp.com');
+    const isDiscordCdn = memory.metadata?.isDiscordCdn;
     const isForbesArticle = memory.url?.includes('forbes.com');
     
-    const mediaType = memory.metadata?.mediaType || (isDiscordCdn && memory.url ? detectDiscordMediaType(memory.url) : 'rich');
+    // Determine media type
+    const mediaType = memory.metadata?.mediaType || memory.type || (isDiscordCdn ? detectDiscordMediaType(memory.url) : 'rich');
     const showFavicon = memory.metadata?.favicon && isValidUrl(memory.metadata.favicon) && !faviconError;
 
     const renderFavicon = showFavicon && (
@@ -195,22 +196,83 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       </Box>
     );
 
-    // Handle rich embeds (social media, etc)
-    if (mediaType === 'rich' && memory.metadata?.embedHtml) {
+    // Handle Discord CDN content
+    if (isDiscordCdn) {
+      const fileExtension = memory.url.split('.').pop()?.toLowerCase();
+      const exParam = new URLSearchParams(memory.url.split('?')[1]).get('ex');
+      const isExpired = exParam && (parseInt(exParam, 16) * 1000 < Date.now());
+      
+      if (isExpired) {
+        return (
+          <>
+            {renderHeader}
+            <Box sx={{ 
+              width: '100%', 
+              minHeight: '200px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'background.paper',
+              color: 'text.secondary',
+              borderRadius: 1,
+              p: 2,
+              textAlign: 'center'
+            }}>
+              This content has expired. Please contact an administrator to refresh it.
+            </Box>
+          </>
+        );
+      }
+
+      if (['mp4', 'webm', 'mov'].includes(fileExtension || '')) {
+        return (
+          <>
+            {renderHeader}
+            <Box sx={{ 
+              position: 'relative',
+              width: '100%',
+              pt: '56.25%',
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              overflow: 'hidden'
+            }}>
+              <video
+                controls
+                preload="metadata"
+                playsInline
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  background: '#000'
+                }}
+              >
+                <source src={memory.url} type={`video/${fileExtension}`} />
+                Your browser does not support the video tag.
+              </video>
+            </Box>
+          </>
+        );
+      }
+    }
+
+    // Handle YouTube/Vimeo videos
+    if (memory.metadata?.embedHtml && ['video', 'rich'].includes(mediaType)) {
       return (
         <>
           {renderHeader}
-          <Box
-            sx={{
-              position: 'relative',
-              width: '100%',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              ...(memory.metadata?.height && memory.metadata?.width
-                ? { paddingTop: `${(memory.metadata.height / memory.metadata.width) * 100}%` }
-                : { paddingTop: '56.25%' })
-            }}
-          >
+          <Box sx={{ 
+            position: 'relative',
+            width: '100%',
+            pt: memory.metadata?.height && memory.metadata?.width 
+              ? `${(memory.metadata.height / memory.metadata.width) * 100}%` 
+              : '56.25%',
+            bgcolor: 'background.paper',
+            borderRadius: 1,
+            overflow: 'hidden'
+          }}>
             <Box
               sx={{
                 position: 'absolute',
@@ -224,7 +286,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   border: 'none'
                 }
               }}
-              dangerouslySetInnerHTML={{ __html: memory.metadata?.embedHtml || '' }}
+              dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
             />
           </Box>
         </>
