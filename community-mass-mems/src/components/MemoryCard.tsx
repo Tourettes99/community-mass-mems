@@ -146,7 +146,10 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       </Box>
     );
 
-    if (memory.metadata?.embedHtml) {
+    const mediaType = memory.metadata?.mediaType || 'rich';
+
+    // Handle rich embeds (social media, etc)
+    if (mediaType === 'rich' && memory.metadata?.embedHtml) {
       return (
         <>
           {renderHeader}
@@ -175,107 +178,113 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               dangerouslySetInnerHTML={{ __html: memory.metadata?.embedHtml || '' }}
             />
           </Box>
-          {memory.metadata?.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {memory.metadata.description}
-            </Typography>
-          )}
         </>
       );
     }
 
-    if (memory.metadata && ['image', 'video', 'audio'].includes(memory.metadata.mediaType || '')) {
-      const mediaType = memory.metadata.mediaType;
-      const mediaContent = mediaType === 'video' ? (
-        <video
-          controls
-          style={{ width: '100%', maxHeight: '400px' }}
-          src={memory.url}
-        >
-          Your browser does not support the video tag.
-        </video>
-      ) : mediaType === 'audio' ? (
-        <audio
-          controls
-          style={{ width: '100%' }}
-          src={memory.url}
-        >
-          Your browser does not support the audio tag.
-        </audio>
-      ) : (
-        <Box
-          component="img"
-          src={memory.url}
-          alt={title}
-          sx={{
-            width: '100%',
-            height: 'auto',
-            maxHeight: '400px',
-            objectFit: 'contain',
-            borderRadius: 1
-          }}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            e.currentTarget.src = memory.metadata?.previewUrl || '/placeholder.png';
-          }}
-        />
-      );
-
+    // Handle article-type content
+    if (mediaType === 'article') {
       return (
-        <>
-          {renderHeader}
-          {mediaContent}
-          {memory.metadata?.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {memory.metadata.description}
-            </Typography>
-          )}
-        </>
-      );
-    }
-
-    return (
-      <>
-        {renderHeader}
-        <Link
-          href={memory.url}
-          target="_blank"
+        <Link 
+          href={memory.url} 
+          target="_blank" 
           rel="noopener noreferrer"
-          underline="none"
-          sx={{ color: 'inherit' }}
+          sx={{ 
+            textDecoration: 'none', 
+            color: 'inherit',
+            '&:hover': {
+              textDecoration: 'none'
+            }
+          }}
         >
-          <Card sx={{ display: 'flex', flexDirection: 'column', '&:hover': { boxShadow: 6 } }}>
+          <Card 
+            variant="outlined" 
+            sx={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              '&:hover': {
+                backgroundColor: 'action.hover'
+              }
+            }}
+          >
             {memory.metadata?.previewUrl && (
               <CardMedia
                 component="img"
-                sx={{
-                  width: '100%',
-                  height: 200,
-                  objectFit: 'cover'
-                }}
+                height="200"
                 image={memory.metadata.previewUrl}
-                alt={memory.metadata?.title || 'Preview image'}
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                  e.currentTarget.style.display = 'none';
-                }}
+                alt={title}
+                sx={{ objectFit: 'cover' }}
               />
             )}
-            <CardContent>
-              <Typography variant="h6" component="div" gutterBottom>
-                {memory.metadata?.title || memory.url}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                {memory.metadata?.description || 'No description available'}
-              </Typography>
+            <CardContent sx={{ flex: 1 }}>
+              {renderHeader}
+              {memory.metadata?.description && (
+                <Typography variant="body2" color="text.secondary">
+                  {memory.metadata.description}
+                </Typography>
+              )}
               {memory.metadata?.siteName && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  {renderFavicon}
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   {memory.metadata.siteName}
                 </Typography>
               )}
             </CardContent>
           </Card>
         </Link>
-      </>
+      );
+    }
+
+    // Handle media content (images, videos, audio)
+    if (['image', 'video', 'audio'].includes(mediaType)) {
+      return (
+        <>
+          {renderHeader}
+          {mediaType === 'video' ? (
+            <video
+              controls
+              style={{ width: '100%', maxHeight: '400px' }}
+              src={memory.url}
+            >
+              Your browser does not support the video tag.
+            </video>
+          ) : mediaType === 'audio' ? (
+            <audio
+              controls
+              style={{ width: '100%' }}
+              src={memory.url}
+            >
+              Your browser does not support the audio tag.
+            </audio>
+          ) : (
+            <img
+              src={memory.url}
+              alt={title}
+              style={{ 
+                width: '100%', 
+                maxHeight: '400px',
+                objectFit: 'contain' 
+              }}
+            />
+          )}
+          {memory.metadata?.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {memory.metadata.description}
+            </Typography>
+          )}
+        </>
+      );
+    }
+
+    // Fallback for unknown types
+    return (
+      <Link 
+        href={memory.url} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        sx={{ textDecoration: 'none', color: 'inherit' }}
+      >
+        {renderHeader}
+      </Link>
     );
   };
 

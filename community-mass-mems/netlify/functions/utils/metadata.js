@@ -179,28 +179,55 @@ function generateEmbedHtml(url, unfurlData, ogsData) {
 }
 
 function determineMediaType(url, unfurlData, ogsData) {
-  // Check file extension first
-  const fileExtension = url.split('.').pop()?.toLowerCase();
-  if (fileExtension) {
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) return 'image';
-    if (['mp4', 'webm', 'mov'].includes(fileExtension)) return 'video';
-    if (['mp3', 'wav', 'ogg'].includes(fileExtension)) return 'audio';
-  }
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.toLowerCase();
 
-  // Check OG type
-  const ogType = ogsData?.ogType;
-  if (ogType) {
-    if (ogType.includes('video')) return 'video';
-    if (ogType.includes('music') || ogType.includes('audio')) return 'audio';
-    if (ogType.includes('article')) return 'article';
-    if (ogType.includes('profile')) return 'profile';
-  }
+    // Check for known video platforms
+    if (domain.includes('youtube.com') || domain.includes('youtu.be') ||
+        domain.includes('vimeo.com') || domain.includes('tiktok.com')) {
+      return 'video';
+    }
 
-  // Check for media in unfurl data
-  if (unfurlData?.open_graph?.videos?.length > 0) return 'video';
-  if (unfurlData?.open_graph?.audio?.length > 0) return 'audio';
-  
-  return 'rich';
+    // Check for known social media platforms
+    if (domain.includes('twitter.com') || domain.includes('x.com') ||
+        domain.includes('instagram.com') || domain.includes('facebook.com')) {
+      return 'rich';
+    }
+
+    // Check file extension first
+    const fileExtension = url.split('.').pop()?.toLowerCase();
+    if (fileExtension) {
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) return 'image';
+      if (['mp4', 'webm', 'mov'].includes(fileExtension)) return 'video';
+      if (['mp3', 'wav', 'ogg'].includes(fileExtension)) return 'audio';
+    }
+
+    // Check OG type
+    const ogType = ogsData?.ogType;
+    if (ogType) {
+      if (ogType.includes('video')) return 'video';
+      if (ogType.includes('music') || ogType.includes('audio')) return 'audio';
+      if (ogType.includes('article')) return 'article';
+      if (ogType.includes('profile')) return 'profile';
+    }
+
+    // Check for media in unfurl data
+    if (unfurlData?.open_graph?.videos?.length > 0) return 'video';
+    if (unfurlData?.open_graph?.audio?.length > 0) return 'audio';
+    if (unfurlData?.open_graph?.images?.length > 0) return 'article';
+
+    // Default to article if there's a title and description
+    if ((ogsData?.ogTitle || unfurlData.title) && 
+        (ogsData?.ogDescription || unfurlData.description)) {
+      return 'article';
+    }
+    
+    return 'rich';
+  } catch (error) {
+    console.error('Error determining media type:', error);
+    return 'rich';
+  }
 }
 
 function createBasicMetadata(url) {

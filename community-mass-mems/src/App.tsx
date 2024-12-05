@@ -11,6 +11,7 @@ import PatreonBar from './components/PatreonBar';
 import ThemeToggle from './components/ThemeToggle';
 import UploadBar from './components/UploadBar';
 import useMemoryStore from './stores/memoryStore';
+import SocialScripts from './components/SocialScripts';
 
 const AppContent = () => {
   const { mode } = useTheme();
@@ -86,6 +87,7 @@ const App = () => {
     <ThemeProvider>
       <UploadBar onUpload={handleUpload} />
       <AppContent />
+      <SocialScripts />
       <Snackbar 
         open={!!error} 
         autoHideDuration={6000} 
