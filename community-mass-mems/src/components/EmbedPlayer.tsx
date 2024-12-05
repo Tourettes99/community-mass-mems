@@ -43,8 +43,9 @@ const EmbedPlayer: React.FC<EmbedPlayerProps> = ({ type, url, title, metadata })
           setError(null);
         });
 
-        waveSurferRef.current.on('error', (err) => {
-          console.error('WaveSurfer error:', err);
+        // Handle errors without parameters since WaveSurfer types don't expect them
+        waveSurferRef.current.on('error', () => {
+          console.error('WaveSurfer error: Failed to load audio');
           setError('Failed to load audio');
           setUseFallback(true);
         });
