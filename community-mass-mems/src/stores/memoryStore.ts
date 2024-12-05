@@ -29,7 +29,7 @@ const useMemoryStore = create<MemoryStore>()((set) => ({
   
   setMemories: (memories) => set({ 
     memories: memories.sort((a, b) => 
-      getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
+      getValidDate(b.submittedAt) - getValidDate(a.submittedAt)
     )
   }),
   
@@ -46,7 +46,7 @@ const useMemoryStore = create<MemoryStore>()((set) => ({
 
     return {
       memories: [...uniqueNewMemories, ...state.memories].sort((a, b) => 
-        getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
+        getValidDate(b.submittedAt) - getValidDate(a.submittedAt)
       )
     };
   }),
@@ -69,7 +69,7 @@ const useMemoryStore = create<MemoryStore>()((set) => ({
     
     return {
       memories: newMemories.sort((a, b) => 
-        getValidDate(b.metadata?.createdAt) - getValidDate(a.metadata?.createdAt)
+        getValidDate(b.submittedAt) - getValidDate(a.submittedAt)
       )
     };
   }),
