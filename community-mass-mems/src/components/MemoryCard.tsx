@@ -197,7 +197,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     );
 
     // Handle Discord CDN content
-    if (isDiscordCdn) {
+    if (isDiscordCdn && memory.url) {
       const fileExtension = memory.url.split('.').pop()?.toLowerCase();
       const exParam = new URLSearchParams(memory.url.split('?')[1]).get('ex');
       const isExpired = exParam && (parseInt(exParam, 16) * 1000 < Date.now());
