@@ -7,7 +7,11 @@ import {
   Chip,
   IconButton,
   Link,
-  CardMedia
+  CardMedia,
+  Divider,
+  PersonIcon,
+  CalendarTodayIcon,
+  PublicIcon
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -147,11 +151,11 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
 
   const renderContent = () => {
     const title = memory.metadata?.title || memory.url || 'No title';
-    const isDiscordCdn = memory.url?.includes('cdn.discordapp.com') || memory.url?.includes('media.discordapp.net');
-    const isForbesArticle = memory.url?.includes('forbes.com');
-    
-    // Determine media type
-    const mediaType = memory.metadata?.mediaType || (isDiscordCdn ? detectDiscordMediaType(memory.url || '') : memory.type) || 'rich';
+    const description = memory.metadata?.description;
+    const author = memory.metadata?.author;
+    const publishedDate = memory.metadata?.publishedDate;
+    const siteName = memory.metadata?.siteName;
+    const mediaType = memory.metadata?.mediaType || memory.type;
     const showFavicon = memory.metadata?.favicon && isValidUrl(memory.metadata.favicon) && !faviconError;
 
     const renderFavicon = showFavicon && (
@@ -173,139 +177,90 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     const renderHeader = (
       <Box sx={{ 
         display: 'flex', 
-        alignItems: 'center', 
-        mb: 1,
-        gap: 1
+        flexDirection: 'column',
+        gap: 1,
+        mb: 2
       }}>
-        {renderFavicon}
-        <Typography 
-          variant="h6" 
-          sx={{ 
-            fontSize: '1.1rem',
-            fontWeight: 500,
-            lineHeight: 1.3,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 1,
-            WebkitBoxOrient: 'vertical',
-            width: '100%'
-          }}
-        >
-          {title}
-        </Typography>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 1
+        }}>
+          {renderFavicon}
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontSize: '1.1rem',
+              fontWeight: 500,
+              lineHeight: 1.3,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              width: '100%'
+            }}
+          >
+            {title}
+          </Typography>
+        </Box>
+        {(author || publishedDate || siteName) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', fontSize: '0.875rem' }}>
+            {author && (
+              <>
+                <PersonIcon sx={{ fontSize: '1rem' }} />
+                <Typography variant="body2">{author}</Typography>
+                {(publishedDate || siteName) && <Divider orientation="vertical" flexItem />}
+              </>
+            )}
+            {publishedDate && (
+              <>
+                <CalendarTodayIcon sx={{ fontSize: '1rem' }} />
+                <Typography variant="body2">{new Date(publishedDate).toLocaleDateString()}</Typography>
+                {siteName && <Divider orientation="vertical" flexItem />}
+              </>
+            )}
+            {siteName && (
+              <>
+                <PublicIcon sx={{ fontSize: '1rem' }} />
+                <Typography variant="body2">{siteName}</Typography>
+              </>
+            )}
+          </Box>
+        )}
+        {description && (
+          <Typography 
+            variant="body2" 
+            color="text.secondary"
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical'
+            }}
+          >
+            {description}
+          </Typography>
+        )}
       </Box>
     );
 
-    // Handle Discord CDN content
-    if (isDiscordCdn && memory.url) {
-      const fileExtension = memory.url.split('.').pop()?.split('?')[0]?.toLowerCase();
-      const exParam = new URLSearchParams(memory.url.split('?')[1]).get('ex');
-      const isExpired = exParam && (parseInt(exParam, 16) * 1000 < Date.now());
-      
-      if (isExpired) {
-        return (
-          <>
-            {renderHeader}
-            <Box sx={{ 
-              width: '100%', 
-              minHeight: '100px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'background.paper',
-              color: 'text.secondary',
-              borderRadius: 1,
-              p: 2,
-              textAlign: 'center'
-            }}>
-              This content has expired. Please contact an administrator to refresh it.
-            </Box>
-          </>
-        );
-      }
-
-      // Handle images
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '')) {
-        return (
-          <>
-            {renderHeader}
-            <Box sx={{ 
-              width: '100%',
-              bgcolor: 'background.paper',
-              borderRadius: 1,
-              overflow: 'hidden',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center'
-            }}>
-              <img
-                src={memory.url}
-                alt={title}
-                style={{ 
-                  width: '100%',
-                  height: 'auto',
-                  maxHeight: '300px',
-                  objectFit: 'contain'
-                }}
-                loading="lazy"
-              />
-            </Box>
-          </>
-        );
-      }
-
-      // Handle videos
-      if (['mp4', 'webm', 'mov'].includes(fileExtension || '')) {
-        return (
-          <>
-            {renderHeader}
-            <Box sx={{ 
-              position: 'relative',
-              width: '100%',
-              pt: '56.25%',
-              bgcolor: 'background.paper',
-              borderRadius: 1,
-              overflow: 'hidden',
-              maxHeight: '300px'
-            }}>
-              <video
-                controls
-                preload="metadata"
-                playsInline
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  background: '#000',
-                  maxHeight: '300px'
-                }}
-              >
-                <source src={memory.url} type={`video/${fileExtension}`} />
-                Your browser does not support the video tag.
-              </video>
-            </Box>
-          </>
-        );
-      }
-    }
-
-    // Handle YouTube/Vimeo videos
-    if (memory.metadata?.embedHtml && ['video', 'rich'].includes(mediaType)) {
+    // Handle rich media content
+    if (memory.metadata?.embedHtml) {
       return (
         <>
           {renderHeader}
           <Box sx={{ 
             position: 'relative',
             width: '100%',
-            pt: memory.metadata?.height && memory.metadata?.width 
-              ? `${(memory.metadata.height / memory.metadata.width) * 100}%` 
+            pt: memory.metadata?.dimensions?.height && memory.metadata?.dimensions?.width
+              ? `${(memory.metadata.dimensions.height / memory.metadata.dimensions.width) * 100}%`
               : '56.25%',
             bgcolor: 'background.paper',
             borderRadius: 1,
-            overflow: 'hidden'
+            overflow: 'hidden',
+            mb: 2
           }}>
             <Box
               sx={{
@@ -327,181 +282,74 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       );
     }
 
-    // Handle article-type content
-    if (mediaType === 'article' || isForbesArticle) {
-      return (
-        <Link 
-          href={memory.url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          sx={{ 
-            textDecoration: 'none', 
-            color: 'inherit',
-            display: 'block',
-            '&:hover': {
-              textDecoration: 'none'
-            }
-          }}
-        >
-          <Card 
-            variant="outlined" 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: memory.metadata?.previewUrl ? 'row' : 'column',
-              '&:hover': {
-                backgroundColor: 'action.hover'
-              },
-              borderRadius: '8px',
-              maxWidth: '400px'
-            }}
-          >
-            {memory.metadata?.previewUrl && (
-              <Box sx={{ width: '120px', position: 'relative' }}>
-                <CardMedia
-                  component="img"
-                  sx={{ 
-                    height: '100px',
-                    objectFit: 'cover'
-                  }}
-                  image={memory.metadata.previewUrl}
-                  alt={title}
-                />
-              </Box>
-            )}
-            <CardContent sx={{ flex: 1, p: 1.5 }}>
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                mb: 0.5,
-                gap: 0.5
-              }}>
-                {renderFavicon}
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
-                    lineHeight: 1.2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 1,
-                    WebkitBoxOrient: 'vertical'
-                  }}
-                >
-                  {title}
-                </Typography>
-              </Box>
-              {memory.metadata?.description && (
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary"
-                  sx={{
-                    fontSize: '0.8rem',
-                    lineHeight: 1.3,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    mb: 0.5
-                  }}
-                >
-                  {memory.metadata.description}
-                </Typography>
-              )}
-              {memory.metadata?.siteName && (
-                <Typography 
-                  variant="caption" 
-                  color="text.secondary" 
-                  sx={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    fontSize: '0.75rem'
-                  }}
-                >
-                  {memory.metadata.siteName}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Link>
-      );
-    }
-
-    // Handle media content (images, videos, audio)
-    if (['image', 'video', 'audio'].includes(mediaType)) {
+    // Handle image preview
+    if (memory.metadata?.previewUrl && memory.metadata?.mediaType === 'image') {
       return (
         <>
           {renderHeader}
           <Box sx={{ 
-            borderRadius: '8px', 
+            width: '100%',
+            bgcolor: 'background.paper',
+            borderRadius: 1,
             overflow: 'hidden',
-            backgroundColor: 'action.hover',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
             mb: 2
           }}>
-            {mediaType === 'video' ? (
-              <video
-                controls
-                style={{ 
-                  width: '100%', 
-                  maxHeight: '500px',
-                  borderRadius: '8px'
-                }}
-                src={memory.url}
-              >
-                Your browser does not support the video tag.
-              </video>
-            ) : mediaType === 'audio' ? (
-              <Box sx={{ p: 2 }}>
-                <audio
-                  controls
-                  style={{ width: '100%' }}
-                  src={memory.url}
-                >
-                  Your browser does not support the audio tag.
-                </audio>
-              </Box>
-            ) : (
-              <img
-                src={memory.url}
-                alt={title}
-                style={{ 
-                  width: '100%', 
-                  maxHeight: '500px',
-                  objectFit: 'contain',
-                  borderRadius: '8px'
-                }}
-              />
-            )}
+            <img
+              src={memory.metadata.previewUrl}
+              alt={title}
+              style={{ 
+                width: '100%',
+                height: 'auto',
+                maxHeight: '400px',
+                objectFit: 'contain'
+              }}
+              loading="lazy"
+            />
           </Box>
-          {memory.metadata?.description && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {memory.metadata.description}
-            </Typography>
-          )}
         </>
       );
     }
 
-    // Fallback for unknown types
-    return (
-      <Link 
-        href={memory.url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        sx={{ 
-          textDecoration: 'none', 
-          color: 'inherit',
-          '&:hover': {
-            textDecoration: 'underline'
-          }
-        }}
-      >
-        {renderHeader}
-      </Link>
-    );
+    // Handle video preview
+    if (memory.metadata?.video) {
+      return (
+        <>
+          {renderHeader}
+          <Box sx={{ 
+            position: 'relative',
+            width: '100%',
+            pt: '56.25%',
+            bgcolor: 'background.paper',
+            borderRadius: 1,
+            overflow: 'hidden',
+            mb: 2
+          }}>
+            <video
+              controls
+              preload="metadata"
+              playsInline
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: '#000'
+              }}
+            >
+              <source src={memory.metadata.video.url} type={memory.metadata.video.type} />
+              Your browser does not support the video tag.
+            </video>
+          </Box>
+        </>
+      );
+    }
+
+    // Fallback to basic preview
+    return renderHeader;
   };
 
   return (
