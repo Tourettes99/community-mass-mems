@@ -3,6 +3,16 @@ const fileType = require('file-type');
 const fetch = require('node-fetch');
 const ogs = require('open-graph-scraper');
 const { getOEmbedProviders } = require('oembed-providers');
+const metascraper = require('metascraper')([
+  require('metascraper-author')(),
+  require('metascraper-date')(),
+  require('metascraper-description')(),
+  require('metascraper-image')(),
+  require('metascraper-logo')(),
+  require('metascraper-publisher')(),
+  require('metascraper-title')(),
+  require('metascraper-url')()
+]);
 
 // Universal URL metadata extractor
 async function extractUrlMetadata(url) {
@@ -19,33 +29,69 @@ async function extractUrlMetadata(url) {
       };
     }
 
-    // Step 2: Try unfurl + open-graph-scraper combo
-    const [unfurlData, ogsData] = await Promise.all([
+    // Step 2: Try multiple metadata extraction methods in parallel
+    const [unfurlData, ogsData, metascraperData] = await Promise.allSettled([
       unfurl(url),
-      ogs({ url, fetchOptions: { timeout: 10000 } })
+      ogs({ url, fetchOptions: { timeout: 10000 } }),
+      fetch(url).then(res => res.text()).then(html => metascraper({ html, url }))
     ]);
 
-    const ogImage = ogsData?.result?.ogImage?.[0];
-    const unfurlImage = unfurlData?.open_graph?.images?.[0];
+    // Get successful results
+    const unfurlResult = unfurlData.status === 'fulfilled' ? unfurlData.value : null;
+    const ogsResult = ogsData.status === 'fulfilled' ? ogsData.value.result : null;
+    const metascraperResult = metascraperData.status === 'fulfilled' ? metascraperData.value : null;
 
-    // Merge all metadata sources with priority
-    return {
-      title: ogsData?.result?.ogTitle || unfurlData.title || url,
-      description: ogsData?.result?.ogDescription || unfurlData.description || '',
-      siteName: ogsData?.result?.ogSiteName || unfurlData.site_name || new URL(url).hostname,
-      mediaType: determineMediaType(url, unfurlData, ogsData?.result),
-      previewUrl: ogImage?.url || unfurlImage?.url || unfurlData.favicon,
+    // Combine metadata with priority
+    const metadata = {
+      title: metascraperResult?.title || ogsResult?.ogTitle || unfurlResult?.title || url,
+      description: metascraperResult?.description || ogsResult?.ogDescription || unfurlResult?.description || '',
+      siteName: metascraperResult?.publisher || ogsResult?.ogSiteName || unfurlResult?.site_name || new URL(url).hostname,
+      author: metascraperResult?.author || ogsResult?.ogArticle?.author || unfurlResult?.author,
+      publishedDate: metascraperResult?.date || ogsResult?.ogArticle?.publishedTime || unfurlResult?.published,
+      mediaType: determineMediaType(url, unfurlResult, ogsResult),
+      previewUrl: metascraperResult?.image || ogsResult?.ogImage?.[0]?.url || unfurlResult?.open_graph?.images?.[0]?.url,
       previewType: 'image',
-      favicon: unfurlData.favicon,
+      favicon: metascraperResult?.logo || unfurlResult?.favicon,
       url: url,
-      embedHtml: generateEmbedHtml(url, unfurlData, ogsData?.result),
-      height: ogImage?.height || unfurlImage?.height,
-      width: ogImage?.width || unfurlImage?.width,
+      embedHtml: generateEmbedHtml(url, unfurlResult, ogsResult),
       meta: {
-        ...unfurlData,
-        ...ogsData?.result
+        keywords: ogsResult?.ogKeywords || [],
+        locale: ogsResult?.ogLocale || unfurlResult?.locale,
+        type: ogsResult?.ogType || unfurlResult?.type,
+        robots: unfurlResult?.robots || {},
+        twitter: {
+          card: ogsResult?.twitterCard,
+          site: ogsResult?.twitterSite,
+          creator: ogsResult?.twitterCreator,
+          image: ogsResult?.twitterImage?.[0]?.url
+        }
       }
     };
+
+    // Add dimensions if available
+    if (ogsResult?.ogImage?.[0]) {
+      metadata.dimensions = {
+        width: ogsResult.ogImage[0].width,
+        height: ogsResult.ogImage[0].height
+      };
+    }
+
+    // Add rich media data
+    if (unfurlResult?.open_graph?.videos?.[0]) {
+      metadata.video = {
+        url: unfurlResult.open_graph.videos[0].url,
+        type: unfurlResult.open_graph.videos[0].type,
+        width: unfurlResult.open_graph.videos[0].width,
+        height: unfurlResult.open_graph.videos[0].height
+      };
+    }
+
+    // Add structured data if available
+    if (unfurlResult?.json_ld) {
+      metadata.structuredData = unfurlResult.json_ld;
+    }
+
+    return metadata;
   } catch (error) {
     console.error('Error extracting URL metadata:', error);
     return createBasicMetadata(url);
