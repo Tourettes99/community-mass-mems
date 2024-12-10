@@ -39,14 +39,15 @@ export interface Memory {
     width?: number;
     previewUrl?: string;
     siteName?: string;
+    publishedDate?: string;
+    author?: string;
+    authorUrl?: string;
     // New fields for media handling
     isDiscordCdn?: boolean;
     expiresAt?: string;
     format?: string;
     videoId?: string;
     embedUrl?: string;
-    author?: string;
-    authorUrl?: string;
     meta?: {
       [key: string]: any;
     };
