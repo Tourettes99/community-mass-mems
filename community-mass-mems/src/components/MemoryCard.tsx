@@ -282,33 +282,97 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       );
     }
 
-    // Handle image preview
-    if (memory.metadata?.previewUrl && memory.metadata?.mediaType === 'image') {
+    // Handle GIF preview
+    if (memory.metadata?.gif) {
+      const { url, stillUrl, mp4, webp } = memory.metadata.gif;
       return (
         <>
           {renderHeader}
-          <Box sx={{ 
-            width: '100%',
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            overflow: 'hidden',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            mb: 2
-          }}>
+          <Box
+            sx={{
+              position: 'relative',
+              width: '100%',
+              pt: memory.metadata.gif.height && memory.metadata.gif.width
+                ? `${(memory.metadata.gif.height / memory.metadata.gif.width) * 100}%`
+                : '56.25%',
+              bgcolor: 'background.paper',
+            }}
+          >
+            {mp4 ? (
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                }}
+                poster={stillUrl}
+              >
+                <source src={mp4} type="video/mp4" />
+                <img src={url} alt="GIF" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </video>
+            ) : (
+              <img
+                src={webp || url}
+                alt="GIF"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                }}
+              />
+            )}
+          </Box>
+        </>
+      );
+    }
+
+    // Handle image preview
+    if (memory.metadata?.image) {
+      const { url, alt, caption, thumbnails } = memory.metadata.image;
+      return (
+        <>
+          {renderHeader}
+          <Box
+            sx={{
+              position: 'relative',
+              width: '100%',
+              pt: memory.metadata.image.height && memory.metadata.image.width
+                ? `${(memory.metadata.image.height / memory.metadata.image.width) * 100}%`
+                : '56.25%',
+              bgcolor: 'background.paper',
+            }}
+          >
             <img
-              src={memory.metadata.previewUrl}
-              alt={title}
-              style={{ 
+              src={url}
+              alt={alt || 'Image'}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
                 width: '100%',
-                height: 'auto',
-                maxHeight: '400px',
-                objectFit: 'contain'
+                height: '100%',
+                objectFit: 'contain',
               }}
               loading="lazy"
+              srcSet={thumbnails ? `${thumbnails.small} 300w, ${thumbnails.medium} 600w, ${thumbnails.large} 1200w` : undefined}
+              sizes="(max-width: 600px) 100vw, (max-width: 960px) 75vw, 50vw"
             />
           </Box>
+          {caption && (
+            <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1, display: 'block' }}>
+              {caption}
+            </Typography>
+          )}
         </>
       );
     }
