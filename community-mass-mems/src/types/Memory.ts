@@ -46,6 +46,32 @@ export interface Memory {
     publishedDate?: string;
     author?: string;
     authorUrl?: string;
+    // Image-specific fields
+    image?: {
+      url: string;
+      type?: string;
+      width?: number;
+      height?: number;
+      alt?: string;
+      caption?: string;
+      isAnimated?: boolean;
+      thumbnails?: {
+        small?: string;
+        medium?: string;
+        large?: string;
+      };
+    };
+    // GIF-specific fields
+    gif?: {
+      url: string;
+      stillUrl?: string;
+      width?: number;
+      height?: number;
+      frames?: number;
+      size?: number;
+      mp4?: string;
+      webp?: string;
+    };
     // Video-specific fields
     video?: {
       url?: string;
