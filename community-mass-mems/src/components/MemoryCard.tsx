@@ -1,20 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  Box,
   Card,
   CardContent,
-  Typography,
-  Box,
   Chip,
   IconButton,
   Link,
   CardMedia,
   Divider,
-  PersonIcon,
-  CalendarTodayIcon,
-  PublicIcon
+  Typography
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import PersonIcon from '@mui/icons-material/Person';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import PublicIcon from '@mui/icons-material/Public';
 import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
 import EmbedPlayer from './EmbedPlayer';
