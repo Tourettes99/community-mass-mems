@@ -46,6 +46,14 @@ export interface Memory {
     publishedDate?: string;
     author?: string;
     authorUrl?: string;
+    // Video-specific fields
+    video?: {
+      url?: string;
+      type?: string;
+      width?: number;
+      height?: number;
+      duration?: number;
+    };
     // New fields for media handling
     isDiscordCdn?: boolean;
     expiresAt?: string;
