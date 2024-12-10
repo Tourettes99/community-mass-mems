@@ -35,6 +35,10 @@ export interface Memory {
     twitterImage?: string;
     twitterCard?: string;
     embedHtml?: string;
+    dimensions?: {
+      height: number;
+      width: number;
+    };
     height?: number;
     width?: number;
     previewUrl?: string;
