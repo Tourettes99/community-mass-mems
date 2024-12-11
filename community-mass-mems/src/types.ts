@@ -11,7 +11,7 @@ export interface Memory {
     favicon?: string;
     mediaType?: 'url' | 'image' | 'video' | 'audio' | 'static';
     previewUrl?: string;
-    embedHtml?: string;
+    embedHtml: string;
     playbackHtml?: string;
     isPlayable?: boolean;
     fileSize?: number;
