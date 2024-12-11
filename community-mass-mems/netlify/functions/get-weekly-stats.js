@@ -23,7 +23,8 @@ exports.handler = async (event, context) => {
 
     // Count posts this week
     const postsThisWeek = await Memory.countDocuments({
-      submittedAt: { $gte: startOfWeek.toISOString() }
+      submittedAt: { $gte: startOfWeek.toISOString() },
+      status: 'approved'  // Only count approved posts
     });
 
     return {
