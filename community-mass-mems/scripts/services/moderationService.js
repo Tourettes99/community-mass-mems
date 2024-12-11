@@ -2,6 +2,7 @@ const fetch = require('node-fetch');
 const fs = require('fs').promises;
 const path = require('path');
 const chalk = require('chalk');
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '..', '.env') });
 
 class ModerationService {
   constructor() {
@@ -11,6 +12,11 @@ class ModerationService {
 
   async initialize() {
     try {
+      if (!process.env.OPENAI_API_KEY) {
+        console.error(chalk.red('OPENAI_API_KEY is not set in environment variables'));
+        console.log(chalk.yellow('Available environment variables:'), Object.keys(process.env));
+        throw new Error('OPENAI_API_KEY environment variable is not set');
+      }
       const configPath = path.join(__dirname, '..', '..', 'config', 'moderation-rules.json');
       const configData = await fs.readFile(configPath, 'utf8');
       const config = JSON.parse(configData);

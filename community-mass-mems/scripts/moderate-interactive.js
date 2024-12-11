@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const { MongoClient, ObjectId } = require('mongodb');
 const readline = require('readline');
 const chalk = require('chalk');
@@ -91,167 +91,100 @@ async function resetWeeklyPosts(collection) {
 }
 
 async function moderateMemories() {
-  let client;
   try {
-    // Initialize moderation service
     await moderationService.initialize();
     
-    client = await MongoClient.connect(process.env.MONGODB_URI);
-    console.log(chalk.green('Connected to MongoDB successfully!\n'));
-
-    const db = client.db('memories');
+    const client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+    console.log(chalk.green('Connected to MongoDB successfully!'));
+    
+    const db = client.db();
     const collection = db.collection('memories');
-
-    while (true) {
-      const action = await askQuestion(
-        chalk.cyan('\nMain Menu:\n') +
-        '1. Moderate pending posts\n' +
-        '2. Reset weekly post counter\n' +
-        '3. Quit\n' +
-        chalk.yellow('Choose action (1-3): ')
-      );
-
-      switch (action) {
-        case '1':
-          // Get pending memories
-          const pendingMemories = await collection.find({ status: 'pending' }).toArray();
-          
-          if (pendingMemories.length === 0) {
-            console.log(chalk.yellow('No pending memories to moderate.'));
-            continue;
-          }
-
-          console.log(chalk.blue(`Found ${pendingMemories.length} pending memories.`));
-
-          for (let i = 0; i < pendingMemories.length; i++) {
-            const memory = pendingMemories[i];
-            console.log(formatMemory(memory, i));
-
-            // Run content through moderation service
-            const moderationResult = await moderationService.moderateContent(
-              memory.type === 'text' ? memory.content : memory,
-              memory.type
-            );
-
-            if (memory.type === 'url') {
-              const refreshMetadata = await askQuestion('\nRefresh metadata? (y/n): ');
-              if (refreshMetadata.toLowerCase() === 'y') {
-                try {
-                  console.log('\nFetching fresh metadata...');
-                  const metadata = await extractUrlMetadata(memory.url);
-                  console.log(formatMetadata(metadata));
-
-                  const updateMetadata = await askQuestion('\nUpdate with fresh metadata? (y/n): ');
-                  if (updateMetadata.toLowerCase() === 'y') {
-                    await collection.updateOne(
-                      { _id: memory._id },
-                      { $set: { metadata: metadata } }
-                    );
-                    console.log(chalk.green('Metadata updated successfully.'));
-                  }
-                } catch (error) {
-                  console.error(chalk.red('Error refreshing metadata:'), error.message);
-                }
-              }
-            }
-
-            // Show moderation recommendation
-            console.log(chalk.yellow('\nModeration Recommendation:'), 
-              moderationResult.decision === 'approve' ? chalk.green(moderationResult.decision) :
-              moderationResult.decision === 'reject' ? chalk.red(moderationResult.decision) :
-              chalk.yellow(moderationResult.decision)
-            );
-            console.log(chalk.yellow('Reason:'), moderationResult.reason);
-
-            const memoryAction = await askQuestion(
-              '\nActions:\n' +
-              '1. Approve\n' +
-              '2. Reject\n' +
-              '3. Skip\n' +
-              '4. Edit tags\n' +
-              '5. Back to main menu\n' +
-              'Choose action (1-5): '
-            );
-
-            switch (memoryAction) {
-              case '1':
-                await collection.updateOne(
-                  { _id: memory._id },
-                  { 
-                    $set: { 
-                      status: 'approved',
-                      moderatedAt: new Date(),
-                      votes: { up: 0, down: 0 },
-                      userVotes: {},
-                      moderationResult: moderationResult
-                    }
-                  }
-                );
-                console.log(chalk.green('Memory approved.'));
-                break;
-
-              case '2':
-                await collection.updateOne(
-                  { _id: memory._id },
-                  { 
-                    $set: { 
-                      status: 'rejected',
-                      moderatedAt: new Date(),
-                      moderationResult: moderationResult
-                    }
-                  }
-                );
-                console.log(chalk.red('Memory rejected.'));
-                break;
-
-              case '3':
-                console.log(chalk.yellow('Skipping to next memory.'));
-                break;
-
-              case '4':
-                const currentTags = memory.tags || [];
-                console.log(`\nCurrent tags: ${chalk.yellow(currentTags.join(', ') || 'None')}`);
-                const newTags = await askQuestion('Enter new tags (comma-separated) or press enter to keep current: ');
-                
-                if (newTags.trim()) {
-                  const tagArray = newTags.split(',').map(tag => tag.trim()).filter(tag => tag);
-                  await collection.updateOne(
-                    { _id: memory._id },
-                    { $set: { tags: tagArray } }
-                  );
-                  console.log(chalk.green('Tags updated successfully.'));
-                }
-                break;
-
-              case '5':
-                i = pendingMemories.length; // Exit the loop
-                break;
-
-              default:
-                console.log(chalk.yellow('Invalid choice. Skipping to next memory.'));
-            }
-          }
-          break;
-
-        case '2':
-          await resetWeeklyPosts(collection);
-          break;
-
-        case '3':
-          console.log(chalk.green('Exiting moderation...'));
-          return;
-
-        default:
-          console.log(chalk.red('Invalid choice. Please try again.'));
-      }
+    
+    const pendingMemories = await collection.find({ status: 'pending' }).toArray();
+    
+    if (pendingMemories.length === 0) {
+      console.log(chalk.yellow('\nNo pending memories found.'));
+      await client.close();
+      rl.close();
+      return;
     }
-
+    
+    console.log(chalk.cyan(`Found ${pendingMemories.length} pending memories.\n`));
+    
+    for (const memory of pendingMemories) {
+      console.log(formatMemory(memory, pendingMemories.indexOf(memory)));
+      
+      console.log('\nAnalyzing content...');
+      const content = memory.type === 'text' ? memory.content : memory.url;
+      
+      try {
+        const moderationResult = await moderationService.moderateContent(content);
+        
+        // Automatic decision based on confidence scores
+        if (moderationResult.flagged && moderationResult.categories_scores) {
+          const maxScore = Math.max(...Object.values(moderationResult.categories_scores));
+          
+          if (maxScore > 0.8) {
+            // High confidence rejection
+            await collection.updateOne(
+              { _id: memory._id },
+              { $set: { status: 'rejected', moderationReason: 'Automatic rejection - high confidence violation' } }
+            );
+            console.log(chalk.red('Content automatically rejected due to high confidence violation'));
+            
+            // Send email notification for rejected content
+            const emailContent = `Content was automatically rejected.\nID: ${memory._id}\nReason: High confidence violation\nScores: ${JSON.stringify(moderationResult.categories_scores, null, 2)}`;
+            // TODO: Implement email notification
+            
+          } else if (maxScore > 0.4) {
+            // Medium confidence - needs manual review
+            console.log(chalk.yellow('Content requires manual review - medium confidence'));
+            const answer = await askQuestion('Approve this content? (y/n): ');
+            
+            if (answer.toLowerCase() === 'y') {
+              await collection.updateOne(
+                { _id: memory._id },
+                { $set: { status: 'approved' } }
+              );
+              console.log(chalk.green('Content approved'));
+            } else {
+              await collection.updateOne(
+                { _id: memory._id },
+                { $set: { status: 'rejected', moderationReason: 'Manual rejection after review' } }
+              );
+              console.log(chalk.red('Content rejected'));
+            }
+          } else {
+            // Low confidence - auto approve
+            await collection.updateOne(
+              { _id: memory._id },
+              { $set: { status: 'approved' } }
+            );
+            console.log(chalk.green('Content automatically approved - low risk score'));
+          }
+        } else {
+          // No flags - auto approve
+          await collection.updateOne(
+            { _id: memory._id },
+            { $set: { status: 'approved' } }
+          );
+          console.log(chalk.green('Content automatically approved - no flags'));
+        }
+      } catch (error) {
+        console.error(chalk.red('Error during moderation:'), error);
+        // Keep the content pending if there's an error
+        console.log(chalk.yellow('Content will remain pending due to error'));
+      }
+      
+      console.log('\n' + '-'.repeat(50) + '\n');
+    }
+    
+    await client.close();
+    rl.close();
+    
   } catch (error) {
     console.error(chalk.red('Error:'), error);
-  } finally {
-    if (client) {
-      await client.close();
-    }
     rl.close();
   }
 }
