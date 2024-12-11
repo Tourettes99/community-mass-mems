@@ -46,7 +46,7 @@ class AutoModerationService {
       // Check custom rules
       const customViolations = [];
       if (this.rules) {
-        for (const rule of this.knowledgeBase.custom_rules) {
+        for (const rule of this.knowledgeBase?.custom_rules || []) {
           const regex = new RegExp(rule.pattern, 'i');
           if (regex.test(content)) {
             customViolations.push(rule);
@@ -57,20 +57,41 @@ class AutoModerationService {
       // Make moderation decision
       let decision = 'approve';
       let reason = 'Content meets community guidelines';
+      let maxScore = 0;
+      let maxCategory = null;
 
       // Check custom violations first
       if (customViolations.length > 0) {
         decision = 'reject';
         reason = `Content violates custom rules: ${customViolations.map(v => v.reason).join(', ')}`;
-      }
-      // Then check category scores
-      else {
-        for (const [category, rule] of Object.entries(this.rules)) {
-          const score = openAIResult.category_scores[category] || 0;
-          if (score >= rule.threshold) {
-            decision = 'reject';
-            reason = `Content violates ${category} threshold`;
-            break;
+      } else {
+        // Find the highest scoring category
+        for (const [category, score] of Object.entries(openAIResult.category_scores)) {
+          if (score > maxScore) {
+            maxScore = score;
+            maxCategory = category;
+          }
+        }
+
+        // If any score is above the auto-reject threshold, reject it
+        if (maxScore >= this.settings.auto_reject_threshold) {
+          decision = 'reject';
+          reason = `Content exceeds global rejection threshold (${Math.round(maxScore * 100)}% ${maxCategory})`;
+        }
+        // If the highest score is below auto-approve threshold, approve it
+        else if (maxScore <= this.settings.auto_approve_threshold) {
+          decision = 'approve';
+          reason = 'Content is well below moderation thresholds';
+        }
+        // For scores in between, check individual category thresholds
+        else {
+          for (const [category, rule] of Object.entries(this.rules)) {
+            const score = openAIResult.category_scores[category] || 0;
+            if (score >= rule.threshold) {
+              decision = 'reject';
+              reason = `Content exceeds ${category} threshold (${Math.round(score * 100)}%)`;
+              break;
+            }
           }
         }
       }
