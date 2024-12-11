@@ -8,15 +8,32 @@ const chalk = require('chalk');
 const { extractUrlMetadata } = require('../netlify/functions/utils/metadata');
 const moderationService = require('./services/moderationService');
 
-// Load environment variables
-const result = dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
+// Load environment variables from the correct path
+const envPath = path.join(__dirname, '..', '..', 'community-mass-mems', '.env');
+const result = dotenv.config({ path: envPath });
+
 if (result.error) {
   console.error(chalk.red('Error loading .env file:'), result.error);
+  console.error(chalk.yellow('Tried to load from:'), envPath);
   process.exit(1);
 }
 
-// MongoDB Connection URL - hardcoded as fallback
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
+console.log(chalk.green('Successfully loaded environment variables'));
+
+// MongoDB Connection URL
+const MONGODB_URI = process.env.MONGODB_URI;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+// Make sure required variables are available
+if (!MONGODB_URI) {
+  console.error(chalk.red('Error: MongoDB connection string is required'));
+  process.exit(1);
+}
+
+if (!OPENAI_API_KEY) {
+  console.error(chalk.red('Error: OpenAI API key is required'));
+  process.exit(1);
+}
 
 // Format memory details with more context
 function formatMemory(memory, index) {
