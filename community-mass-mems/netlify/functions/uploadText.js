@@ -1,15 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongodb').MongoClient;
-const nodemailer = require('nodemailer');
-
-// Create transporter for sending emails
-const transporter = nodemailer.createTransport({
-  service: 'gmail',  // Use Gmail service
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
+const autoModeration = require('./services/autoModeration');
+const emailNotification = require('./services/emailNotification');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -49,7 +41,30 @@ exports.handler = async (event, context) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ message: 'No content provided' })
+        body: JSON.stringify({ message: 'Content is required' })
+      };
+    }
+
+    // Initialize and run auto moderation
+    await autoModeration.initialize();
+    const moderationResult = await autoModeration.moderateContent(content);
+
+    // Send email notification regardless of decision
+    await emailNotification.sendModerationNotification(content, moderationResult);
+
+    // If content is rejected, return early with rejection reason
+    if (moderationResult.decision === 'reject') {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ 
+          message: 'Content rejected by moderation',
+          reason: moderationResult.reason,
+          categories: moderationResult.categories
+        })
       };
     }
 
@@ -87,28 +102,6 @@ exports.handler = async (event, context) => {
     // Save to database
     const result = await collection.insertOne(memory);
     
-    // Send notification email
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: process.env.EMAIL_USER,
-        subject: 'New Text Memory Submission for Review',
-        text: `New text memory submitted for review:
-
-Content: ${content}
-Title: ${memory.metadata.title || 'No title'}
-Tags: ${memory.tags.join(', ') || 'No tags'}
-Submitted at: ${new Date().toLocaleString()}
-
-ID: ${result.insertedId}
-
-You can review this submission in the moderation console.`
-      });
-    } catch (emailError) {
-      console.error('Error sending email:', emailError);
-      // Continue even if email fails
-    }
-
     return {
       statusCode: 200,
       headers: {

@@ -152,57 +152,66 @@ async function moderateMemories() {
       const content = memory.type === 'text' ? memory.content : memory.url;
       
       try {
-        const moderationResult = await moderationService.moderateContent(content);
+        const moderationResult = await moderationService.moderateContent(content, memory.type);
         
+        // Ensure we have category scores before proceeding
+        if (!moderationResult || !moderationResult.category_scores) {
+          console.log(chalk.yellow('Warning: No moderation scores available'));
+          continue;
+        }
+
         // Automatic decision based on confidence scores
-        if (moderationResult.flagged && moderationResult.categories_scores) {
-          const maxScore = Math.max(...Object.values(moderationResult.categories_scores));
+        const maxScore = Math.max(...Object.values(moderationResult.category_scores));
+        
+        if (moderationResult.flagged) {
+          // High confidence rejection
+          await collection.updateOne(
+            { _id: memory._id },
+            { $set: { status: 'rejected', moderationReason: 'Automatic rejection - flagged content' } }
+          );
+          console.log(chalk.red('Content automatically rejected due to flagged content'));
           
-          if (maxScore > 0.8) {
-            // High confidence rejection
-            await collection.updateOne(
-              { _id: memory._id },
-              { $set: { status: 'rejected', moderationReason: 'Automatic rejection - high confidence violation' } }
-            );
-            console.log(chalk.red('Content automatically rejected due to high confidence violation'));
-            
-            // Send email notification for rejected content
-            const emailContent = `Content was automatically rejected.\nID: ${memory._id}\nReason: High confidence violation\nScores: ${JSON.stringify(moderationResult.categories_scores, null, 2)}`;
-            // TODO: Implement email notification
-            
-          } else if (maxScore > 0.4) {
-            // Medium confidence - needs manual review
-            console.log(chalk.yellow('Content requires manual review - medium confidence'));
-            const answer = await askQuestion('Approve this content? (y/n): ');
-            
-            if (answer.toLowerCase() === 'y') {
-              await collection.updateOne(
-                { _id: memory._id },
-                { $set: { status: 'approved' } }
-              );
-              console.log(chalk.green('Content approved'));
-            } else {
-              await collection.updateOne(
-                { _id: memory._id },
-                { $set: { status: 'rejected', moderationReason: 'Manual rejection after review' } }
-              );
-              console.log(chalk.red('Content rejected'));
-            }
-          } else {
-            // Low confidence - auto approve
+          // Send email notification for rejected content
+          const emailContent = `Content was automatically rejected.\nID: ${memory._id}\nReason: Flagged content\nScores: ${JSON.stringify(moderationResult.category_scores, null, 2)}`;
+          // TODO: Implement email notification
+          
+        } else if (maxScore > 0.8) {
+          // High confidence rejection
+          await collection.updateOne(
+            { _id: memory._id },
+            { $set: { status: 'rejected', moderationReason: 'Automatic rejection - high confidence violation' } }
+          );
+          console.log(chalk.red('Content automatically rejected due to high confidence violation'));
+          
+          // Send email notification for rejected content
+          const emailContent = `Content was automatically rejected.\nID: ${memory._id}\nReason: High confidence violation\nScores: ${JSON.stringify(moderationResult.category_scores, null, 2)}`;
+          // TODO: Implement email notification
+          
+        } else if (maxScore > 0.4) {
+          // Medium confidence - needs manual review
+          console.log(chalk.yellow('Content requires manual review - medium confidence'));
+          const answer = await askQuestion('Approve this content? (y/n): ');
+          
+          if (answer.toLowerCase() === 'y') {
             await collection.updateOne(
               { _id: memory._id },
               { $set: { status: 'approved' } }
             );
-            console.log(chalk.green('Content automatically approved - low risk score'));
+            console.log(chalk.green('Content approved'));
+          } else {
+            await collection.updateOne(
+              { _id: memory._id },
+              { $set: { status: 'rejected', moderationReason: 'Manual rejection after review' } }
+            );
+            console.log(chalk.red('Content rejected'));
           }
         } else {
-          // No flags - auto approve
+          // Low confidence - auto approve
           await collection.updateOne(
             { _id: memory._id },
             { $set: { status: 'approved' } }
           );
-          console.log(chalk.green('Content automatically approved - no flags'));
+          console.log(chalk.green('Content automatically approved - low risk score'));
         }
       } catch (error) {
         console.error(chalk.red('Error during moderation:'), error);
