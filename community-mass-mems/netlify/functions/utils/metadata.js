@@ -49,46 +49,22 @@ async function extractUrlMetadata(url) {
       author: metascraperResult?.author || ogsResult?.ogArticle?.author || unfurlResult?.author,
       publishedDate: metascraperResult?.date || ogsResult?.ogArticle?.publishedTime || unfurlResult?.published,
       mediaType: determineMediaType(url, unfurlResult, ogsResult),
-      previewUrl: metascraperResult?.image || ogsResult?.ogImage?.[0]?.url || unfurlResult?.open_graph?.images?.[0]?.url,
-      previewType: 'image',
-      favicon: metascraperResult?.logo || unfurlResult?.favicon,
-      url: url,
+      previewUrl: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url || url,
       embedHtml: generateEmbedHtml(url, unfurlResult, ogsResult),
-      meta: {
-        keywords: ogsResult?.ogKeywords || [],
-        locale: ogsResult?.ogLocale || unfurlResult?.locale,
-        type: ogsResult?.ogType || unfurlResult?.type,
-        robots: unfurlResult?.robots || {},
-        twitter: {
-          card: ogsResult?.twitterCard,
-          site: ogsResult?.twitterSite,
-          creator: ogsResult?.twitterCreator,
-          image: ogsResult?.twitterImage?.[0]?.url
-        }
+      favicon: unfurlResult?.favicon || ogsResult?.favicon,
+      ogImage: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url,
+      dimensions: {
+        height: ogsResult?.ogImage?.height || unfurlResult?.open_graph?.images?.[0]?.height,
+        width: ogsResult?.ogImage?.width || unfurlResult?.open_graph?.images?.[0]?.width
       }
     };
 
-    // Add dimensions if available
-    if (ogsResult?.ogImage?.[0]) {
-      metadata.dimensions = {
-        width: ogsResult.ogImage[0].width,
-        height: ogsResult.ogImage[0].height
-      };
-    }
-
-    // Add rich media data
-    if (unfurlResult?.open_graph?.videos?.[0]) {
-      metadata.video = {
-        url: unfurlResult.open_graph.videos[0].url,
-        type: unfurlResult.open_graph.videos[0].type,
-        width: unfurlResult.open_graph.videos[0].width,
-        height: unfurlResult.open_graph.videos[0].height
-      };
-    }
-
-    // Add structured data if available
-    if (unfurlResult?.json_ld) {
-      metadata.structuredData = unfurlResult.json_ld;
+    // For media URLs, ensure we have the correct metadata
+    const fileExtension = url.split('.').pop()?.toLowerCase();
+    if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(fileExtension)) {
+      metadata.mediaType = ['mp4', 'webm', 'mov'].includes(fileExtension) ? 'video' : 'image';
+      metadata.previewUrl = url;
+      metadata.title = url.split('/').pop();
     }
 
     return metadata;

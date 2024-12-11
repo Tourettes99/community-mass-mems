@@ -246,7 +246,83 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       </Box>
     );
 
-    // Handle rich media content
+    // Handle media preview (images, GIFs, videos)
+    if (memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url) {
+      const mediaUrl = memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url;
+      const mediaType = memory.metadata?.mediaType || detectDiscordMediaType(mediaUrl);
+      const isGif = mediaUrl?.toLowerCase().endsWith('.gif');
+
+      return (
+        <>
+          {renderHeader}
+          <Box
+            sx={{
+              position: 'relative',
+              width: '100%',
+              pt: memory.metadata?.dimensions?.height && memory.metadata?.dimensions?.width
+                ? `${(memory.metadata.dimensions.height / memory.metadata.dimensions.width) * 100}%`
+                : '56.25%',
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              overflow: 'hidden',
+              mb: 2,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}
+          >
+            {mediaType === 'video' ? (
+              <video
+                src={mediaUrl}
+                controls
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
+              />
+            ) : isGif ? (
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
+              >
+                <source src={mediaUrl} type="video/mp4" />
+                <img src={mediaUrl} alt="GIF" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </video>
+            ) : (
+              <img
+                src={mediaUrl}
+                alt={memory.metadata?.title || 'Media content'}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
+                loading="lazy"
+              />
+            )}
+          </Box>
+        </>
+      );
+    }
+
+    // Handle rich media content with embed HTML
     if (memory.metadata?.embedHtml) {
       return (
         <>
@@ -277,136 +353,6 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               }}
               dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
             />
-          </Box>
-        </>
-      );
-    }
-
-    // Handle GIF preview
-    if (memory.metadata?.gif) {
-      const { url, stillUrl, mp4, webp } = memory.metadata.gif;
-      return (
-        <>
-          {renderHeader}
-          <Box
-            sx={{
-              position: 'relative',
-              width: '100%',
-              pt: memory.metadata.gif.height && memory.metadata.gif.width
-                ? `${(memory.metadata.gif.height / memory.metadata.gif.width) * 100}%`
-                : '56.25%',
-              bgcolor: 'background.paper',
-            }}
-          >
-            {mp4 ? (
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                }}
-                poster={stillUrl}
-              >
-                <source src={mp4} type="video/mp4" />
-                <img src={url} alt="GIF" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              </video>
-            ) : (
-              <img
-                src={webp || url}
-                alt="GIF"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                }}
-              />
-            )}
-          </Box>
-        </>
-      );
-    }
-
-    // Handle image preview
-    if (memory.metadata?.image) {
-      const { url, alt, caption, thumbnails } = memory.metadata.image;
-      return (
-        <>
-          {renderHeader}
-          <Box
-            sx={{
-              position: 'relative',
-              width: '100%',
-              pt: memory.metadata.image.height && memory.metadata.image.width
-                ? `${(memory.metadata.image.height / memory.metadata.image.width) * 100}%`
-                : '56.25%',
-              bgcolor: 'background.paper',
-            }}
-          >
-            <img
-              src={url}
-              alt={alt || 'Image'}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-              }}
-              loading="lazy"
-              srcSet={thumbnails ? `${thumbnails.small} 300w, ${thumbnails.medium} 600w, ${thumbnails.large} 1200w` : undefined}
-              sizes="(max-width: 600px) 100vw, (max-width: 960px) 75vw, 50vw"
-            />
-          </Box>
-          {caption && (
-            <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1, display: 'block' }}>
-              {caption}
-            </Typography>
-          )}
-        </>
-      );
-    }
-
-    // Handle video preview
-    if (memory.metadata?.video) {
-      return (
-        <>
-          {renderHeader}
-          <Box sx={{ 
-            position: 'relative',
-            width: '100%',
-            pt: '56.25%',
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            overflow: 'hidden',
-            mb: 2
-          }}>
-            <video
-              controls
-              preload="metadata"
-              playsInline
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                background: '#000'
-              }}
-            >
-              <source src={memory.metadata.video.url} type={memory.metadata.video.type} />
-              Your browser does not support the video tag.
-            </video>
           </Box>
         </>
       );
