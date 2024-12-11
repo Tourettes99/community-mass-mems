@@ -50,7 +50,7 @@ async function extractUrlMetadata(url) {
       publishedDate: metascraperResult?.date || ogsResult?.ogArticle?.publishedTime || unfurlResult?.published,
       mediaType: determineMediaType(url, unfurlResult, ogsResult),
       previewUrl: null,
-      embedHtml: generateEmbedHtml(url, unfurlResult, ogsResult),
+      embedHtml: '',  // Initialize as empty string
       favicon: unfurlResult?.favicon || ogsResult?.favicon,
       ogImage: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url,
       dimensions: {

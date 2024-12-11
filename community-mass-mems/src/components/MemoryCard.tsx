@@ -310,21 +310,25 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             overflow: 'hidden',
             mb: 2
           }}>
-            <Box
-              sx={{
+            <div
+              style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
                 height: '100%',
-                '& iframe': {
+              }}
+            >
+              <div
+                style={{
                   width: '100%',
                   height: '100%',
-                  border: 'none'
-                }
-              }}
-              dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
-            />
+                }}
+                dangerouslySetInnerHTML={{ 
+                  __html: memory.metadata.embedHtml || '' 
+                }}
+              />
+            </div>
           </Box>
           {renderFooter}
         </>
@@ -356,21 +360,25 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               overflow: 'hidden',
               mb: 2
             }}>
-              <Box
-                sx={{
+              <div
+                style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
                   width: '100%',
                   height: '100%',
-                  '& iframe': {
+                }}
+              >
+                <div
+                  style={{
                     width: '100%',
                     height: '100%',
-                    border: 'none'
-                  }
-                }}
-                dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
-              />
+                  }}
+                  dangerouslySetInnerHTML={{ 
+                    __html: memory.metadata.embedHtml || '' 
+                  }}
+                />
+              </div>
             </Box>
             {renderFooter}
           </>
