@@ -64,22 +64,31 @@ async function extractUrlMetadata(url) {
       }
     };
 
-    // Special handling for Discord CDN
-    if (domain === 'cdn.discordapp.com') {
+    // Special handling for Discord CDN and media URLs
+    if (domain === 'cdn.discordapp.com' || domain === 'media.discordapp.net') {
       metadata.siteName = 'Discord';
+      // Clean the filename from query parameters
       metadata.title = url.split('/').pop()?.split('?')[0] || url;
       
-      if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(fileExtension)) {
-        if (fileExtension === 'gif') {
+      // Get clean file extension (before any query params)
+      const cleanExtension = metadata.title.split('.').pop()?.toLowerCase();
+      
+      if (cleanExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(cleanExtension)) {
+        if (cleanExtension === 'gif') {
           metadata.mediaType = 'video'; // Handle GIFs as videos for autoplay
           metadata.previewUrl = url;
-          metadata.embedHtml = `<video autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: contain;" poster="${metadata.previewUrl}"><source src="${url}" type="video/mp4"><img src="${metadata.previewUrl}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;"></video>`;
-        } else if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
+          metadata.embedHtml = `<video autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: contain;"><source src="${url}" type="video/mp4"><img src="${url}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;"></video>`;
+        } else if (['mp4', 'webm', 'mov'].includes(cleanExtension)) {
           metadata.mediaType = 'video';
           metadata.previewUrl = url;
-          metadata.embedHtml = `<video controls playsinline style="width: 100%; height: 100%; object-fit: contain;" poster="${metadata.previewUrl}"><source src="${url}" type="video/${fileExtension}">Your browser does not support the video tag.</video>`;
+          const mimeTypes = {
+            'mp4': 'video/mp4',
+            'webm': 'video/webm',
+            'mov': 'video/quicktime'
+          };
+          metadata.embedHtml = `<video controls playsinline style="width: 100%; height: 100%; object-fit: contain;"><source src="${url}" type="${mimeTypes[cleanExtension]}">Your browser does not support the video tag.</video>`;
         } else {
-          // Regular images
+          // Regular images (jpg, jpeg, png, webp)
           metadata.mediaType = 'image';
           metadata.previewUrl = url;
           metadata.embedHtml = `<img src="${url}" alt="${metadata.title}" loading="lazy" style="width: 100%; height: 100%; object-fit: contain;">`;
