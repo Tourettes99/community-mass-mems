@@ -300,7 +300,25 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       </Box>
     );
 
-    // Handle YouTube and other embeds first
+    // Handle text posts first
+    if (memory.type === 'text') {
+      return (
+        <>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            gap: 2
+          }}>
+            <Typography variant="body1">
+              {memory.content}
+            </Typography>
+          </Box>
+          {renderFooter}
+        </>
+      );
+    }
+
+    // Handle YouTube and other embeds
     if (memory.metadata?.embedHtml && memory.metadata?.mediaType !== 'image') {
       return (
         <>
