@@ -5,6 +5,7 @@ const emailNotification = require('./services/emailNotification');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
+  let client;
 
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
@@ -31,7 +32,6 @@ exports.handler = async (event, context) => {
     };
   }
 
-  let client;
   try {
     const { content, tags } = JSON.parse(event.body);
     if (!content) {
@@ -49,25 +49,6 @@ exports.handler = async (event, context) => {
     await autoModeration.initialize();
     const moderationResult = await autoModeration.moderateContent(content);
 
-    // Send email notification regardless of decision
-    await emailNotification.sendModerationNotification(content, moderationResult);
-
-    // If content is rejected, return early with rejection reason
-    if (moderationResult.decision === 'reject') {
-      return {
-        statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({ 
-          message: 'Content rejected by moderation',
-          reason: moderationResult.reason,
-          categories: moderationResult.categories
-        })
-      };
-    }
-
     // Connect to MongoDB
     client = await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
@@ -78,12 +59,19 @@ exports.handler = async (event, context) => {
     const db = client.db('memories');
     const collection = db.collection('memories');
 
-    // Create memory document
+    // Create memory document with moderation status
     const memory = {
       type: 'text',
       content: content,
       tags: Array.isArray(tags) ? tags : [],
-      status: 'pending',
+      status: moderationResult.decision === 'approve' ? 'approved' : 'rejected',
+      moderationResult: {
+        decision: moderationResult.decision,
+        reason: moderationResult.reason,
+        categories: moderationResult.categories,
+        flagged: moderationResult.flagged,
+        category_scores: moderationResult.category_scores
+      },
       metadata: {
         type: 'text',
         format: 'text/plain',
@@ -99,9 +87,29 @@ exports.handler = async (event, context) => {
       updatedAt: new Date()
     };
 
-    // Save to database
+    // Save to database regardless of moderation result (for audit purposes)
     const result = await collection.insertOne(memory);
-    
+
+    // Send email notification with the detailed report
+    await emailNotification.sendModerationNotification(content, moderationResult);
+
+    // Return appropriate response based on moderation decision
+    if (moderationResult.decision === 'reject') {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ 
+          message: 'Content rejected by moderation',
+          reason: moderationResult.reason,
+          categories: moderationResult.categories,
+          id: result.insertedId
+        })
+      };
+    }
+
     return {
       statusCode: 200,
       headers: {
@@ -109,7 +117,7 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        message: 'Memory submitted successfully',
+        message: 'Memory submitted and approved',
         id: result.insertedId
       })
     };
