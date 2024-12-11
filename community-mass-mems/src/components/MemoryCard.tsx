@@ -344,11 +344,24 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     if (!metadata) return renderHeader;
 
     const mediaUrl = metadata.previewUrl || metadata.ogImage || memory.url;
-    if (!mediaUrl) return renderHeader;
+    if (!mediaUrl && !metadata.embedHtml) return renderHeader;
 
     const isVideo = metadata.mediaType === 'video';
-    const isGif = mediaUrl.toLowerCase().endsWith('.gif');
-    const hasEmbed = metadata.embedHtml && metadata.mediaType !== 'image';
+    const isGif = mediaUrl?.toLowerCase().endsWith('.gif');
+    const hasEmbed = Boolean(metadata.embedHtml?.trim());
+
+    // Handle rich previews (website cards)
+    if (metadata.mediaType === 'rich' && hasEmbed && metadata.embedHtml) {
+      return (
+        <>
+          {renderHeader}
+          <Box sx={{ mb: 2 }}>
+            <div dangerouslySetInnerHTML={{ __html: metadata.embedHtml }} />
+          </Box>
+          {renderFooter}
+        </>
+      );
+    }
 
     // Handle video content (YouTube, GIFs, or other videos)
     if (isVideo || isGif || hasEmbed) {

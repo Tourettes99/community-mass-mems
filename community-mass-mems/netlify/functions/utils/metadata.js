@@ -231,6 +231,39 @@ async function extractUrlMetadata(url) {
       }
     }
 
+    // Create a preview card for websites without specific media
+    if (metadata.mediaType === 'rich' || !metadata.mediaType) {
+      metadata.mediaType = 'rich';
+      
+      // Build a nice looking preview card
+      const faviconHtml = metadata.favicon ? 
+        `<img src="${metadata.favicon}" alt="" style="width: 16px; height: 16px; margin-right: 8px;">` : '';
+      
+      const imageHtml = metadata.previewUrl ? 
+        `<div style="width: 100%; padding-top: 52.5%; position: relative; background: #f5f5f5; margin-bottom: 12px;">
+           <img src="${metadata.previewUrl}" alt="${metadata.title}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
+         </div>` : '';
+
+      metadata.embedHtml = `
+        <div style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: white;">
+          ${imageHtml}
+          <div style="padding: 16px;">
+            <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px; color: #1a1a1a; overflow: hidden; text-overflow: ellipsis;">
+              ${metadata.title}
+            </div>
+            ${metadata.description ? 
+              `<div style="font-size: 14px; color: #666; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                ${metadata.description}
+              </div>` : ''}
+            <div style="display: flex; align-items: center; font-size: 12px; color: #666;">
+              ${faviconHtml}
+              ${metadata.siteName || domain}
+            </div>
+          </div>
+        </div>
+      `.replace(/\s+/g, ' ').trim();
+    }
+
     return metadata;
   } catch (error) {
     console.error('Error extracting URL metadata:', error);
