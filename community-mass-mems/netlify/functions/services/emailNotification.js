@@ -42,46 +42,44 @@ class EmailNotificationService {
     return explanation;
   }
 
-  async sendModerationNotification(content, moderationResult) {
+  async sendModerationNotification(memory, moderationResult) {
     const explanation = this.formatModerationResult(moderationResult);
     const status = moderationResult.decision === 'approve' ? 'Approved' : 'Rejected';
     
     const emailContent = {
       from: process.env.EMAIL_USER,
       to: process.env.NOTIFICATION_EMAIL || process.env.EMAIL_USER,
-      subject: `Content Moderation Alert: ${status}`,
+      subject: `${status}: New text memory submitted for review`,
       text: `
-Content Moderation Report
+Memory Review Status: ${status}
 ------------------------
-Status: ${status}
-Time: ${new Date().toLocaleString()}
+Content: ${memory.content}
+Title: ${memory.metadata.title}
+Tags: ${memory.tags.length > 0 ? memory.tags.join(', ') : 'No tags'}
+Submitted at: ${new Date(memory.submittedAt).toLocaleString()}
+ID: ${memory._id}
 
-Explanation:
+Moderation Details:
 ${explanation}
 
-Content Preview:
-${content.substring(0, 200)}${content.length > 200 ? '...' : ''}
-
-Technical Details:
-${JSON.stringify(moderationResult, null, 2)}
+You can review this submission in the moderation console.
       `,
       html: `
-        <h2>Content Moderation Report</h2>
-        <p><strong>Status:</strong> <span style="color: ${status === 'Approved' ? 'green' : 'red'}">${status}</span></p>
-        <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+        <h2>Memory Review Status: <span style="color: ${status === 'Approved' ? 'green' : 'red'}">${status}</span></h2>
         
-        <h3>Explanation:</h3>
+        <h3>Submission Details:</h3>
+        <ul>
+          <li><strong>Content:</strong> ${memory.content}</li>
+          <li><strong>Title:</strong> ${memory.metadata.title}</li>
+          <li><strong>Tags:</strong> ${memory.tags.length > 0 ? memory.tags.join(', ') : 'No tags'}</li>
+          <li><strong>Submitted at:</strong> ${new Date(memory.submittedAt).toLocaleString()}</li>
+          <li><strong>ID:</strong> ${memory._id}</li>
+        </ul>
+        
+        <h3>Moderation Details:</h3>
         <p style="white-space: pre-line">${explanation}</p>
         
-        <h3>Content Preview:</h3>
-        <p style="background-color: #f5f5f5; padding: 10px; border-radius: 5px;">
-          ${content.substring(0, 200)}${content.length > 200 ? '...' : ''}
-        </p>
-        
-        <h3>Technical Details:</h3>
-        <pre style="background-color: #f5f5f5; padding: 10px; border-radius: 5px;">
-${JSON.stringify(moderationResult, null, 2)}
-        </pre>
+        <p>You can review this submission in the moderation console.</p>
       `
     };
 
