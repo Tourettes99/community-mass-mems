@@ -93,11 +93,14 @@ async function extractUrlMetadata(url) {
     // Handle OG video data
     if (ogsResult?.ogVideo?.url || ogsResult?.ogVideoSecureUrl) {
       const videoUrl = ogsResult.ogVideoSecureUrl || ogsResult.ogVideo.url;
+      const videoType = ogsResult?.ogVideo?.type || '';
       metadata.mediaType = 'video';
       metadata.previewUrl = videoUrl;
       
-      // If it's an MP4, we can play it directly
-      if (videoUrl.toLowerCase().endsWith('.mp4')) {
+      // Check if it's an MP4 either by extension or content type
+      if (videoUrl.toLowerCase().endsWith('.mp4') || 
+          videoType.toLowerCase().includes('mp4') ||
+          videoType.toLowerCase() === 'video/mp4') {
         metadata.embedHtml = `<video 
           controls 
           playsinline
@@ -109,6 +112,33 @@ async function extractUrlMetadata(url) {
         </video>`;
       }
       return metadata;
+    }
+
+    // Handle Twitter video card
+    if (unfurlResult?.twitter_card?.type === 'video' || unfurlResult?.twitter_card?.type === 'player') {
+      const videoUrl = unfurlResult.twitter_card.players?.[0]?.url || 
+                      unfurlResult.twitter_card.video_url ||
+                      unfurlResult.twitter_card.stream_url;
+      
+      if (videoUrl) {
+        metadata.mediaType = 'video';
+        metadata.previewUrl = unfurlResult.twitter_card.image_url || videoUrl;
+        
+        // If it's an MP4 stream
+        if (videoUrl.toLowerCase().endsWith('.mp4') || 
+            unfurlResult.twitter_card.content_type?.toLowerCase().includes('mp4')) {
+          metadata.embedHtml = `<video 
+            controls 
+            playsinline
+            style="width: 100%; height: 100%;"
+            poster="${unfurlResult.twitter_card.image_url || ''}"
+          >
+            <source src="${videoUrl}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>`;
+        }
+        return metadata;
+      }
     }
 
     // Handle OG image data
