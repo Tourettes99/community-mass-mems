@@ -49,8 +49,8 @@ async function extractUrlMetadata(url) {
       author: metascraperResult?.author || ogsResult?.ogArticle?.author || unfurlResult?.author,
       publishedDate: metascraperResult?.date || ogsResult?.ogArticle?.publishedTime || unfurlResult?.published,
       mediaType: determineMediaType(url, unfurlResult, ogsResult),
-      previewUrl: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url,
-      embedHtml: generateEmbedHtml(url, unfurlResult, ogsData),
+      previewUrl: null,
+      embedHtml: generateEmbedHtml(url, unfurlResult, ogsResult),
       favicon: unfurlResult?.favicon || ogsResult?.favicon,
       ogImage: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url,
       dimensions: {
@@ -59,10 +59,19 @@ async function extractUrlMetadata(url) {
       }
     };
 
-    // For YouTube URLs, ensure we have the embed
+    // Handle direct media URLs first
+    const fileExtension = url.split('.').pop()?.toLowerCase();
+    if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(fileExtension)) {
+      metadata.mediaType = ['mp4', 'webm', 'mov'].includes(fileExtension) ? 'video' : 'image';
+      metadata.previewUrl = url;
+      metadata.title = url.split('/').pop();
+      return metadata;
+    }
+
+    // Handle YouTube URLs
     const urlObj = new URL(url);
     const domain = urlObj.hostname.toLowerCase();
-    if ((domain.includes('youtube.com') || domain.includes('youtu.be')) && !metadata.embedHtml) {
+    if ((domain.includes('youtube.com') || domain.includes('youtu.be'))) {
       const videoId = url.includes('youtu.be') 
         ? url.split('/').pop()?.split('?')[0]
         : new URLSearchParams(urlObj.search).get('v');
@@ -76,37 +85,21 @@ async function extractUrlMetadata(url) {
           allowfullscreen
         ></iframe>`;
         metadata.mediaType = 'video';
+        metadata.previewUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        return metadata;
       }
     }
 
-    // For media URLs, ensure we have the correct metadata
-    const fileExtension = url.split('.').pop()?.toLowerCase();
-    if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(fileExtension)) {
-      metadata.mediaType = ['mp4', 'webm', 'mov'].includes(fileExtension) ? 'video' : 'image';
-      metadata.previewUrl = url;
-      metadata.title = url.split('/').pop();
-    }
-
-    // Extract media from OG data if available
-    if (ogsResult?.ogImage && !metadata.previewUrl) {
+    // Handle OG image data
+    if (ogsResult?.ogImage?.url) {
       metadata.previewUrl = ogsResult.ogImage.url;
-      metadata.dimensions = {
-        height: ogsResult.ogImage.height,
-        width: ogsResult.ogImage.width
-      };
       if (!metadata.mediaType || metadata.mediaType === 'rich') {
         metadata.mediaType = 'image';
       }
     }
-
-    // Extract media from unfurl data if available
-    if (unfurlResult?.open_graph?.images?.[0] && !metadata.previewUrl) {
-      const image = unfurlResult.open_graph.images[0];
-      metadata.previewUrl = image.url;
-      metadata.dimensions = {
-        height: image.height,
-        width: image.width
-      };
+    // Fallback to unfurl data
+    else if (unfurlResult?.open_graph?.images?.[0]?.url) {
+      metadata.previewUrl = unfurlResult.open_graph.images[0].url;
       if (!metadata.mediaType || metadata.mediaType === 'rich') {
         metadata.mediaType = 'image';
       }
