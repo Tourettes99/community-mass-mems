@@ -73,37 +73,16 @@ async function extractUrlMetadata(url) {
         if (fileExtension === 'gif') {
           metadata.mediaType = 'video'; // Handle GIFs as videos for autoplay
           metadata.previewUrl = url;
-          metadata.embedHtml = `<video 
-            autoplay 
-            loop 
-            muted 
-            playsinline
-            style="width: 100%; height: 100%; object-fit: contain;"
-          >
-            <source src="${url}" type="video/mp4">
-            <img src="${url}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;">
-          </video>`;
+          metadata.embedHtml = `<video autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: contain;" poster="${metadata.previewUrl}"><source src="${url}" type="video/mp4"><img src="${metadata.previewUrl}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;"></video>`;
         } else if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
           metadata.mediaType = 'video';
           metadata.previewUrl = url;
-          metadata.embedHtml = `<video 
-            controls 
-            playsinline
-            style="width: 100%; height: 100%; object-fit: contain;"
-          >
-            <source src="${url}" type="video/${fileExtension}">
-            Your browser does not support the video tag.
-          </video>`;
+          metadata.embedHtml = `<video controls playsinline style="width: 100%; height: 100%; object-fit: contain;" poster="${metadata.previewUrl}"><source src="${url}" type="video/${fileExtension}">Your browser does not support the video tag.</video>`;
         } else {
           // Regular images
           metadata.mediaType = 'image';
           metadata.previewUrl = url;
-          metadata.embedHtml = `<img 
-            src="${url}" 
-            alt="${metadata.title}"
-            loading="lazy"
-            style="width: 100%; height: 100%; object-fit: contain;"
-          >`;
+          metadata.embedHtml = `<img src="${url}" alt="${metadata.title}" loading="lazy" style="width: 100%; height: 100%; object-fit: contain;">`;
         }
       }
       return metadata;
@@ -146,17 +125,7 @@ async function extractUrlMetadata(url) {
           unfurlResult?.twitter_card?.image_type === 'animated_gif') {
         metadata.mediaType = 'video';
         metadata.previewUrl = unfurlResult?.twitter_card?.image_url || ogsResult?.ogImage?.url;
-        metadata.embedHtml = `<video 
-          autoplay 
-          loop 
-          muted 
-          playsinline
-          style="width: 100%; height: 100%; object-fit: contain;"
-          poster="${metadata.previewUrl}"
-        >
-          <source src="${videoUrl}" type="video/mp4">
-          <img src="${metadata.previewUrl}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;">
-        </video>`;
+        metadata.embedHtml = `<video autoplay loop muted playsinline style="width: 100%; height: 100%; object-fit: contain;" poster="${metadata.previewUrl}"><source src="${videoUrl}" type="video/mp4"><img src="${metadata.previewUrl}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;"></video>`;
         return metadata;
       }
 
@@ -169,22 +138,10 @@ async function extractUrlMetadata(url) {
         
         // If it's a direct video URL
         if (videoUrl.endsWith('.mp4') || videoType?.includes('mp4')) {
-          metadata.embedHtml = `<video 
-            controls 
-            playsinline
-            style="width: 100%; height: 100%; object-fit: contain;"
-            poster="${metadata.previewUrl}"
-          >
-            <source src="${videoUrl}" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>`;
+          metadata.embedHtml = `<video controls playsinline style="width: 100%; height: 100%; object-fit: contain;" poster="${metadata.previewUrl}"><source src="${videoUrl}" type="video/mp4">Your browser does not support the video tag.</video>`;
         } else {
           // Use Twitter's player iframe
-          metadata.embedHtml = `<iframe 
-            src="${videoUrl}"
-            style="width: 100%; height: 100%; border: none;"
-            allowfullscreen
-          ></iframe>`;
+          metadata.embedHtml = `<iframe src="${videoUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen></iframe>`;
         }
         return metadata;
       }
