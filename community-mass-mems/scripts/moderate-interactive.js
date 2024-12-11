@@ -4,20 +4,22 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { MongoClient, ObjectId } = require('mongodb');
 const readline = require('readline');
+const chalk = require('chalk');
 const { extractUrlMetadata } = require('../netlify/functions/utils/metadata');
+const moderationService = require('./services/moderationService');
 
 // Format memory details with more context
 function formatMemory(memory, index) {
   const lines = [
-    `\n[${'='.repeat(20)} Memory ${index + 1} ${'='.repeat(20)}]`,
-    `ID: ${memory._id}`,
-    `Type: ${memory.type}`,
-    `Status: ${memory.status}`,
-    `Created: ${memory.createdAt ? new Date(memory.createdAt).toLocaleString() : 'Unknown'}`
+    `\n${chalk.cyan('='.repeat(20))} Memory ${index + 1} ${chalk.cyan('='.repeat(20))}`,
+    `ID: ${chalk.yellow(memory._id)}`,
+    `Type: ${chalk.blue(memory.type)}`,
+    `Status: ${chalk.magenta(memory.status)}`,
+    `Created: ${chalk.green(memory.createdAt ? new Date(memory.createdAt).toLocaleString() : 'Unknown')}`
   ];
 
   if (memory.type === 'url') {
-    lines.push(`URL: ${memory.url}`);
+    lines.push(`URL: ${chalk.blue(memory.url)}`);
     if (memory.metadata) {
       lines.push('\nCurrent Metadata:');
       lines.push(`Title: ${memory.metadata.title || 'No title'}`);
@@ -29,11 +31,11 @@ function formatMemory(memory, index) {
       }
     }
   } else if (memory.type === 'text') {
-    lines.push(`Content: ${memory.content}`);
+    lines.push(`Content: ${chalk.white(memory.content)}`);
   }
 
   if (memory.tags && memory.tags.length > 0) {
-    lines.push(`\nTags: ${memory.tags.join(', ')}`);
+    lines.push(`\nTags: ${chalk.yellow(memory.tags.join(', '))}`);
   }
 
   return lines.join('\n');
@@ -84,26 +86,29 @@ async function resetWeeklyPosts(collection) {
       { status: 'approved', submittedAt: { $gte: startOfWeek.toISOString() } },
       { $set: { submittedAt: new Date(startOfWeek.getTime() - 1000) } } // Set to 1 second before start of week
     );
-    console.log('Weekly post counter has been reset successfully.');
+    console.log(chalk.green('Weekly post counter has been reset successfully.'));
   }
 }
 
 async function moderateMemories() {
   let client;
   try {
+    // Initialize moderation service
+    await moderationService.initialize();
+    
     client = await MongoClient.connect(process.env.MONGODB_URI);
-    console.log('Connected to MongoDB successfully!\n');
+    console.log(chalk.green('Connected to MongoDB successfully!\n'));
 
     const db = client.db('memories');
     const collection = db.collection('memories');
 
     while (true) {
       const action = await askQuestion(
-        '\nMain Menu:\n' +
+        chalk.cyan('\nMain Menu:\n') +
         '1. Moderate pending posts\n' +
         '2. Reset weekly post counter\n' +
         '3. Quit\n' +
-        'Choose action (1-3): '
+        chalk.yellow('Choose action (1-3): ')
       );
 
       switch (action) {
@@ -112,15 +117,21 @@ async function moderateMemories() {
           const pendingMemories = await collection.find({ status: 'pending' }).toArray();
           
           if (pendingMemories.length === 0) {
-            console.log('No pending memories to moderate.');
+            console.log(chalk.yellow('No pending memories to moderate.'));
             continue;
           }
 
-          console.log(`Found ${pendingMemories.length} pending memories.`);
+          console.log(chalk.blue(`Found ${pendingMemories.length} pending memories.`));
 
           for (let i = 0; i < pendingMemories.length; i++) {
             const memory = pendingMemories[i];
             console.log(formatMemory(memory, i));
+
+            // Run content through moderation service
+            const moderationResult = await moderationService.moderateContent(
+              memory.type === 'text' ? memory.content : memory,
+              memory.type
+            );
 
             if (memory.type === 'url') {
               const refreshMetadata = await askQuestion('\nRefresh metadata? (y/n): ');
@@ -136,13 +147,21 @@ async function moderateMemories() {
                       { _id: memory._id },
                       { $set: { metadata: metadata } }
                     );
-                    console.log('Metadata updated successfully.');
+                    console.log(chalk.green('Metadata updated successfully.'));
                   }
                 } catch (error) {
-                  console.error('Error refreshing metadata:', error.message);
+                  console.error(chalk.red('Error refreshing metadata:'), error.message);
                 }
               }
             }
+
+            // Show moderation recommendation
+            console.log(chalk.yellow('\nModeration Recommendation:'), 
+              moderationResult.decision === 'approve' ? chalk.green(moderationResult.decision) :
+              moderationResult.decision === 'reject' ? chalk.red(moderationResult.decision) :
+              chalk.yellow(moderationResult.decision)
+            );
+            console.log(chalk.yellow('Reason:'), moderationResult.reason);
 
             const memoryAction = await askQuestion(
               '\nActions:\n' +
@@ -161,11 +180,14 @@ async function moderateMemories() {
                   { 
                     $set: { 
                       status: 'approved',
-                      moderatedAt: new Date()
+                      moderatedAt: new Date(),
+                      votes: { up: 0, down: 0 },
+                      userVotes: {},
+                      moderationResult: moderationResult
                     }
                   }
                 );
-                console.log('Memory approved.');
+                console.log(chalk.green('Memory approved.'));
                 break;
 
               case '2':
@@ -174,20 +196,21 @@ async function moderateMemories() {
                   { 
                     $set: { 
                       status: 'rejected',
-                      moderatedAt: new Date()
+                      moderatedAt: new Date(),
+                      moderationResult: moderationResult
                     }
                   }
                 );
-                console.log('Memory rejected.');
+                console.log(chalk.red('Memory rejected.'));
                 break;
 
               case '3':
-                console.log('Skipping to next memory.');
+                console.log(chalk.yellow('Skipping to next memory.'));
                 break;
 
               case '4':
                 const currentTags = memory.tags || [];
-                console.log(`\nCurrent tags: ${currentTags.join(', ') || 'None'}`);
+                console.log(`\nCurrent tags: ${chalk.yellow(currentTags.join(', ') || 'None')}`);
                 const newTags = await askQuestion('Enter new tags (comma-separated) or press enter to keep current: ');
                 
                 if (newTags.trim()) {
@@ -196,7 +219,7 @@ async function moderateMemories() {
                     { _id: memory._id },
                     { $set: { tags: tagArray } }
                   );
-                  console.log('Tags updated successfully.');
+                  console.log(chalk.green('Tags updated successfully.'));
                 }
                 break;
 
@@ -205,7 +228,7 @@ async function moderateMemories() {
                 break;
 
               default:
-                console.log('Invalid choice. Skipping to next memory.');
+                console.log(chalk.yellow('Invalid choice. Skipping to next memory.'));
             }
           }
           break;
@@ -215,16 +238,16 @@ async function moderateMemories() {
           break;
 
         case '3':
-          console.log('Exiting moderation...');
+          console.log(chalk.green('Exiting moderation...'));
           return;
 
         default:
-          console.log('Invalid choice. Please try again.');
+          console.log(chalk.red('Invalid choice. Please try again.'));
       }
     }
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error(chalk.red('Error:'), error);
   } finally {
     if (client) {
       await client.close();
@@ -234,5 +257,5 @@ async function moderateMemories() {
 }
 
 // Start the moderation process
-console.log('Starting moderation interface...\n');
+console.log(chalk.cyan('Starting moderation interface...\n'));
 moderateMemories().catch(console.error);
