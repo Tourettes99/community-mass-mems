@@ -2,6 +2,7 @@ require('dotenv').config();
 const { MongoClient } = require('mongodb');
 const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
+const emailNotification = require('./services/emailNotification');
 
 // Create transporter for sending emails
 const transporter = nodemailer.createTransport({
@@ -252,28 +253,16 @@ exports.handler = async (event, context) => {
 
     // Save to database
     const result = await collection.insertOne(memory);
+    memory._id = result.insertedId;
     
-    // Send notification email
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: process.env.EMAIL_USER,
-        subject: `New ${type.toUpperCase()} Memory Submission for Review`,
-        text: `New ${type} memory submitted for review:
-
-${type === 'url' ? `URL: ${url}` : `Content: ${content}`}
-Title: ${metadata.title || 'No title'}
-Tags: ${memory.tags.join(', ') || 'No tags'}
-Submitted at: ${new Date().toLocaleString()}
-
-ID: ${result.insertedId}
-
-You can review this submission in the moderation console.`
-      });
-    } catch (emailError) {
-      console.error('Error sending email:', emailError);
-      // Continue even if email fails
-    }
+    // Send notification email using the email notification service
+    await emailNotification.sendModerationNotification(memory, {
+      decision: 'pending',
+      reason: 'Awaiting moderation review',
+      categories: [],
+      flagged: false,
+      category_scores: {}
+    });
 
     return {
       statusCode: 200,
