@@ -89,9 +89,10 @@ exports.handler = async (event, context) => {
 
     // Save to database regardless of moderation result (for audit purposes)
     const result = await collection.insertOne(memory);
+    memory._id = result.insertedId;
 
-    // Send email notification with the detailed report
-    await emailNotification.sendModerationNotification(content, moderationResult);
+    // Send email notification with the complete memory object
+    await emailNotification.sendModerationNotification(memory, moderationResult);
 
     // Return appropriate response based on moderation decision
     if (moderationResult.decision === 'reject') {
