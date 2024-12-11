@@ -49,8 +49,8 @@ async function extractUrlMetadata(url) {
       author: metascraperResult?.author || ogsResult?.ogArticle?.author || unfurlResult?.author,
       publishedDate: metascraperResult?.date || ogsResult?.ogArticle?.publishedTime || unfurlResult?.published,
       mediaType: determineMediaType(url, unfurlResult, ogsResult),
-      previewUrl: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url || url,
-      embedHtml: generateEmbedHtml(url, unfurlResult, ogsResult),
+      previewUrl: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url,
+      embedHtml: generateEmbedHtml(url, unfurlResult, ogsData),
       favicon: unfurlResult?.favicon || ogsResult?.favicon,
       ogImage: ogsResult?.ogImage?.url || unfurlResult?.open_graph?.images?.[0]?.url,
       dimensions: {
@@ -85,6 +85,31 @@ async function extractUrlMetadata(url) {
       metadata.mediaType = ['mp4', 'webm', 'mov'].includes(fileExtension) ? 'video' : 'image';
       metadata.previewUrl = url;
       metadata.title = url.split('/').pop();
+    }
+
+    // Extract media from OG data if available
+    if (ogsResult?.ogImage && !metadata.previewUrl) {
+      metadata.previewUrl = ogsResult.ogImage.url;
+      metadata.dimensions = {
+        height: ogsResult.ogImage.height,
+        width: ogsResult.ogImage.width
+      };
+      if (!metadata.mediaType || metadata.mediaType === 'rich') {
+        metadata.mediaType = 'image';
+      }
+    }
+
+    // Extract media from unfurl data if available
+    if (unfurlResult?.open_graph?.images?.[0] && !metadata.previewUrl) {
+      const image = unfurlResult.open_graph.images[0];
+      metadata.previewUrl = image.url;
+      metadata.dimensions = {
+        height: image.height,
+        width: image.width
+      };
+      if (!metadata.mediaType || metadata.mediaType === 'rich') {
+        metadata.mediaType = 'image';
+      }
     }
 
     return metadata;
@@ -224,7 +249,7 @@ function determineMediaType(url, unfurlData, ogsData) {
   try {
     const urlObj = new URL(url);
     const domain = urlObj.hostname.toLowerCase();
-
+    
     // Check for known video platforms
     if (domain.includes('youtube.com') || domain.includes('youtu.be') ||
         domain.includes('vimeo.com') || domain.includes('tiktok.com')) {
