@@ -334,9 +334,50 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     // Handle media preview (images, GIFs, videos)
     if (memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url) {
       const mediaUrl = memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url;
-      const isVideo = memory.metadata?.mediaType === 'video';
-      const isGif = mediaUrl?.toLowerCase().endsWith('.gif');
+      
+      // Skip if no valid media URL
+      if (!mediaUrl) return renderHeader;
 
+      const isVideo = memory.metadata?.mediaType === 'video';
+      const isGif = mediaUrl.toLowerCase().endsWith('.gif');
+      const hasEmbed = memory.metadata?.embedHtml && memory.metadata?.mediaType !== 'image';
+
+      // Use embed if available and not an image
+      if (hasEmbed) {
+        return (
+          <>
+            {renderHeader}
+            <Box sx={{ 
+              position: 'relative',
+              width: '100%',
+              pt: '56.25%', // 16:9 aspect ratio
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              overflow: 'hidden',
+              mb: 2
+            }}>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  '& iframe': {
+                    width: '100%',
+                    height: '100%',
+                    border: 'none'
+                  }
+                }}
+                dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
+              />
+            </Box>
+            {renderFooter}
+          </>
+        );
+      }
+
+      // Handle media content
       return (
         <>
           {renderHeader}
@@ -351,38 +392,41 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               borderRadius: 1,
               overflow: 'hidden',
               mb: 2,
-              '& img': {
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain'
-              },
-              '& video': {
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain'
-              }
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
           >
-            {isVideo ? (
+            {isVideo || isGif ? (
               <video
-                controls
+                controls={isVideo}
                 loop={isGif}
                 autoPlay={isGif}
                 muted={isGif}
                 playsInline
                 src={mediaUrl}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
               />
             ) : (
               <img
                 src={mediaUrl}
                 alt={memory.metadata?.title || 'Preview'}
                 loading="lazy"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
               />
             )}
           </Box>
