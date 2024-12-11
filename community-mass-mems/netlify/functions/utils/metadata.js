@@ -59,6 +59,26 @@ async function extractUrlMetadata(url) {
       }
     };
 
+    // For YouTube URLs, ensure we have the embed
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.toLowerCase();
+    if ((domain.includes('youtube.com') || domain.includes('youtu.be')) && !metadata.embedHtml) {
+      const videoId = url.includes('youtu.be') 
+        ? url.split('/').pop()?.split('?')[0]
+        : new URLSearchParams(urlObj.search).get('v');
+      if (videoId) {
+        metadata.embedHtml = `<iframe 
+          width="560" 
+          height="315" 
+          src="https://www.youtube.com/embed/${videoId}" 
+          frameborder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowfullscreen
+        ></iframe>`;
+        metadata.mediaType = 'video';
+      }
+    }
+
     // For media URLs, ensure we have the correct metadata
     const fileExtension = url.split('.').pop()?.toLowerCase();
     if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(fileExtension)) {
