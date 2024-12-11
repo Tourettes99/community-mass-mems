@@ -1,12 +1,22 @@
 #!/usr/bin/env node
 
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
+const dotenv = require('dotenv');
 const { MongoClient, ObjectId } = require('mongodb');
 const readline = require('readline');
 const chalk = require('chalk');
 const { extractUrlMetadata } = require('../netlify/functions/utils/metadata');
 const moderationService = require('./services/moderationService');
+
+// Load environment variables
+const result = dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
+if (result.error) {
+  console.error(chalk.red('Error loading .env file:'), result.error);
+  process.exit(1);
+}
+
+// MongoDB Connection URL - hardcoded as fallback
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 
 // Format memory details with more context
 function formatMemory(memory, index) {
@@ -91,14 +101,20 @@ async function resetWeeklyPosts(collection) {
 }
 
 async function moderateMemories() {
+  let client;
   try {
     await moderationService.initialize();
     
-    const client = new MongoClient(process.env.MONGODB_URI);
+    console.log(chalk.blue('Connecting to MongoDB...'));
+    client = new MongoClient(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+    
     await client.connect();
     console.log(chalk.green('Connected to MongoDB successfully!'));
     
-    const db = client.db();
+    const db = client.db('memories');
     const collection = db.collection('memories');
     
     const pendingMemories = await collection.find({ status: 'pending' }).toArray();
