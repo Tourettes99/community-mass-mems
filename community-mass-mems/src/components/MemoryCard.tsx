@@ -246,8 +246,58 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       </Box>
     );
 
+    const renderFooter = (
+      <Box sx={{ 
+        mt: 2,
+        pt: 2,
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              onClick={() => handleVote('up')}
+              color={userVote === 'up' ? 'primary' : 'default'}
+            >
+              <ThumbUpIcon fontSize="small" />
+            </IconButton>
+            <Typography variant="body2" sx={{ mx: 1 }}>
+              {memory.votes?.up || 0}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              onClick={() => handleVote('down')}
+              color={userVote === 'down' ? 'error' : 'default'}
+            >
+              <ThumbDownIcon fontSize="small" />
+            </IconButton>
+            <Typography variant="body2" sx={{ mx: 1 }}>
+              {memory.votes?.down || 0}
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Typography 
+          variant="caption" 
+          color="text.secondary"
+          sx={{ 
+            display: 'flex',
+            alignItems: 'center'
+          }}
+        >
+          {formatDate(memory.submittedAt)}
+        </Typography>
+      </Box>
+    );
+
     // Handle YouTube and other embeds first
-    if (memory.metadata?.embedHtml) {
+    if (memory.metadata?.embedHtml && memory.metadata?.mediaType !== 'image') {
       return (
         <>
           {renderHeader}
@@ -276,6 +326,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               dangerouslySetInnerHTML={{ __html: memory.metadata.embedHtml }}
             />
           </Box>
+          {renderFooter}
         </>
       );
     }
@@ -283,10 +334,8 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     // Handle media preview (images, GIFs, videos)
     if (memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url) {
       const mediaUrl = memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url;
-      if (!mediaUrl) return renderHeader;
-
-      const mediaType = memory.metadata?.mediaType || detectDiscordMediaType(mediaUrl);
-      const isGif = mediaUrl.toLowerCase().endsWith('.gif');
+      const isVideo = memory.metadata?.mediaType === 'video';
+      const isGif = mediaUrl?.toLowerCase().endsWith('.gif');
 
       return (
         <>
@@ -297,63 +346,47 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               width: '100%',
               pt: memory.metadata?.dimensions?.height && memory.metadata?.dimensions?.width
                 ? `${(memory.metadata.dimensions.height / memory.metadata.dimensions.width) * 100}%`
-                : '56.25%',
+                : '56.25%', // Default 16:9 aspect ratio
               bgcolor: 'background.paper',
               borderRadius: 1,
               overflow: 'hidden',
               mb: 2,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center'
+              '& img': {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              },
+              '& video': {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              }
             }}
           >
-            {mediaType === 'video' ? (
+            {isVideo ? (
               <video
-                src={mediaUrl}
                 controls
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
-              />
-            ) : isGif ? (
-              <video
-                autoPlay
-                loop
-                muted
+                loop={isGif}
+                autoPlay={isGif}
+                muted={isGif}
                 playsInline
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
-              >
-                <source src={mediaUrl} type="video/mp4" />
-                <img src={mediaUrl} alt="GIF" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              </video>
+                src={mediaUrl}
+              />
             ) : (
               <img
                 src={mediaUrl}
-                alt={memory.metadata?.title || 'Media content'}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
+                alt={memory.metadata?.title || 'Preview'}
                 loading="lazy"
               />
             )}
           </Box>
+          {renderFooter}
         </>
       );
     }
@@ -401,54 +434,6 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
               }}
             />
           ))}
-        </Box>
-
-        <Box sx={{ 
-          mt: 2,
-          pt: 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <IconButton
-                size="small"
-                onClick={() => handleVote('up')}
-                color={userVote === 'up' ? 'primary' : 'default'}
-              >
-                <ThumbUpIcon fontSize="small" />
-              </IconButton>
-              <Typography variant="body2" sx={{ mx: 1 }}>
-                {memory.votes?.up || 0}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <IconButton
-                size="small"
-                onClick={() => handleVote('down')}
-                color={userVote === 'down' ? 'error' : 'default'}
-              >
-                <ThumbDownIcon fontSize="small" />
-              </IconButton>
-              <Typography variant="body2" sx={{ mx: 1 }}>
-                {memory.votes?.down || 0}
-              </Typography>
-            </Box>
-          </Box>
-          
-          <Typography 
-            variant="caption" 
-            color="text.secondary"
-            sx={{ 
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            {formatDate(memory.submittedAt)}
-          </Typography>
         </Box>
       </CardContent>
     </Card>
