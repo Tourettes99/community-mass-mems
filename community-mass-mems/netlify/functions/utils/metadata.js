@@ -90,6 +90,27 @@ async function extractUrlMetadata(url) {
       }
     }
 
+    // Handle OG video data
+    if (ogsResult?.ogVideo?.url || ogsResult?.ogVideoSecureUrl) {
+      const videoUrl = ogsResult.ogVideoSecureUrl || ogsResult.ogVideo.url;
+      metadata.mediaType = 'video';
+      metadata.previewUrl = videoUrl;
+      
+      // If it's an MP4, we can play it directly
+      if (videoUrl.toLowerCase().endsWith('.mp4')) {
+        metadata.embedHtml = `<video 
+          controls 
+          playsinline
+          style="width: 100%; height: 100%;"
+          poster="${ogsResult.ogImage?.url || ''}"
+        >
+          <source src="${videoUrl}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>`;
+      }
+      return metadata;
+    }
+
     // Handle OG image data
     if (ogsResult?.ogImage?.url) {
       metadata.previewUrl = ogsResult.ogImage.url;
