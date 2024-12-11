@@ -5,8 +5,12 @@ const chalk = require('chalk');
 const dotenv = require('dotenv');
 
 // Load environment variables from the correct path
-const envPath = path.join(__dirname, '..', '..', '..', 'community-mass-mems', '.env');
+const envPath = path.join(__dirname, '..', '..', '.env');
 dotenv.config({ path: envPath });
+
+// For debugging
+console.log('Loading .env from:', envPath);
+console.log('API Key starts with:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 10) : 'not found');
 
 class ModerationService {
   constructor() {
@@ -134,13 +138,14 @@ class ModerationService {
 
     console.log(chalk.yellow('\nCategory Scores:'));
     scores.forEach(({ category, score }) => {
-      const color = score > 0.8 ? 'red' : score > 0.5 ? 'yellow' : 'green';
+      const color = score > this.settings.auto_reject_threshold ? 'red' : 
+                   score > this.settings.auto_approve_threshold ? 'yellow' : 'green';
       console.log(chalk[color](`  • ${category}: ${score}`));
     });
 
     // Check against custom rules
     const customViolations = [];
-    if (this.knowledgeBase.custom_rules) {
+    if (this.rules) {
       console.log(chalk.yellow('\nChecking custom rules...'));
       for (const rule of this.knowledgeBase.custom_rules) {
         const regex = new RegExp(rule.pattern, 'i');
@@ -152,36 +157,49 @@ class ModerationService {
     }
 
     // Make moderation decision
-    const highestScore = Math.max(...Object.values(openAIResult.category_scores));
-    let decision;
-    let reason;
+    let decision = 'approve';
+    let reason = 'Content meets community guidelines';
 
-    if (highestScore >= this.settings.auto_reject_threshold || customViolations.length > 0) {
+    // Check custom violations first
+    if (customViolations.length > 0) {
       decision = 'reject';
-      reason = categories.length > 0 
-        ? `Content violates rules: ${categories.join(', ')}` 
-        : 'Content violates custom rules';
-    } else if (highestScore <= this.settings.auto_approve_threshold && customViolations.length === 0) {
-      decision = 'approve';
-      reason = 'Content meets community guidelines';
-    } else {
-      decision = 'review';
-      reason = 'Content requires human review';
+      reason = `Content violates custom rules: ${customViolations.map(v => v.reason).join(', ')}`;
+    }
+    // Then check category scores
+    else {
+      for (const [category, rule] of Object.entries(this.rules)) {
+        const score = openAIResult.category_scores[category] || 0;
+        if (score >= rule.threshold) {
+          decision = 'reject';
+          reason = `Content violates ${category} threshold`;
+          break;
+        }
+      }
+    }
+
+    // If no automatic decision made, check against global thresholds
+    if (decision === 'approve') {
+      const maxScore = Math.max(...Object.values(openAIResult.category_scores));
+      if (maxScore >= this.settings.auto_reject_threshold) {
+        decision = 'reject';
+        reason = 'Content exceeds global rejection threshold';
+      }
     }
 
     console.log(chalk.yellow('\nRecommended Action:'));
     console.log(
       decision === 'approve' ? chalk.green(`  ${decision.toUpperCase()}: ${reason}`) :
-      decision === 'reject' ? chalk.red(`  ${decision.toUpperCase()}: ${reason}`) :
-      chalk.yellow(`  ${decision.toUpperCase()}: ${reason}`)
+      chalk.red(`  ${decision.toUpperCase()}: ${reason}`)
     );
 
     return {
       decision,
       reason,
-      openAIResult,
-      customViolations,
-      requiresHumanReview: this.settings.require_human_review && decision !== 'approve'
+      flagged: openAIResult.flagged || customViolations.length > 0,
+      category_scores: openAIResult.category_scores,
+      categories: categories,
+      custom_violations: customViolations,
+      requires_review: false
     };
   }
 }
