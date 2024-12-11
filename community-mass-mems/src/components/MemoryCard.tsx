@@ -336,115 +336,111 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     }
 
     // Handle media preview (images, GIFs, videos)
-    if (memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url) {
-      const mediaUrl = memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url;
-      
-      // Skip if no valid media URL
-      if (!mediaUrl) return renderHeader;
+    const metadata = memory.metadata;
+    if (!metadata) return renderHeader;
 
-      const isVideo = memory.metadata?.mediaType === 'video';
-      const isGif = mediaUrl.toLowerCase().endsWith('.gif');
-      const hasEmbed = memory.metadata?.embedHtml && memory.metadata?.mediaType !== 'image';
+    const mediaUrl = metadata.previewUrl || metadata.ogImage || memory.url;
+    if (!mediaUrl) return renderHeader;
 
-      // Use embed if available and not an image
-      if (hasEmbed) {
-        return (
-          <>
-            {renderHeader}
-            <Box sx={{ 
-              position: 'relative',
-              width: '100%',
-              pt: '56.25%', // 16:9 aspect ratio
-              bgcolor: 'background.paper',
-              borderRadius: 1,
-              overflow: 'hidden',
-              mb: 2
-            }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                }}
-              >
-                <div
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                  }}
-                  dangerouslySetInnerHTML={{ 
-                    __html: memory.metadata.embedHtml || '' 
-                  }}
-                />
-              </div>
-            </Box>
-            {renderFooter}
-          </>
-        );
-      }
+    const isVideo = metadata.mediaType === 'video';
+    const isGif = mediaUrl.toLowerCase().endsWith('.gif');
+    const hasEmbed = metadata.embedHtml && metadata.mediaType !== 'image';
 
-      // Handle media content
+    // Use embed if available and not an image
+    if (hasEmbed) {
       return (
         <>
           {renderHeader}
-          <Box
-            sx={{
-              position: 'relative',
-              width: '100%',
-              pt: memory.metadata?.dimensions?.height && memory.metadata?.dimensions?.width
-                ? `${(memory.metadata.dimensions.height / memory.metadata.dimensions.width) * 100}%`
-                : '56.25%', // Default 16:9 aspect ratio
-              bgcolor: 'background.paper',
-              borderRadius: 1,
-              overflow: 'hidden',
-              mb: 2,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center'
-            }}
-          >
-            {isVideo || isGif ? (
-              <video
-                controls={isVideo}
-                loop={isGif}
-                autoPlay={isGif}
-                muted={isGif}
-                playsInline
-                src={mediaUrl}
+          <Box sx={{ 
+            position: 'relative',
+            width: '100%',
+            pt: '56.25%', // 16:9 aspect ratio
+            bgcolor: 'background.paper',
+            borderRadius: 1,
+            overflow: 'hidden',
+            mb: 2
+          }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+              }}
+            >
+              <div
                 style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
                   width: '100%',
                   height: '100%',
-                  objectFit: 'contain'
+                }}
+                dangerouslySetInnerHTML={{ 
+                  __html: metadata.embedHtml 
                 }}
               />
-            ) : (
-              <img
-                src={mediaUrl}
-                alt={memory.metadata?.title || 'Preview'}
-                loading="lazy"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
-              />
-            )}
+            </div>
           </Box>
           {renderFooter}
         </>
       );
     }
 
-    // Fallback to basic preview
-    return renderHeader;
+    // Handle media content
+    return (
+      <>
+        {renderHeader}
+        <Box
+          sx={{
+            position: 'relative',
+            width: '100%',
+            pt: metadata.dimensions?.height && metadata.dimensions?.width
+              ? `${(metadata.dimensions.height / metadata.dimensions.width) * 100}%`
+              : '56.25%', // Default 16:9 aspect ratio
+            bgcolor: 'background.paper',
+            borderRadius: 1,
+            overflow: 'hidden',
+            mb: 2,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          {isVideo || isGif ? (
+            <video
+              controls={isVideo}
+              loop={isGif}
+              autoPlay={isGif}
+              muted={isGif}
+              playsInline
+              src={mediaUrl}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              }}
+            />
+          ) : (
+            <img
+              src={mediaUrl}
+              alt={metadata.title || 'Preview'}
+              loading="lazy"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              }}
+            />
+          )}
+        </Box>
+        {renderFooter}
+      </>
+    );
   };
 
   return (
