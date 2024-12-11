@@ -17,6 +17,11 @@ const metascraper = require('metascraper')([
 // Universal URL metadata extractor
 async function extractUrlMetadata(url) {
   try {
+    // Parse URL components first
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.toLowerCase();
+    const fileExtension = url.split('.').pop()?.toLowerCase().split('?')[0]; // Handle URLs with query params
+
     // Step 1: Try oEmbed first as it's the most reliable for supported sites
     const oEmbedData = await tryOEmbed(url);
     if (oEmbedData) {
@@ -45,7 +50,7 @@ async function extractUrlMetadata(url) {
     const metadata = {
       title: metascraperResult?.title || ogsResult?.ogTitle || unfurlResult?.title || url,
       description: metascraperResult?.description || ogsResult?.ogDescription || unfurlResult?.description || '',
-      siteName: metascraperResult?.publisher || ogsResult?.ogSiteName || unfurlResult?.site_name || new URL(url).hostname,
+      siteName: metascraperResult?.publisher || ogsResult?.ogSiteName || unfurlResult?.site_name || domain,
       author: metascraperResult?.author || ogsResult?.ogArticle?.author || unfurlResult?.author,
       publishedDate: metascraperResult?.date || ogsResult?.ogArticle?.publishedTime || unfurlResult?.published,
       mediaType: determineMediaType(url, unfurlResult, ogsResult),
@@ -59,22 +64,135 @@ async function extractUrlMetadata(url) {
       }
     };
 
-    // Handle direct media URLs first
-    const fileExtension = url.split('.').pop()?.toLowerCase();
+    // Special handling for Discord CDN
+    if (domain === 'cdn.discordapp.com') {
+      metadata.siteName = 'Discord';
+      metadata.title = url.split('/').pop()?.split('?')[0] || url;
+      
+      if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(fileExtension)) {
+        if (fileExtension === 'gif') {
+          metadata.mediaType = 'video'; // Handle GIFs as videos for autoplay
+          metadata.previewUrl = url;
+          metadata.embedHtml = `<video 
+            autoplay 
+            loop 
+            muted 
+            playsinline
+            style="width: 100%; height: 100%; object-fit: contain;"
+          >
+            <source src="${url}" type="video/mp4">
+            <img src="${url}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;">
+          </video>`;
+        } else if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
+          metadata.mediaType = 'video';
+          metadata.previewUrl = url;
+          metadata.embedHtml = `<video 
+            controls 
+            playsinline
+            style="width: 100%; height: 100%; object-fit: contain;"
+          >
+            <source src="${url}" type="video/${fileExtension}">
+            Your browser does not support the video tag.
+          </video>`;
+        } else {
+          // Regular images
+          metadata.mediaType = 'image';
+          metadata.previewUrl = url;
+          metadata.embedHtml = `<img 
+            src="${url}" 
+            alt="${metadata.title}"
+            loading="lazy"
+            style="width: 100%; height: 100%; object-fit: contain;"
+          >`;
+        }
+      }
+      return metadata;
+    }
+
+    // Handle regular direct media URLs
     if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'].includes(fileExtension)) {
       metadata.mediaType = ['mp4', 'webm', 'mov'].includes(fileExtension) ? 'video' : 'image';
       metadata.previewUrl = url;
       metadata.title = url.split('/').pop();
+      
+      // For videos, create an embed
+      if (metadata.mediaType === 'video') {
+        metadata.embedHtml = `<video 
+          controls 
+          playsinline
+          style="width: 100%; height: 100%;"
+        >
+          <source src="${url}" type="video/${fileExtension}">
+          Your browser does not support the video tag.
+        </video>`;
+      }
       return metadata;
     }
 
+    // Handle Twitter URLs
+    if (domain === 'twitter.com' || domain === 'x.com') {
+      // Try to get video URL from meta tags
+      const videoUrl = unfurlResult?.twitter_card?.players?.[0]?.url || 
+                      unfurlResult?.twitter_card?.player?.url ||
+                      ogsResult?.ogVideo?.url ||
+                      ogsResult?.twitterPlayer?.url;
+
+      const videoType = unfurlResult?.twitter_card?.players?.[0]?.content_type || 
+                       ogsResult?.ogVideo?.type;
+
+      // Handle Twitter GIFs
+      if (unfurlResult?.twitter_card?.type === 'animated_gif' || 
+          videoUrl?.includes('tweet_video') ||
+          unfurlResult?.twitter_card?.image_type === 'animated_gif') {
+        metadata.mediaType = 'video';
+        metadata.previewUrl = unfurlResult?.twitter_card?.image_url || ogsResult?.ogImage?.url;
+        metadata.embedHtml = `<video 
+          autoplay 
+          loop 
+          muted 
+          playsinline
+          style="width: 100%; height: 100%; object-fit: contain;"
+          poster="${metadata.previewUrl}"
+        >
+          <source src="${videoUrl}" type="video/mp4">
+          <img src="${metadata.previewUrl}" alt="${metadata.title}" style="width: 100%; height: 100%; object-fit: contain;">
+        </video>`;
+        return metadata;
+      }
+
+      // Handle Twitter Videos
+      if (videoUrl && (unfurlResult?.twitter_card?.type === 'video' || 
+                      unfurlResult?.twitter_card?.type === 'player' ||
+                      ogsResult?.ogType === 'video')) {
+        metadata.mediaType = 'video';
+        metadata.previewUrl = unfurlResult?.twitter_card?.image_url || ogsResult?.ogImage?.url;
+        
+        // If it's a direct video URL
+        if (videoUrl.endsWith('.mp4') || videoType?.includes('mp4')) {
+          metadata.embedHtml = `<video 
+            controls 
+            playsinline
+            style="width: 100%; height: 100%; object-fit: contain;"
+            poster="${metadata.previewUrl}"
+          >
+            <source src="${videoUrl}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>`;
+        } else {
+          // Use Twitter's player iframe
+          metadata.embedHtml = `<iframe 
+            src="${videoUrl}"
+            style="width: 100%; height: 100%; border: none;"
+            allowfullscreen
+          ></iframe>`;
+        }
+        return metadata;
+      }
+    }
+
     // Handle YouTube URLs
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.toLowerCase();
     if ((domain.includes('youtube.com') || domain.includes('youtu.be'))) {
-      const videoId = url.includes('youtu.be') 
-        ? url.split('/').pop()?.split('?')[0]
-        : new URLSearchParams(urlObj.search).get('v');
+      const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
       if (videoId) {
         metadata.embedHtml = `<iframe 
           width="560" 
@@ -200,9 +318,7 @@ function generateEmbedHtml(url, unfurlData, ogsData) {
     
     // YouTube
     if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-      const videoId = url.includes('youtu.be') 
-        ? url.split('/').pop()?.split('?')[0]
-        : new URLSearchParams(urlObj.search).get('v');
+      const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
       if (videoId) {
         return `<iframe 
           width="560" 
