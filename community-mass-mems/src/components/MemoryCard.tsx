@@ -8,13 +8,15 @@ import {
   Link,
   CardMedia,
   Divider,
-  Typography
+  Typography,
+  Avatar
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import PersonIcon from '@mui/icons-material/Person';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import PublicIcon from '@mui/icons-material/Public';
+import YouTubeIcon from '@mui/icons-material/YouTube';
 import { Memory } from '../types/Memory';
 import useMemoryStore from '../stores/memoryStore';
 import EmbedPlayer from './EmbedPlayer';
@@ -348,46 +350,142 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     const isGif = mediaUrl.toLowerCase().endsWith('.gif');
     const hasEmbed = metadata.embedHtml && metadata.mediaType !== 'image';
 
-    // Use embed if available and not an image
-    if (hasEmbed) {
+    // Handle video content (YouTube, GIFs, or other videos)
+    if (isVideo || isGif || hasEmbed) {
       return (
         <>
           {renderHeader}
           <Box sx={{ 
-            position: 'relative',
-            width: '100%',
-            pt: '56.25%', // 16:9 aspect ratio
             bgcolor: 'background.paper',
             borderRadius: 1,
             overflow: 'hidden',
             mb: 2
           }}>
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-              }}
-            >
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                }}
-                dangerouslySetInnerHTML={{ 
-                  __html: metadata.embedHtml || ''
-                }}
-              />
-            </div>
+            {/* Video Title and Source */}
+            <Box sx={{ 
+              p: 2, 
+              display: 'flex', 
+              alignItems: 'center',
+              gap: 1
+            }}>
+              {metadata.siteName === 'YouTube' && (
+                <Box 
+                  component="span"
+                  sx={{ 
+                    bgcolor: 'error.main',
+                    color: 'white',
+                    p: 0.5,
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24
+                  }}
+                >
+                  <YouTubeIcon sx={{ fontSize: 16 }} />
+                </Box>
+              )}
+              <Typography variant="body2" color="text.secondary">
+                {metadata.siteName || 'Video'}
+              </Typography>
+            </Box>
+
+            {/* Video Preview */}
+            <Box sx={{ 
+              position: 'relative',
+              width: '100%',
+              pt: '56.25%', // 16:9 aspect ratio
+              bgcolor: 'background.paper',
+              overflow: 'hidden',
+            }}>
+              {hasEmbed ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                    }}
+                    dangerouslySetInnerHTML={{ 
+                      __html: metadata.embedHtml || ''
+                    }}
+                  />
+                </div>
+              ) : (
+                isVideo ? (
+                  <video
+                    controls={isVideo}
+                    loop={isGif}
+                    autoPlay={isGif}
+                    muted={isGif}
+                    playsInline
+                    src={mediaUrl}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={mediaUrl}
+                    alt={metadata.title || 'Preview'}
+                    loading="lazy"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                )
+              )}
+            </Box>
+
+            {/* Video Description */}
+            {metadata.title && (
+              <Box sx={{ p: 2 }}>
+                <Typography variant="subtitle1">
+                  {metadata.title}
+                </Typography>
+                {metadata.description && (
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary"
+                    sx={{ 
+                      mt: 1,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {metadata.description}
+                  </Typography>
+                )}
+              </Box>
+            )}
           </Box>
           {renderFooter}
         </>
       );
     }
 
-    // Handle media content
+    // Handle regular images
     return (
       <>
         {renderHeader}
@@ -407,38 +505,19 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
             alignItems: 'center'
           }}
         >
-          {isVideo || isGif ? (
-            <video
-              controls={isVideo}
-              loop={isGif}
-              autoPlay={isGif}
-              muted={isGif}
-              playsInline
-              src={mediaUrl}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain'
-              }}
-            />
-          ) : (
-            <img
-              src={mediaUrl}
-              alt={metadata.title || 'Preview'}
-              loading="lazy"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain'
-              }}
-            />
-          )}
+          <img
+            src={mediaUrl}
+            alt={metadata.title || 'Preview'}
+            loading="lazy"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain'
+            }}
+          />
         </Box>
         {renderFooter}
       </>
