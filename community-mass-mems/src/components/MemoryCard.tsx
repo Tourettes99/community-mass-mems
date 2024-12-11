@@ -249,8 +249,10 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     // Handle media preview (images, GIFs, videos)
     if (memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url) {
       const mediaUrl = memory.metadata?.previewUrl || memory.metadata?.ogImage || memory.url;
+      if (!mediaUrl) return renderHeader;
+
       const mediaType = memory.metadata?.mediaType || detectDiscordMediaType(mediaUrl);
-      const isGif = mediaUrl?.toLowerCase().endsWith('.gif');
+      const isGif = mediaUrl.toLowerCase().endsWith('.gif');
 
       return (
         <>
