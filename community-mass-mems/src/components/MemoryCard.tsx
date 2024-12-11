@@ -325,7 +325,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   height: '100%',
                 }}
                 dangerouslySetInnerHTML={{ 
-                  __html: memory.metadata.embedHtml || '' 
+                  __html: metadata.embedHtml || '' // Ensure it's always a string
                 }}
               />
             </div>
@@ -375,7 +375,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   height: '100%',
                 }}
                 dangerouslySetInnerHTML={{ 
-                  __html: metadata.embedHtml 
+                  __html: metadata.embedHtml || '' // Ensure it's always a string
                 }}
               />
             </div>
