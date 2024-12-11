@@ -149,7 +149,9 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
     }
   };
 
-  const renderContent = () => {
+  const renderContent = (memory: Memory) => {
+    if (!memory) return null;
+
     const title = memory.metadata?.title || memory.url || 'No title';
     const description = memory.metadata?.description;
     const author = memory.metadata?.author;
@@ -325,7 +327,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   height: '100%',
                 }}
                 dangerouslySetInnerHTML={{ 
-                  __html: metadata.embedHtml || '' // Ensure it's always a string
+                  __html: memory.metadata.embedHtml || ''
                 }}
               />
             </div>
@@ -375,7 +377,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
                   height: '100%',
                 }}
                 dangerouslySetInnerHTML={{ 
-                  __html: metadata.embedHtml || '' // Ensure it's always a string
+                  __html: metadata.embedHtml || ''
                 }}
               />
             </div>
@@ -457,7 +459,7 @@ const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClic
       }}
     >
       <CardContent sx={{ flexGrow: 1, p: 3 }}>
-        {renderContent()}
+        {renderContent(memory)}
         
         <Box sx={{ 
           mt: 2, 
