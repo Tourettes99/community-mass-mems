@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
-const autoModeration = require('./services/autoModeration');
+const groqModeration = require('./services/groqModeration');
 const emailNotification = require('./services/emailNotification');
 
 exports.handler = async (event, context) => {
@@ -62,8 +62,8 @@ exports.handler = async (event, context) => {
     }
 
     // Initialize and run auto moderation
-    await autoModeration.initialize();
-    const moderationResult = await autoModeration.moderateContent(content, type);
+    await groqModeration.initialize();
+    const moderationResult = await groqModeration.moderateContent(content, type);
 
     // Connect to MongoDB
     client = await MongoClient.connect(process.env.MONGODB_URI, {
