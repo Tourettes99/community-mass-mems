@@ -1,5 +1,5 @@
 [build]
-  base = "community-mass-mems"
+  base = "."
   command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
   publish = "build"
 
@@ -88,11 +88,6 @@
 [[redirects]]
   from = "/.netlify/functions/*"
   to = "/.netlify/functions/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.mp3"
-  to = "/episode-1-introduktion.mp3"
   status = 200
 
 [[redirects]]

@@ -19,7 +19,7 @@ export const AnnouncementBanner: React.FC = () => {
     const fetchAnnouncement = async () => {
       try {
         console.log('Fetching announcement...');
-        const response = await fetch('/.netlify/functions/announcement');
+        const response = await fetch('/api/announcement');
         console.log('Response status:', response.status);
         const data = await response.json();
         console.log('Announcement data:', data);
