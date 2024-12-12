@@ -25,20 +25,24 @@ exports.handler = async (event, context) => {
     };
   }
 
+  let client;
   try {
-    const client = new MongoClient(process.env.MONGODB_URI);
+    console.log('Connecting to MongoDB...');
+    client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
+    console.log('Connected to MongoDB');
 
     const db = client.db('mass-mems');
     const collection = db.collection('announcements');
 
+    console.log('Fetching announcements...');
     const announcements = await collection
       .find({})
       .sort({ createdAt: -1 })
       .limit(10)
       .toArray();
-
-    await client.close();
+    
+    console.log('Found announcements:', announcements);
 
     return {
       statusCode: 200,
@@ -50,7 +54,12 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Internal server error' }),
+      body: JSON.stringify({ error: 'Internal server error', details: error.message }),
     };
+  } finally {
+    if (client) {
+      await client.close();
+      console.log('MongoDB connection closed');
+    }
   }
 };
