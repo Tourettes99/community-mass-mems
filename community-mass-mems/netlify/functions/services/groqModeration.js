@@ -3,7 +3,7 @@ const chalk = require('chalk');
 
 class GroqModerationService {
   constructor() {
-    this.groq = new Groq();
+    this.groq = null;
     this.model = "llama-3.1-70b-versatile";
   }
 
@@ -13,8 +13,23 @@ class GroqModerationService {
         throw new Error('GROQ_API_KEY environment variable is not set');
       }
       
-      // Test the API key with a simple request
-      await this.moderateContent("test");
+      // Initialize Groq client with API key
+      this.groq = new Groq({
+        apiKey: process.env.GROQ_API_KEY
+      });
+
+      // Test the connection without moderation
+      const testCompletion = await this.groq.chat.completions.create({
+        model: this.model,
+        messages: [{ role: "user", content: "test" }],
+        temperature: 0.1,
+        max_tokens: 10
+      });
+
+      if (!testCompletion?.choices?.[0]?.message) {
+        throw new Error('Failed to connect to Groq API');
+      }
+
       console.log(chalk.green('✓ Groq moderation service initialized'));
     } catch (error) {
       console.error(chalk.red('Error initializing Groq moderation service:'), error);
@@ -24,6 +39,10 @@ class GroqModerationService {
 
   async moderateContent(text, type = 'text') {
     try {
+      if (!this.groq) {
+        throw new Error('Groq client not initialized');
+      }
+
       console.log(chalk.blue('Sending request to Groq API...'));
 
       const tools = [{
@@ -66,7 +85,7 @@ class GroqModerationService {
         },
         {
           role: "user",
-          content: text
+          content: text || ''  // Ensure text is never undefined
         }
       ];
 
@@ -79,14 +98,23 @@ class GroqModerationService {
         max_tokens: 1000
       });
 
-      const response = completion.choices[0];
-      
-      if (!response.message.tool_calls) {
+      if (!completion?.choices?.[0]?.message?.tool_calls?.[0]) {
         throw new Error('No moderation result received from Groq API');
       }
 
-      const toolCall = response.message.tool_calls[0];
-      const result = JSON.parse(toolCall.function.arguments);
+      const toolCall = completion.choices[0].message.tool_calls[0];
+      let result;
+      
+      try {
+        result = JSON.parse(toolCall.function.arguments);
+      } catch (error) {
+        console.error('Error parsing Groq API response:', error);
+        throw new Error('Invalid response format from Groq API');
+      }
+
+      if (!result || typeof result.is_appropriate !== 'boolean' || !result.category_scores) {
+        throw new Error('Invalid moderation result format');
+      }
 
       // Ensure category_scores are numbers
       if (result.category_scores) {
