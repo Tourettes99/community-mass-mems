@@ -4,7 +4,6 @@ const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
 const emailNotification = require('./services/emailNotification');
 const { getUrlMetadata } = require('./utils/urlMetadata');
-const autoModeration = require('./services/autoModeration');
 const groqModeration = require('./services/groqModeration');
 const fileStorage = require('./services/fileStorage');
 
@@ -171,76 +170,98 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Initialize and run auto moderation
-    await autoModeration.initialize();
-    const moderationResult = await autoModeration.moderateContent(type === 'url' ? url : content, type);
+    // Run content moderation
+    try {
+      await groqModeration.initialize();
+      const moderationResult = await groqModeration.moderateContent(type === 'url' ? url : content, type);
 
-    // Connect to MongoDB
-    client = await MongoClient.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 10000,
-      family: 4
-    });
+      // Connect to MongoDB
+      client = await MongoClient.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 10000,
+        family: 4
+      });
 
-    const db = client.db('memories');
-    const collection = db.collection('memories');
+      const db = client.db('memories');
+      const collection = db.collection('memories');
 
-    // Create memory document
-    const memory = {
-      type: type,
-      url: type === 'url' ? url : undefined,
-      content: type === 'text' ? content : undefined,
-      tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-      status: moderationResult.decision,  // Use decision directly: 'approve' or 'reject'
-      moderationResult: {
-        decision: moderationResult.decision,
-        reason: moderationResult.reason,
-        categories: moderationResult.categories,
-        flagged: moderationResult.flagged,
-        category_scores: moderationResult.category_scores
-      },
-      metadata: {
-        ...metadata,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      votes: { up: 0, down: 0 },
-      userVotes: {},
-      submittedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    // Save to database
-    const result = await collection.insertOne(memory);
-    memory._id = result.insertedId;
-    
-    // Send notification email
-    await emailNotification.sendModerationNotification(memory, moderationResult);
-
-    // Return appropriate response based on moderation decision
-    if (moderationResult.decision === 'reject') {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          message: 'Content rejected by moderation',
+      // Create memory document
+      const memory = {
+        type: type,
+        url: type === 'url' ? url : undefined,
+        content: type === 'text' ? content : undefined,
+        tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
+        status: moderationResult.decision,  // Use decision directly: 'approve' or 'reject'
+        moderationResult: {
+          decision: moderationResult.decision,
           reason: moderationResult.reason,
           categories: moderationResult.categories,
-          category_scores: moderationResult.category_scores,
+          flagged: moderationResult.flagged,
+          category_scores: moderationResult.category_scores
+        },
+        metadata: {
+          ...metadata,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        votes: { up: 0, down: 0 },
+        userVotes: {},
+        submittedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Save to database
+      const result = await collection.insertOne(memory);
+      memory._id = result.insertedId;
+      
+      // Send notification email
+      await emailNotification.sendModerationNotification(memory, moderationResult);
+
+      // Return appropriate response based on moderation decision
+      if (moderationResult.decision === 'reject') {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            message: 'Content rejected by moderation',
+            reason: moderationResult.reason,
+            categories: moderationResult.categories,
+            category_scores: moderationResult.category_scores,
+            id: result.insertedId
+          })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          message: 'Content submitted and approved',
           id: result.insertedId
         })
       };
+    } catch (error) {
+      console.error('Error:', error);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          message: 'Error submitting content',
+          error: error.message 
+        })
+      };
+    } finally {
+      // Clean up MongoDB connections
+      try {
+        await fileStorage.cleanup();
+      } catch (error) {
+        console.error('Error cleaning up file storage:', error);
+      }
+      if (client) {
+        await client.close();
+      }
     }
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        message: 'Content submitted and approved',
-        id: result.insertedId
-      })
-    };
   } catch (error) {
     console.error('Error:', error);
     return {
@@ -251,15 +272,5 @@ exports.handler = async (event, context) => {
         error: error.message 
       })
     };
-  } finally {
-    // Clean up MongoDB connections
-    try {
-      await fileStorage.cleanup();
-    } catch (error) {
-      console.error('Error cleaning up file storage:', error);
-    }
-    if (client) {
-      await client.close();
-    }
   }
 };
