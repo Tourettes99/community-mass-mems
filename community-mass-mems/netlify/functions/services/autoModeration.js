@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const path = require('path');
 const fs = require('fs').promises;
+const { getUrlMetadata } = require('../utils/urlMetadata');
 
 class AutoModerationService {
   constructor() {
@@ -24,8 +25,45 @@ class AutoModerationService {
     }
   }
 
-  async moderateContent(content) {
+  async moderateContent(content, type = 'text') {
     try {
+      let textToModerate = content;
+      let metadata = null;
+
+      // If it's a URL, fetch metadata and combine relevant text for moderation
+      if (type === 'url') {
+        metadata = await getUrlMetadata(content);
+        const textsToCheck = [
+          metadata.title,
+          metadata.description,
+          metadata.metaTags?.description,
+          metadata.metaTags?.keywords,
+          metadata.metaTags?.content,
+          metadata.metaTags?.['og:title'],
+          metadata.metaTags?.['og:description'],
+          metadata.author
+        ].filter(Boolean);
+
+        textToModerate = textsToCheck.join('\n');
+      }
+
+      // Pre-check meta tags for content rating
+      if (metadata?.contentRating || metadata?.ageRating) {
+        const rating = metadata.contentRating || metadata.ageRating;
+        const adultRatings = ['adult', 'mature', '18+', 'nsfw', 'explicit'];
+        if (adultRatings.some(term => rating.toLowerCase().includes(term))) {
+          return {
+            decision: 'reject',
+            reason: `Content rating indicates adult content: ${rating}`,
+            flagged: true,
+            category_scores: {},
+            categories: ['adult_content'],
+            custom_violations: [],
+            metadata
+          };
+        }
+      }
+
       // Call OpenAI Moderation API
       const response = await fetch('https://api.openai.com/v1/moderations', {
         method: 'POST',
@@ -33,7 +71,7 @@ class AutoModerationService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.openaiApiKey}`
         },
-        body: JSON.stringify({ input: content })
+        body: JSON.stringify({ input: textToModerate })
       });
 
       const result = await response.json();
@@ -48,7 +86,7 @@ class AutoModerationService {
       if (this.rules) {
         for (const rule of this.knowledgeBase?.custom_rules || []) {
           const regex = new RegExp(rule.pattern, 'i');
-          if (regex.test(content)) {
+          if (regex.test(textToModerate)) {
             customViolations.push(rule);
           }
         }
@@ -104,7 +142,8 @@ class AutoModerationService {
         categories: Object.entries(openAIResult.categories)
           .filter(([_, flagged]) => flagged)
           .map(([category]) => category),
-        custom_violations: customViolations
+        custom_violations: customViolations,
+        metadata
       };
     } catch (error) {
       console.error('Error in content moderation:', error);
