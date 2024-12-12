@@ -88,13 +88,21 @@ class GroqModerationService {
       const toolCall = response.message.tool_calls[0];
       const result = JSON.parse(toolCall.function.arguments);
 
+      // Ensure category_scores are numbers
+      if (result.category_scores) {
+        Object.entries(result.category_scores).forEach(([key, value]) => {
+          result.category_scores[key] = typeof value === 'number' ? value : parseFloat(value) || 0;
+        });
+      }
+
       console.log(chalk.yellow('\nModeration Analysis:'));
       console.log(chalk.cyan('Content Type:'), type);
       console.log(chalk.cyan('Is Appropriate:'), result.is_appropriate);
       console.log(chalk.cyan('Category Scores:'));
       Object.entries(result.category_scores).forEach(([category, score]) => {
         const color = score > 0.7 ? chalk.red : score > 0.4 ? chalk.yellow : chalk.green;
-        console.log(`  ${category}: ${color(score.toFixed(3))}`);
+        const scoreValue = typeof score === 'number' ? score.toFixed(3) : score;
+        console.log(`  ${category}: ${color(scoreValue)}`);
       });
 
       if (!result.is_appropriate && result.reason) {
