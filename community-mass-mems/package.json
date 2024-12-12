@@ -26,7 +26,7 @@
     "ajv": "8.0.0",
     "ajv-keywords": "5.0.0",
     "aws4": "^1.13.2",
-    "axios": "^1.7.7",
+    "axios": "1.7.9",
     "boxen": "5.1.2",
     "chalk": "4.1.2",
     "cross-env": "^7.0.3",
@@ -56,6 +56,7 @@
     "unfurl.js": "^6.4.0",
     "wavesurfer.js": "^7.3.2",
     "web-vitals": "^2.1.4",
+    "yargs": "17.7.2",
     "zustand": "^4.4.1"
   },
   "scripts": {
