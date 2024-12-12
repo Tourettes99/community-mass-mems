@@ -40,7 +40,8 @@
     "canvas",
     "jsdom",
     "fs",
-    "fs-extra"
+    "fs-extra",
+    "@netlify/blobs"
   ]
 
 [[headers]]
