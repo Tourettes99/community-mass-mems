@@ -38,7 +38,9 @@
     "express",
     "path",
     "canvas",
-    "jsdom"
+    "jsdom",
+    "fs",
+    "fs-extra"
   ]
 
 [[headers]]
