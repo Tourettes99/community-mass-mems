@@ -18,7 +18,7 @@ export const AnnouncementBanner: React.FC = () => {
   useEffect(() => {
     const fetchAnnouncement = async () => {
       try {
-        const response = await fetch('/api/announcement');
+        const response = await fetch('/.netlify/functions/announcement');
         const data = await response.json();
         if (data && data.active) {
           setAnnouncement(data);
