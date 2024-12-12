@@ -4,10 +4,15 @@ const chalk = require('chalk');
 class GroqModerationService {
   constructor() {
     this.groq = null;
-    this.model = "llama-3.1-70b-versatile";
+    this.model = "llama2-70b-4096";  // Changed to a more reliable model
+    this.initialized = false;
   }
 
   async initialize() {
+    if (this.initialized) {
+      return;
+    }
+
     try {
       if (!process.env.GROQ_API_KEY) {
         throw new Error('GROQ_API_KEY environment variable is not set');
@@ -30,20 +35,28 @@ class GroqModerationService {
         throw new Error('Failed to connect to Groq API');
       }
 
+      this.initialized = true;
       console.log(chalk.green('✓ Groq moderation service initialized'));
     } catch (error) {
       console.error(chalk.red('Error initializing Groq moderation service:'), error);
+      this.groq = null;
+      this.initialized = false;
       throw error;
     }
   }
 
   async moderateContent(text, type = 'text') {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
     try {
       if (!this.groq) {
         throw new Error('Groq client not initialized');
       }
 
       console.log(chalk.blue('Sending request to Groq API...'));
+      console.log(chalk.cyan('Content to moderate:'), { type, text: text?.substring(0, 100) + (text?.length > 100 ? '...' : '') });
 
       const tools = [{
         type: "function",
@@ -95,10 +108,13 @@ class GroqModerationService {
         tools,
         tool_choice: "auto",
         temperature: 0.1,
-        max_tokens: 1000
+        max_tokens: 1000,
+        top_p: 1,
+        stream: false
       });
 
       if (!completion?.choices?.[0]?.message?.tool_calls?.[0]) {
+        console.error(chalk.red('Invalid Groq API response:'), JSON.stringify(completion, null, 2));
         throw new Error('No moderation result received from Groq API');
       }
 
@@ -108,11 +124,13 @@ class GroqModerationService {
       try {
         result = JSON.parse(toolCall.function.arguments);
       } catch (error) {
-        console.error('Error parsing Groq API response:', error);
+        console.error(chalk.red('Error parsing Groq API response:'), error);
+        console.error(chalk.red('Raw response:'), toolCall.function.arguments);
         throw new Error('Invalid response format from Groq API');
       }
 
       if (!result || typeof result.is_appropriate !== 'boolean' || !result.category_scores) {
+        console.error(chalk.red('Invalid result format:'), result);
         throw new Error('Invalid moderation result format');
       }
 
@@ -126,12 +144,7 @@ class GroqModerationService {
       console.log(chalk.yellow('\nModeration Analysis:'));
       console.log(chalk.cyan('Content Type:'), type);
       console.log(chalk.cyan('Is Appropriate:'), result.is_appropriate);
-      console.log(chalk.cyan('Category Scores:'));
-      Object.entries(result.category_scores).forEach(([category, score]) => {
-        const color = score > 0.7 ? chalk.red : score > 0.4 ? chalk.yellow : chalk.green;
-        const scoreValue = typeof score === 'number' ? score.toFixed(3) : score;
-        console.log(`  ${category}: ${color(scoreValue)}`);
-      });
+      console.log(chalk.cyan('Category Scores:'), JSON.stringify(result.category_scores, null, 2));
 
       if (!result.is_appropriate && result.reason) {
         console.log(chalk.cyan('Reason:'), chalk.red(result.reason));
