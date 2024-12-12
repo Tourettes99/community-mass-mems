@@ -4,7 +4,7 @@ const chalk = require('chalk');
 class GroqModerationService {
   constructor() {
     this.groq = null;
-    this.model = "llama2-70b-4096";  // Changed to a more reliable model
+    this.model = "llama3-groq-70b-8192-tool-use-preview";  // Updated to correct model name
     this.initialized = false;
   }
 
