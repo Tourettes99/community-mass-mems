@@ -92,10 +92,7 @@ const App = () => {
       <Container maxWidth="lg">
         <Box sx={{ mt: 4, mb: 4 }}>
           <Stack spacing={2} direction="column" alignItems="flex-end" sx={{ position: 'fixed', right: 24, top: 24, zIndex: 1000 }}>
-            <AnnouncementBell 
-              announcements={announcements} 
-              onAnnouncementRead={markAsRead} 
-            />
+            <AnnouncementBell />
             <PatreonBar />
           </Stack>
           <UploadBar onUpload={handleUpload} />
