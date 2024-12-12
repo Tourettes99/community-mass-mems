@@ -12,7 +12,36 @@ const MEDIA_EXTENSIONS = {
 // Extract meta tags from HTML
 async function extractMetaTags(urlString) {
   try {
-    const response = await fetch(urlString);
+    // Don't try to extract meta tags from media files or Discord CDN
+    const url = new URL(urlString);
+    const extension = url.pathname.split('.').pop()?.toLowerCase();
+    const isDiscordCdn = url.hostname.includes('cdn.discordapp.com') || url.hostname.includes('media.discordapp.net');
+    
+    if (isDiscordCdn || Object.values(MEDIA_EXTENSIONS).flat().includes(extension)) {
+      return {
+        title: url.pathname.split('/').pop() || urlString,
+        description: `${isDiscordCdn ? 'Discord' : ''} ${extension?.toUpperCase() || 'Media'} file`
+      };
+    }
+
+    const response = await fetch(urlString, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('text/html')) {
+      return {
+        title: url.pathname.split('/').pop() || urlString,
+        description: `File type: ${contentType || 'unknown'}`
+      };
+    }
+
     const html = await response.text();
     const dom = new JSDOM(html);
     const doc = dom.window.document;
@@ -43,7 +72,10 @@ async function extractMetaTags(urlString) {
     return metaTags;
   } catch (error) {
     console.error('Error extracting meta tags:', error);
-    return {};
+    return {
+      title: new URL(urlString).pathname.split('/').pop() || urlString,
+      description: `Failed to extract metadata: ${error.message}`
+    };
   }
 }
 
@@ -67,8 +99,10 @@ async function getUrlMetadata(urlString) {
     // Handle Discord CDN
     if (domain.includes('cdn.discordapp.com') || domain.includes('media.discordapp.net')) {
       metadata.isDiscordCdn = true;
-      metadata.metaTags = {};
+      metadata.title = url.pathname.split('/').pop() || urlString;
+      metadata.description = 'Discord CDN File';
       
+      // Handle media files
       if (extension) {
         if (MEDIA_EXTENSIONS.videos.includes(extension)) {
           metadata.mediaType = 'video';
@@ -81,11 +115,30 @@ async function getUrlMetadata(urlString) {
           metadata.format = `audio/${extension}`;
         }
         
+        // Add expiration info from URL
         const exParam = url.searchParams.get('ex');
         if (exParam) {
-          metadata.expiresAt = new Date(parseInt(exParam, 16) * 1000).toISOString();
+          try {
+            metadata.expiresAt = new Date(parseInt(exParam, 16) * 1000).toISOString();
+          } catch (error) {
+            console.error('Error parsing Discord expiration:', error);
+          }
+        }
+
+        // Check if file exists by doing a HEAD request
+        try {
+          const response = await fetch(urlString, { method: 'HEAD' });
+          if (!response.ok) {
+            metadata.error = `File not accessible: ${response.status} ${response.statusText}`;
+            metadata.isExpired = true;
+          }
+        } catch (error) {
+          metadata.error = `Failed to access file: ${error.message}`;
+          metadata.isExpired = true;
         }
       }
+
+      return metadata;
     }
     
     // Handle YouTube
@@ -116,6 +169,7 @@ async function getUrlMetadata(urlString) {
           }
         } catch (error) {
           console.error('Error fetching YouTube metadata:', error);
+          metadata.error = `Failed to fetch YouTube metadata: ${error.message}`;
         }
       }
     }
@@ -145,25 +199,31 @@ async function getUrlMetadata(urlString) {
           }
         } catch (error) {
           console.error('Error fetching Vimeo metadata:', error);
+          metadata.error = `Failed to fetch Vimeo metadata: ${error.message}`;
         }
       }
     }
     
     // For all other URLs, fetch meta tags
     else {
-      const metaTags = await extractMetaTags(urlString);
-      metadata.metaTags = metaTags;
-      metadata.title = metaTags.title || metadata.title;
-      metadata.description = metaTags.description || metadata.description;
-      
-      // Set content rating if available
-      if (metaTags['rating'] || metaTags['content-rating']) {
-        metadata.contentRating = metaTags['rating'] || metaTags['content-rating'];
-      }
-      
-      // Set age restriction if available
-      if (metaTags['age-rating'] || metaTags['age-restriction']) {
-        metadata.ageRating = metaTags['age-rating'] || metaTags['age-restriction'];
+      try {
+        const metaTags = await extractMetaTags(urlString);
+        metadata.metaTags = metaTags;
+        metadata.title = metaTags.title || metadata.title;
+        metadata.description = metaTags.description || metadata.description;
+        
+        // Set content rating if available
+        if (metaTags['rating'] || metaTags['content-rating']) {
+          metadata.contentRating = metaTags['rating'] || metaTags['content-rating'];
+        }
+        
+        // Set age restriction if available
+        if (metaTags['age-rating'] || metaTags['age-restriction']) {
+          metadata.ageRating = metaTags['age-rating'] || metaTags['age-restriction'];
+        }
+      } catch (error) {
+        console.error('Error fetching meta tags:', error);
+        metadata.error = `Failed to fetch meta tags: ${error.message}`;
       }
     }
 
@@ -173,7 +233,9 @@ async function getUrlMetadata(urlString) {
     return {
       url: urlString,
       type: 'url',
-      error: error.message
+      error: error.message,
+      title: urlString,
+      description: `Failed to process URL: ${error.message}`
     };
   }
 }

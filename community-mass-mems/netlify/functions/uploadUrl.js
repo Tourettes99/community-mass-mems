@@ -88,7 +88,23 @@ exports.handler = async (event, context) => {
     // Get metadata based on type
     let metadata;
     if (type === 'url') {
-      metadata = await getUrlMetadata(url);
+      metadata = await getUrlMetadata(url.trim());
+      
+      // Check if the URL is accessible
+      if (metadata.error) {
+        return {
+          statusCode: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: JSON.stringify({ 
+            error: 'URL validation failed',
+            details: metadata.error,
+            isExpired: metadata.isExpired
+          })
+        };
+      }
     } else {
       metadata = {
         type: 'text',
