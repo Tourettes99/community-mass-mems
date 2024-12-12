@@ -100,11 +100,14 @@ export const getTheme = (mode: PaletteMode): Theme => createTheme({
     },
     MuiIconButton: {
       styleOverrides: {
-        root: {
+        root: ({ theme }) => ({
+          color: theme.palette.text.primary,
           '&:hover': {
-            backgroundColor: `${RAL_2005}20`,
+            backgroundColor: theme.palette.mode === 'dark' 
+              ? 'rgba(255, 255, 255, 0.1)' 
+              : `${RAL_2005}20`,
           },
-        },
+        }),
       },
     },
     MuiCircularProgress: {
