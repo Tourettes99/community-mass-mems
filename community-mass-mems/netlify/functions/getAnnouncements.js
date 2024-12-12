@@ -27,22 +27,22 @@ exports.handler = async (event, context) => {
 
   let client;
   try {
-    console.log('Connecting to MongoDB...');
+    console.log('INFO: Connecting to MongoDB...');
     client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
-    console.log('Connected to MongoDB');
+    console.log('INFO: Connected to MongoDB');
 
     const db = client.db('mass-mems');
     const collection = db.collection('announcements');
 
-    console.log('Fetching announcements...');
+    console.log('INFO: Fetching announcements...');
     const announcements = await collection
       .find({})
       .sort({ createdAt: -1 })
       .limit(10)
       .toArray();
     
-    console.log('Found announcements:', announcements);
+    console.log('INFO: Found announcements:', JSON.stringify(announcements));
 
     return {
       statusCode: 200,
@@ -50,16 +50,15 @@ exports.handler = async (event, context) => {
       body: JSON.stringify(announcements),
     };
   } catch (error) {
-    console.error('Error getting announcements:', error);
+    console.error('ERROR:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Internal server error', details: error.message }),
+      body: JSON.stringify({ error: 'Failed to fetch announcements' }),
     };
   } finally {
     if (client) {
       await client.close();
-      console.log('MongoDB connection closed');
     }
   }
 };

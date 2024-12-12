@@ -26,44 +26,51 @@ const useAnnouncementStore = create<AnnouncementStore>()(
           console.log('Fetching announcements...');
           const response = await fetch('/.netlify/functions/getAnnouncements');
           if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Failed to fetch announcements');
+            throw new Error(`Failed to fetch announcements: ${response.status}`);
           }
           
-          const announcements = await response.json();
-          console.log('Received announcements:', announcements);
+          const data = await response.json();
+          console.log('Received announcements:', data);
           
+          if (!Array.isArray(data)) {
+            console.error('Expected array of announcements, got:', typeof data);
+            return;
+          }
+
           const { readAnnouncements } = get();
+          const readSet = new Set(readAnnouncements);
           
-          set({
-            announcements: announcements.map((ann: any) => ({
-              _id: ann._id,
-              message: ann.message,
-              timestamp: ann.timestamp,
-              read: readAnnouncements.has(ann._id)
-            }))
-          });
+          const processedAnnouncements = data.map((ann: any) => ({
+            _id: ann._id,
+            message: ann.message || '',
+            timestamp: ann.timestamp || ann.createdAt || new Date().toISOString(),
+            read: readSet.has(ann._id)
+          }));
+
+          console.log('Processed announcements:', processedAnnouncements);
+          
+          set({ announcements: processedAnnouncements });
         } catch (error) {
           console.error('Error fetching announcements:', error);
         }
       },
 
-      markAsRead: (id: string) =>
-        set((state) => {
-          const newReadAnnouncements = new Set(state.readAnnouncements);
-          newReadAnnouncements.add(id);
-          
-          return {
-            readAnnouncements: newReadAnnouncements,
-            announcements: state.announcements.map((announcement) =>
-              announcement._id === id ? { ...announcement, read: true } : announcement
-            ),
-          };
-        }),
+      markAsRead: (id: string) => {
+        const { readAnnouncements, announcements } = get();
+        const newReadSet = new Set(readAnnouncements);
+        newReadSet.add(id);
+        
+        set({
+          readAnnouncements: newReadSet,
+          announcements: announcements.map(ann => 
+            ann._id === id ? { ...ann, read: true } : ann
+          )
+        });
+      }
     }),
     {
       name: 'announcement-storage',
-      partialize: (state) => ({ readAnnouncements: Array.from(state.readAnnouncements) }),
+      partialize: (state) => ({ readAnnouncements: Array.from(state.readAnnouncements) })
     }
   )
 );
