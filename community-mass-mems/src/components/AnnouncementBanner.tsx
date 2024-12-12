@@ -18,8 +18,11 @@ export const AnnouncementBanner: React.FC = () => {
   useEffect(() => {
     const fetchAnnouncement = async () => {
       try {
+        console.log('Fetching announcement...');
         const response = await fetch('/.netlify/functions/announcement');
+        console.log('Response status:', response.status);
         const data = await response.json();
+        console.log('Announcement data:', data);
         if (data && data.active) {
           setAnnouncement(data);
         } else {
@@ -39,7 +42,12 @@ export const AnnouncementBanner: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  if (!announcement?.active) return null;
+  if (!announcement?.active) {
+    console.log('No active announcement');
+    return null;
+  }
+
+  console.log('Rendering announcement:', announcement.message);
 
   return (
     <Box
@@ -50,14 +58,22 @@ export const AnnouncementBanner: React.FC = () => {
       bg="red.500"
       color="white"
       py={2}
-      zIndex="banner"
+      zIndex={9999}
       overflow="hidden"
       whiteSpace="nowrap"
+      width="100%"
+      height="40px"
+      display="flex"
+      alignItems="center"
+      justifyContent="flex-start"
     >
       <Text
-        animation={`${scroll} 20s linear infinite`}
+        animation={`${scroll} 30s linear infinite`}
         display="inline-block"
         fontWeight="bold"
+        fontSize="lg"
+        px={4}
+        style={{ whiteSpace: 'nowrap' }}
       >
         {announcement.message}
       </Text>

@@ -86,8 +86,8 @@ const App = () => {
 
   return (
     <ThemeProvider>
-      <UploadBar onUpload={handleUpload} />
       <AnnouncementBanner />
+      <UploadBar onUpload={handleUpload} />
       <AppContent />
       <SocialScripts />
       <Snackbar 
