@@ -1,11 +1,9 @@
-const { getStore } = require('@netlify/blobs');
+// In-memory storage for development
+let currentAnnouncement = { message: '', active: false };
 
 exports.handler = async (event, context) => {
     console.log('Function invoked with method:', event.httpMethod);
     try {
-        const store = getStore('announcements');
-        console.log('Store initialized');
-
         if (event.httpMethod === 'OPTIONS') {
             return {
                 statusCode: 204,
@@ -19,15 +17,14 @@ exports.handler = async (event, context) => {
 
         if (event.httpMethod === 'GET') {
             console.log('Processing GET request');
-            const announcement = await store.get('current');
-            console.log('Retrieved announcement:', announcement);
+            console.log('Current announcement:', currentAnnouncement);
             return {
                 statusCode: 200,
                 headers: {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
                 },
-                body: JSON.stringify(announcement || { message: '', active: false })
+                body: JSON.stringify(currentAnnouncement)
             };
         }
 
@@ -35,8 +32,14 @@ exports.handler = async (event, context) => {
             console.log('Processing POST request');
             const body = JSON.parse(event.body);
             console.log('Parsed body:', body);
-            await store.set('current', body);
-            console.log('Announcement stored successfully');
+            
+            // Update the announcement
+            currentAnnouncement = {
+                message: body.message || '',
+                active: body.active || false
+            };
+            
+            console.log('Updated announcement:', currentAnnouncement);
             return {
                 statusCode: 200,
                 headers: {
@@ -50,7 +53,10 @@ exports.handler = async (event, context) => {
         console.log('Method not allowed:', event.httpMethod);
         return {
             statusCode: 405,
-            body: 'Method not allowed'
+            headers: {
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({ error: 'Method not allowed' })
         };
     } catch (error) {
         console.error('Error details:', {
@@ -60,6 +66,9 @@ exports.handler = async (event, context) => {
         });
         return {
             statusCode: 500,
+            headers: {
+                'Access-Control-Allow-Origin': '*'
+            },
             body: JSON.stringify({
                 error: 'Internal server error',
                 details: error.message,

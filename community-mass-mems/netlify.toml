@@ -16,6 +16,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  included_files = ["node_modules/**/*"]
 
 [functions."*"]
   included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
@@ -83,6 +84,11 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
+
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 [[redirects]]
   from = "/*.mp3"
