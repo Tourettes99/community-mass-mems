@@ -1,5 +1,5 @@
 require('dotenv').config();
-const mongoose = require('mongodb').MongoClient;
+const { MongoClient } = require('mongodb');
 const autoModeration = require('./services/autoModeration');
 const emailNotification = require('./services/emailNotification');
 
@@ -33,24 +33,40 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { content, tags } = JSON.parse(event.body);
-    if (!content) {
+    let body;
+    try {
+      body = JSON.parse(event.body);
+    } catch (error) {
       return {
         statusCode: 400,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify({ message: 'Content is required' })
+        body: JSON.stringify({ message: 'Invalid request body' })
+      };
+    }
+
+    const { content, tags, type = 'text' } = body;
+
+    // Strict content validation
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ message: 'Content is required and must be a non-empty string' })
       };
     }
 
     // Initialize and run auto moderation
     await autoModeration.initialize();
-    const moderationResult = await autoModeration.moderateContent(content);
+    const moderationResult = await autoModeration.moderateContent(content, type);
 
     // Connect to MongoDB
-    client = await mongoose.connect(process.env.MONGODB_URI, {
+    client = await MongoClient.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 10000,
       family: 4
@@ -61,9 +77,9 @@ exports.handler = async (event, context) => {
 
     // Create memory document with moderation status
     const memory = {
-      type: 'text',
-      content: content,
-      tags: Array.isArray(tags) ? tags : [],
+      type: type,
+      content: content.trim(),
+      tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
       status: moderationResult.decision === 'approve' ? 'approved' : 'rejected',
       moderationResult: {
         decision: moderationResult.decision,
@@ -73,7 +89,7 @@ exports.handler = async (event, context) => {
         category_scores: moderationResult.category_scores
       },
       metadata: {
-        type: 'text',
+        type: type,
         format: 'text/plain',
         title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
         description: content,
