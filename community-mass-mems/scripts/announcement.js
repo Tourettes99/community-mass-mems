@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 
-const API_URL = 'http://localhost:3000/api/announcement';
+const API_URL = 'https://community-mass-mems.netlify.app/api/announcement';
 
 const argv = yargs(hideBin(process.argv))
     .command('post <message>', 'Post a new announcement', (yargs) => {
