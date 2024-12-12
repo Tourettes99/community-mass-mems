@@ -10,25 +10,34 @@ interface Announcement {
 }
 
 interface AnnouncementBellProps {
-  announcements: Announcement[];
-  onAnnouncementRead: (id: string) => void;
+  // announcements: Announcement[];
+  // onAnnouncementRead: (id: string) => void;
 }
 
-const AnnouncementBell: React.FC<AnnouncementBellProps> = ({ announcements, onAnnouncementRead }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const unreadCount = announcements.filter(a => !a.read).length;
+const AnnouncementBell: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const { announcements, fetchAnnouncements, markAsRead } = useAnnouncementStore();
+  
+  useEffect(() => {
+    fetchAnnouncements();
+    // Fetch announcements every 5 minutes
+    const interval = setInterval(fetchAnnouncements, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchAnnouncements]);
 
   const handleClose = () => {
-    setIsOpen(false);
+    setOpen(false);
   };
 
   const handleBellClick = () => {
-    setIsOpen(!isOpen);
+    setOpen(!open);
   };
 
   const handleAnnouncementRead = (id: string) => {
-    onAnnouncementRead(id);
+    markAsRead(id);
   };
+
+  const unreadCount = announcements.filter(a => !a.read).length;
 
   return (
     <Box sx={{ position: 'relative' }}>
@@ -58,7 +67,7 @@ const AnnouncementBell: React.FC<AnnouncementBellProps> = ({ announcements, onAn
         </Badge>
       </IconButton>
 
-      <Fade in={isOpen}>
+      <Fade in={open}>
         <Paper
           sx={{
             position: 'absolute',
@@ -70,7 +79,7 @@ const AnnouncementBell: React.FC<AnnouncementBellProps> = ({ announcements, onAn
             zIndex: 1000,
             mt: 1,
             p: 2,
-            display: isOpen ? 'block' : 'none',
+            display: open ? 'block' : 'none',
           }}
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
