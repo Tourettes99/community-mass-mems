@@ -178,21 +178,32 @@ exports.handler = async (event, context) => {
 
     // Run content moderation
     try {
+      console.log('Starting content moderation...');
       await groqModeration.initialize();
-      const moderationResult = await groqModeration.moderateContent(type === 'url' ? url : content, type);
+      console.log('Initialized groqModeration service');
+      
+      const contentToModerate = type === 'url' ? url : content;
+      console.log('Content to moderate:', contentToModerate);
+      console.log('Type:', type);
+      
+      const moderationResult = await groqModeration.moderateContent(contentToModerate, type);
+      console.log('Moderation result:', JSON.stringify(moderationResult, null, 2));
 
       // Connect to MongoDB
+      console.log('Connecting to MongoDB...');
       client = await MongoClient.connect(process.env.MONGODB_URI, {
         serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 10000,
         family: 4
       });
+      console.log('Connected to MongoDB');
 
       const db = client.db('memories');
       const collection = db.collection('memories');
 
       // Map moderation result to memory status
       const status = moderationResult.flagged ? 'reject' : 'approve';
+      console.log('Mapped status:', status);
 
       // Create memory document
       const memory = {
@@ -272,13 +283,21 @@ exports.handler = async (event, context) => {
       }
     }
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in main handler:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Close MongoDB connection if it exists
+    if (client) {
+      await client.close();
+    }
+
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
-        message: 'Error submitting content',
-        error: error.message 
+      body: JSON.stringify({
+        error: 'Internal server error',
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }
