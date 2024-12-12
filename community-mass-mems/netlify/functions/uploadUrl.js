@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
+const Memory = require('./models/Memory');
 const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
 const emailNotification = require('./services/emailNotification');
@@ -189,24 +190,21 @@ exports.handler = async (event, context) => {
       const moderationResult = await groqModeration.moderateContent(contentToModerate, type);
       console.log('Moderation result:', JSON.stringify(moderationResult, null, 2));
 
-      // Connect to MongoDB
+      // Connect to MongoDB using Mongoose
       console.log('Connecting to MongoDB...');
-      client = await MongoClient.connect(process.env.MONGODB_URI, {
+      await mongoose.connect(process.env.MONGODB_URI, {
         serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 10000,
         family: 4
       });
       console.log('Connected to MongoDB');
 
-      const db = client.db('memories');
-      const collection = db.collection('memories');
-
       // Map moderation result to memory status
-      const status = moderationResult.flagged ? 'reject' : 'approve';
+      const status = moderationResult.flagged ? 'rejected' : 'approved';
       console.log('Mapped status:', status);
 
-      // Create memory document
-      const memory = {
+      // Create memory document using Mongoose model
+      const memory = new Memory({
         type: type,
         url: type === 'url' ? url : undefined,
         content: type === 'text' ? content : undefined,
@@ -221,19 +219,16 @@ exports.handler = async (event, context) => {
         },
         metadata: {
           ...metadata,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: new Date(),
+          updatedAt: new Date()
         },
         votes: { up: 0, down: 0 },
         userVotes: {},
-        submittedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+        submittedAt: new Date()
+      });
 
       // Save to database
-      const result = await collection.insertOne(memory);
-      memory._id = result.insertedId;
+      await memory.save();
       
       // Send notification email
       await emailNotification.sendModerationNotification(memory, moderationResult);
@@ -248,7 +243,7 @@ exports.handler = async (event, context) => {
             reason: moderationResult.reason,
             categories: moderationResult.category_scores,
             category_scores: moderationResult.category_scores,
-            id: result.insertedId
+            id: memory._id
           })
         };
       }
@@ -257,8 +252,9 @@ exports.handler = async (event, context) => {
         statusCode: 200,
         headers,
         body: JSON.stringify({
-          message: 'Content submitted and approved',
-          id: result.insertedId
+          message: 'Content submitted successfully',
+          id: memory._id,
+          memory: memory
         })
       };
     } catch (error) {
@@ -278,18 +274,14 @@ exports.handler = async (event, context) => {
       } catch (error) {
         console.error('Error cleaning up file storage:', error);
       }
-      if (client) {
-        await client.close();
-      }
+      await mongoose.disconnect();
     }
   } catch (error) {
     console.error('Error in main handler:', error);
     console.error('Error stack:', error.stack);
     
     // Close MongoDB connection if it exists
-    if (client) {
-      await client.close();
-    }
+    await mongoose.disconnect();
 
     return {
       statusCode: 500,
