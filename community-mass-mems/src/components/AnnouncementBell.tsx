@@ -30,11 +30,12 @@ const AnnouncementBell: React.FC = () => {
   const unreadCount = announcements.filter(a => !a.read).length;
 
   return (
-    <Box sx={{ position: 'relative', transform: 'translateY(50%)' }}>
+    <Box sx={{ position: 'relative', transform: 'translateY(100%)' }}>
       <IconButton
         onClick={handleBellClick}
         sx={{
           backgroundColor: 'background.paper',
+          color: 'text.primary',
           '&:hover': {
             backgroundColor: 'action.hover',
           },
@@ -45,8 +46,8 @@ const AnnouncementBell: React.FC = () => {
           color="primary"
           sx={{
             '& .MuiBadge-badge': {
-              backgroundColor: '#ff4444',
-              color: 'white',
+              backgroundColor: (theme) => theme.palette.mode === 'dark' ? '#ff4444' : '#ff4444',
+              color: '#ffffff',
             },
           }}
         >
@@ -59,13 +60,14 @@ const AnnouncementBell: React.FC = () => {
           sx={{
             position: 'absolute',
             right: 0,
+            mt: 1,
             width: 300,
             maxHeight: 400,
-            overflowY: 'auto',
+            overflow: 'auto',
+            backgroundColor: 'background.paper',
+            color: 'text.primary',
+            boxShadow: 3,
             zIndex: 1000,
-            mt: 1,
-            p: 2,
-            display: open ? 'block' : 'none',
           }}
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
