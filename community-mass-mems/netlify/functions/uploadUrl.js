@@ -233,7 +233,7 @@ exports.handler = async (event, context) => {
       const status = moderationResult.flagged ? 'rejected' : 'approved';
       console.log('Mapped status:', status);
 
-      // Create memory document using Mongoose model
+      // Create memory document
       const memory = new Memory({
         type: type,
         url: type === 'url' ? url : undefined,
@@ -249,6 +249,8 @@ exports.handler = async (event, context) => {
         },
         metadata: {
           ...metadata,
+          type: metadata.type || type,
+          mediaType: metadata.mediaType || 'rich',
           createdAt: new Date(),
           updatedAt: new Date()
         },
@@ -270,9 +272,13 @@ exports.handler = async (event, context) => {
           headers,
           body: JSON.stringify({ 
             message: 'Content rejected by moderation',
-            reason: moderationResult.reason,
-            categories: moderationResult.category_scores,
-            category_scores: moderationResult.category_scores,
+            reason: moderationResult.reason || 'Content violates community guidelines',
+            details: {
+              categories: moderationResult.category_scores,
+              scores: Object.entries(moderationResult.category_scores)
+                .map(([category, score]) => `${category}: ${(score * 100).toFixed(1)}%`)
+                .join(', ')
+            },
             id: memory._id
           })
         };
@@ -284,7 +290,16 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
           message: 'Content submitted successfully',
           id: memory._id,
-          memory: memory
+          memory: {
+            ...memory.toObject(),
+            metadata: {
+              ...memory.metadata,
+              embedHtml: memory.metadata.embedHtml || '',
+              previewUrl: memory.metadata.previewUrl || memory.metadata.ogImage || '',
+              favicon: memory.metadata.favicon || '',
+              siteName: memory.metadata.siteName || new URL(url).hostname
+            }
+          }
         })
       };
     } catch (error) {

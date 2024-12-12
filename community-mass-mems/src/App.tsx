@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
-import { CssBaseline, Container, Snackbar, Alert } from '@mui/material';
+import { CssBaseline, Container, Snackbar, Alert, Box, Stack } from '@mui/material';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useTheme } from './contexts/ThemeContext';
 import { getTheme } from './theme';
@@ -13,6 +13,8 @@ import UploadBar from './components/UploadBar';
 import useMemoryStore from './stores/memoryStore';
 import SocialScripts from './components/SocialScripts';
 import AnnouncementBanner from './components/AnnouncementBanner';
+import AnnouncementBell from './components/AnnouncementBell';
+import useAnnouncementStore from './stores/announcementStore';
 
 const AppContent = () => {
   const { mode } = useTheme();
@@ -41,7 +43,6 @@ const AppContent = () => {
       <CssBaseline />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <InfoBar />
-        <PatreonBar />
         <ThemeToggle />
         <MemoryGrid />
         <IntroDialog open={showIntro} onClose={handleCloseIntro} />
@@ -54,6 +55,7 @@ const App = () => {
   const addMemories = useMemoryStore(state => state.addMemories);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { announcements, markAsRead } = useAnnouncementStore();
 
   const handleUpload = async (type: string, content: string, tags: string[]) => {
     try {
@@ -87,8 +89,19 @@ const App = () => {
   return (
     <ThemeProvider>
       <AnnouncementBanner />
-      <UploadBar onUpload={handleUpload} />
-      <AppContent />
+      <Container maxWidth="lg">
+        <Box sx={{ mt: 4, mb: 4 }}>
+          <Stack spacing={2} direction="column" alignItems="flex-end" sx={{ position: 'fixed', right: 24, top: 24, zIndex: 1000 }}>
+            <AnnouncementBell 
+              announcements={announcements} 
+              onAnnouncementRead={markAsRead} 
+            />
+            <PatreonBar />
+          </Stack>
+          <UploadBar onUpload={handleUpload} />
+          <AppContent />
+        </Box>
+      </Container>
       <SocialScripts />
       <Snackbar 
         open={!!error} 
