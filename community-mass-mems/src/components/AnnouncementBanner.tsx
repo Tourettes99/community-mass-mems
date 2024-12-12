@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text, keyframes } from '@chakra-ui/react';
+import { Box, Text } from '@chakra-ui/react';
+import { keyframes } from '@emotion/react';
 
 const scroll = keyframes`
   from { transform: translateX(100%); }
