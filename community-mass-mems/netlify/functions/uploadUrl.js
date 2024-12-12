@@ -4,6 +4,7 @@ const fetch = require('node-fetch');
 const nodemailer = require('nodemailer');
 const emailNotification = require('./services/emailNotification');
 const { getUrlMetadata } = require('./utils/urlMetadata');
+const autoModeration = require('./services/autoModeration');
 
 // Create transporter for sending emails
 const transporter = nodemailer.createTransport({
@@ -24,7 +25,8 @@ const MEDIA_EXTENSIONS = {
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
-  
+  let client;
+
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -53,7 +55,6 @@ exports.handler = async (event, context) => {
     };
   }
 
-  let client;
   try {
     let body;
     try {
@@ -99,6 +100,10 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Initialize and run auto moderation
+    await autoModeration.initialize();
+    const moderationResult = await autoModeration.moderateContent(type === 'url' ? url : content, type);
+
     // Connect to MongoDB
     client = await MongoClient.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
@@ -114,9 +119,20 @@ exports.handler = async (event, context) => {
       type: type,
       url: type === 'url' ? url : undefined,
       content: type === 'text' ? content : undefined,
-      tags: Array.isArray(tags) ? tags : [],
-      status: 'pending',
-      metadata: metadata,
+      tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
+      status: moderationResult.decision,  // Use decision directly: 'approve' or 'reject'
+      moderationResult: {
+        decision: moderationResult.decision,
+        reason: moderationResult.reason,
+        categories: moderationResult.categories,
+        flagged: moderationResult.flagged,
+        category_scores: moderationResult.category_scores
+      },
+      metadata: {
+        ...metadata,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
       votes: { up: 0, down: 0 },
       userVotes: {},
       submittedAt: new Date(),
@@ -128,20 +144,29 @@ exports.handler = async (event, context) => {
     const result = await collection.insertOne(memory);
     memory._id = result.insertedId;
     
-    // Send notification email using the email notification service
-    await emailNotification.sendModerationNotification(memory, {
-      decision: 'pending',
-      reason: 'Awaiting moderation review',
-      categories: [],
-      flagged: false,
-      category_scores: {}
-    });
+    // Send notification email
+    await emailNotification.sendModerationNotification(memory, moderationResult);
+
+    // Return appropriate response based on moderation decision
+    if (moderationResult.decision === 'reject') {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          message: 'Content rejected by moderation',
+          reason: moderationResult.reason,
+          categories: moderationResult.categories,
+          category_scores: moderationResult.category_scores,
+          id: result.insertedId
+        })
+      };
+    }
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        message: 'Memory submitted successfully',
+        message: 'Content submitted and approved',
         id: result.insertedId
       })
     };
@@ -151,7 +176,7 @@ exports.handler = async (event, context) => {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        message: 'Error submitting memory',
+        message: 'Error submitting content',
         error: error.message 
       })
     };

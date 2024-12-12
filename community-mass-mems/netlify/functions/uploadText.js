@@ -80,7 +80,7 @@ exports.handler = async (event, context) => {
       type: type,
       content: content.trim(),
       tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-      status: moderationResult.decision === 'approve' ? 'approved' : 'rejected',
+      status: moderationResult.decision,  // Use decision directly: 'approve' or 'reject'
       moderationResult: {
         decision: moderationResult.decision,
         reason: moderationResult.reason,
@@ -122,6 +122,7 @@ exports.handler = async (event, context) => {
           message: 'Content rejected by moderation',
           reason: moderationResult.reason,
           categories: moderationResult.categories,
+          category_scores: moderationResult.category_scores,
           id: result.insertedId
         })
       };
