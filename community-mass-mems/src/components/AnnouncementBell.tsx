@@ -30,7 +30,7 @@ const AnnouncementBell: React.FC = () => {
   const unreadCount = announcements.filter(a => !a.read).length;
 
   return (
-    <Box sx={{ position: 'relative' }}>
+    <Box sx={{ position: 'relative', transform: 'translateY(50%)' }}>
       <IconButton
         onClick={handleBellClick}
         sx={{
