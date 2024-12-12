@@ -12,6 +12,7 @@ import ThemeToggle from './components/ThemeToggle';
 import UploadBar from './components/UploadBar';
 import useMemoryStore from './stores/memoryStore';
 import SocialScripts from './components/SocialScripts';
+import AnnouncementBanner from './components/AnnouncementBanner';
 
 const AppContent = () => {
   const { mode } = useTheme();
@@ -86,6 +87,7 @@ const App = () => {
   return (
     <ThemeProvider>
       <UploadBar onUpload={handleUpload} />
+      <AnnouncementBanner />
       <AppContent />
       <SocialScripts />
       <Snackbar 
