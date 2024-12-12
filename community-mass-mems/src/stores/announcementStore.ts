@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface Announcement {
-  id: string;
+  _id: string;
   message: string;
   timestamp: string;
   read: boolean;
@@ -23,15 +23,21 @@ const useAnnouncementStore = create<AnnouncementStore>()(
       
       fetchAnnouncements: async () => {
         try {
+          console.log('Fetching announcements...');
           const response = await fetch('/.netlify/functions/getAnnouncements');
-          if (!response.ok) throw new Error('Failed to fetch announcements');
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to fetch announcements');
+          }
           
           const announcements = await response.json();
+          console.log('Received announcements:', announcements);
+          
           const { readAnnouncements } = get();
           
           set({
             announcements: announcements.map((ann: any) => ({
-              id: ann._id,
+              _id: ann._id,
               message: ann.message,
               timestamp: ann.timestamp,
               read: readAnnouncements.has(ann._id)
@@ -50,7 +56,7 @@ const useAnnouncementStore = create<AnnouncementStore>()(
           return {
             readAnnouncements: newReadAnnouncements,
             announcements: state.announcements.map((announcement) =>
-              announcement.id === id ? { ...announcement, read: true } : announcement
+              announcement._id === id ? { ...announcement, read: true } : announcement
             ),
           };
         }),

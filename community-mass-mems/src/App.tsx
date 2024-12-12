@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import { CssBaseline, Container, Snackbar, Alert, Box, Stack } from '@mui/material';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -16,46 +16,24 @@ import AnnouncementBanner from './components/AnnouncementBanner';
 import AnnouncementBell from './components/AnnouncementBell';
 import useAnnouncementStore from './stores/announcementStore';
 
-const AppContent = () => {
+function App() {
   const { mode } = useTheme();
-  const theme = getTheme(mode);
-  
-  // Initialize intro dialog state
-  const [showIntro, setShowIntro] = useState(() => {
-    try {
-      return localStorage.getItem('introShown') !== 'true';
-    } catch {
-      return true;
-    }
-  });
+  const [showIntro, setShowIntro] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const addMemories = useMemoryStore(state => state.addMemories);
 
   const handleCloseIntro = () => {
     setShowIntro(false);
-    try {
-      localStorage.setItem('introShown', 'true');
-    } catch {
-      console.warn('Failed to save intro state to localStorage');
-    }
+    localStorage.setItem('introShown', 'true');
   };
 
-  return (
-    <MuiThemeProvider theme={theme}>
-      <CssBaseline />
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <InfoBar />
-        <ThemeToggle />
-        <MemoryGrid />
-        <IntroDialog open={showIntro} onClose={handleCloseIntro} />
-      </Container>
-    </MuiThemeProvider>
-  );
-};
-
-const App = () => {
-  const addMemories = useMemoryStore(state => state.addMemories);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const { announcements, markAsRead } = useAnnouncementStore();
+  useEffect(() => {
+    const introShown = localStorage.getItem('introShown');
+    if (introShown) {
+      setShowIntro(false);
+    }
+  }, []);
 
   const handleUpload = async (type: string, content: string, tags: string[]) => {
     try {
@@ -64,63 +42,46 @@ const App = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          type,
-          url: type === 'url' ? content : undefined,
-          content: type === 'text' ? content : undefined,
-          tags
-        }),
+        body: JSON.stringify({ type, content, tags }),
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to upload memory');
+        throw new Error(data.error || 'Failed to upload');
       }
 
-      const newMemory = await response.json();
-      addMemories([newMemory]);
+      addMemories([data]);
       setSuccess(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload memory');
-      throw err;
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message);
+      setTimeout(() => setError(null), 5000);
     }
   };
 
   return (
-    <ThemeProvider>
-      <AnnouncementBanner />
+    <MuiThemeProvider theme={getTheme(mode)}>
+      <CssBaseline />
       <Container maxWidth="lg">
         <Box sx={{ mt: 4, mb: 4 }}>
           <Stack spacing={2} direction="column" alignItems="flex-end" sx={{ position: 'fixed', right: 24, top: 24, zIndex: 1000 }}>
+            <ThemeToggle />
             <AnnouncementBell />
             <PatreonBar />
           </Stack>
           <UploadBar onUpload={handleUpload} />
-          <AppContent />
+          <MemoryGrid />
+          <IntroDialog open={showIntro} onClose={handleCloseIntro} />
+          <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
+            <Alert severity="error">{error}</Alert>
+          </Snackbar>
+          <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)}>
+            <Alert severity="success">Successfully uploaded!</Alert>
+          </Snackbar>
         </Box>
       </Container>
       <SocialScripts />
-      <Snackbar 
-        open={!!error} 
-        autoHideDuration={6000} 
-        onClose={() => setError(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setError(null)} severity="error">
-          {error}
-        </Alert>
-      </Snackbar>
-      <Snackbar
-        open={success}
-        autoHideDuration={6000}
-        onClose={() => setSuccess(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSuccess(false)} severity="success">
-          Memory uploaded successfully!
-        </Alert>
-      </Snackbar>
-    </ThemeProvider>
+    </MuiThemeProvider>
   );
 }
 
