@@ -123,23 +123,52 @@ exports.handler = async (event, context) => {
     }
 
     // Get metadata based on type
-    let metadata;
+    let metadata = {};
     if (type === 'url') {
-      metadata = await getUrlMetadata(url.trim());
-      
-      // Check if the URL is accessible
-      if (metadata.error) {
-        return {
-          statusCode: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({ 
-            error: 'URL validation failed',
-            details: metadata.error,
-            isExpired: metadata.isExpired
-          })
+      try {
+        console.log('Fetching metadata for URL:', url);
+        metadata = await getUrlMetadata(url.trim());
+        
+        // Check if the URL is accessible
+        if (metadata.error) {
+          return {
+            statusCode: 400,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({ 
+              error: 'URL validation failed',
+              details: metadata.error,
+              isExpired: metadata.isExpired
+            })
+          };
+        }
+
+        // Ensure all required metadata fields exist
+        metadata = {
+          title: metadata.title || url,
+          description: metadata.description || '',
+          mediaType: metadata.mediaType || 'rich',
+          embedHtml: metadata.embedHtml || '',
+          previewUrl: metadata.previewUrl || metadata.ogImage || '',
+          favicon: metadata.favicon || '',
+          siteName: metadata.siteName || new URL(url).hostname,
+          author: metadata.author || '',
+          publishedDate: metadata.publishedDate || new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      } catch (error) {
+        console.error('Error fetching metadata:', error);
+        // Use basic metadata if fetch fails
+        metadata = {
+          title: url,
+          description: '',
+          mediaType: 'rich',
+          siteName: new URL(url).hostname,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
       }
     } else {
@@ -148,6 +177,7 @@ exports.handler = async (event, context) => {
         format: 'text/plain',
         title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
         description: content,
+        mediaType: 'text',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
