@@ -1,19 +1,9 @@
-const fs = require('fs').promises;
-const path = require('path');
-
-const ANNOUNCEMENT_FILE = path.join('/tmp', 'announcement.json');
-
-async function initializeAnnouncementFile() {
-    try {
-        await fs.access(ANNOUNCEMENT_FILE);
-    } catch {
-        const defaultData = { message: '', active: false };
-        await fs.writeFile(ANNOUNCEMENT_FILE, JSON.stringify(defaultData));
-    }
-}
+const { getStore } = require('@netlify/blobs');
 
 exports.handler = async (event, context) => {
     try {
+        const store = getStore('announcements');
+
         if (event.httpMethod === 'OPTIONS') {
             return {
                 statusCode: 204,
@@ -25,23 +15,21 @@ exports.handler = async (event, context) => {
             };
         }
 
-        await initializeAnnouncementFile();
-
         if (event.httpMethod === 'GET') {
-            const data = await fs.readFile(ANNOUNCEMENT_FILE, 'utf8');
+            const announcement = await store.get('current');
             return {
                 statusCode: 200,
                 headers: {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
                 },
-                body: data
+                body: JSON.stringify(announcement || { message: '', active: false })
             };
         }
 
         if (event.httpMethod === 'POST') {
             const body = JSON.parse(event.body);
-            await fs.writeFile(ANNOUNCEMENT_FILE, JSON.stringify(body));
+            await store.set('current', body);
             return {
                 statusCode: 200,
                 headers: {
@@ -60,7 +48,7 @@ exports.handler = async (event, context) => {
         console.error('Error:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Internal server error' })
+            body: JSON.stringify({ error: 'Internal server error', details: error.message })
         };
     }
 }
