@@ -17,10 +17,17 @@ async function extractMetaTags(urlString) {
     const extension = url.pathname.split('.').pop()?.toLowerCase();
     const isDiscordCdn = url.hostname.includes('cdn.discordapp.com') || url.hostname.includes('media.discordapp.net');
     
+    // Handle media files and Discord CDN
     if (isDiscordCdn || Object.values(MEDIA_EXTENSIONS).flat().includes(extension)) {
+      const mediaType = isDiscordCdn ? detectDiscordMediaType(urlString) : getMediaTypeFromExtension(extension);
       return {
         title: url.pathname.split('/').pop() || urlString,
-        description: `${isDiscordCdn ? 'Discord' : ''} ${extension?.toUpperCase() || 'Media'} file`
+        description: `${isDiscordCdn ? 'Discord' : ''} ${mediaType.toUpperCase()} file`,
+        mediaType,
+        previewUrl: urlString,
+        siteName: isDiscordCdn ? 'Discord' : url.hostname,
+        embedHtml: mediaType === 'video' ? `<video controls src="${urlString}"></video>` :
+                  mediaType === 'audio' ? `<audio controls src="${urlString}"></audio>` : ''
       };
     }
 
@@ -36,9 +43,15 @@ async function extractMetaTags(urlString) {
     
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('text/html')) {
+      const mediaType = getMediaTypeFromContentType(contentType);
       return {
         title: url.pathname.split('/').pop() || urlString,
-        description: `File type: ${contentType || 'unknown'}`
+        description: `File type: ${contentType || 'unknown'}`,
+        mediaType,
+        previewUrl: urlString,
+        siteName: url.hostname,
+        embedHtml: mediaType === 'video' ? `<video controls src="${urlString}"></video>` :
+                  mediaType === 'audio' ? `<audio controls src="${urlString}"></audio>` : ''
       };
     }
 
@@ -77,6 +90,47 @@ async function extractMetaTags(urlString) {
       description: `Failed to extract metadata: ${error.message}`
     };
   }
+}
+
+// Helper function to detect media type from content type
+function getMediaTypeFromContentType(contentType) {
+  if (!contentType) return 'rich';
+  
+  if (contentType.includes('image/')) return 'image';
+  if (contentType.includes('video/')) return 'video';
+  if (contentType.includes('audio/')) return 'audio';
+  
+  return 'rich';
+}
+
+// Helper function to detect media type from file extension
+function getMediaTypeFromExtension(extension) {
+  if (!extension) return 'rich';
+  
+  if (MEDIA_EXTENSIONS.images.includes(extension)) return 'image';
+  if (MEDIA_EXTENSIONS.videos.includes(extension)) return 'video';
+  if (MEDIA_EXTENSIONS.audio.includes(extension)) return 'audio';
+  if (MEDIA_EXTENSIONS.documents.includes(extension)) return 'document';
+  
+  return 'rich';
+}
+
+// Helper function to detect Discord media type
+function detectDiscordMediaType(url) {
+  if (!url) return 'rich';
+  
+  const extension = url.split('.').pop()?.toLowerCase();
+  if (!extension) return 'rich';
+
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
+    return 'image';
+  } else if (['mp4', 'webm', 'mov'].includes(extension)) {
+    return 'video';
+  } else if (['mp3', 'ogg', 'wav'].includes(extension)) {
+    return 'audio';
+  }
+  
+  return 'rich';
 }
 
 // Get URL metadata including meta tags
@@ -242,5 +296,8 @@ async function getUrlMetadata(urlString) {
 
 module.exports = {
   getUrlMetadata,
-  extractMetaTags
+  extractMetaTags,
+  getMediaTypeFromContentType,
+  getMediaTypeFromExtension,
+  detectDiscordMediaType
 };
