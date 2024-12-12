@@ -41,7 +41,23 @@ exports.handler = async (event, context) => {
 
   try {
     // Initialize services first
-    await initializeServices();
+    try {
+      await initializeServices();
+    } catch (error) {
+      console.error('Error initializing services:', error);
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          error: 'Failed to initialize services',
+          details: error.message 
+        })
+      };
+    }
 
     const headers = {
       'Access-Control-Allow-Origin': '*',
@@ -131,18 +147,27 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // If the URL is from Discord CDN, store it permanently
-    if (url.includes('cdn.discordapp.com')) {
+    // Process Discord CDN URLs
+    if (url && url.includes('cdn.discordapp.com')) {
       try {
-        const { fileId } = await fileStorage.storeFileFromUrl(url, {
-          type: 'discord_cdn',
-          originalMetadata: metadata
-        });
+        console.log('Processing Discord CDN URL:', url);
+        const storedFile = await fileStorage.storeFileFromUrl(url);
+        console.log('File stored successfully:', storedFile);
+        
         // Replace the Discord URL with our permanent URL
-        url = await fileStorage.getFileUrl(fileId);
+        const permanentUrl = await fileStorage.getFileUrl(storedFile.fileId);
+        console.log('Generated permanent URL:', permanentUrl);
+        url = permanentUrl;
       } catch (error) {
-        console.error('Error storing Discord file:', error);
-        // Continue with original URL if storage fails
+        console.error('Error processing Discord CDN URL:', error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Failed to process Discord CDN URL',
+            details: error.message 
+          })
+        };
       }
     }
 
@@ -227,6 +252,12 @@ exports.handler = async (event, context) => {
       })
     };
   } finally {
+    // Clean up MongoDB connections
+    try {
+      await fileStorage.cleanup();
+    } catch (error) {
+      console.error('Error cleaning up file storage:', error);
+    }
     if (client) {
       await client.close();
     }
