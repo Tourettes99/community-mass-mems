@@ -44,18 +44,18 @@ class EmailNotificationService {
 
   async sendModerationNotification(memory, moderationResult) {
     const explanation = this.formatModerationResult(moderationResult);
-    const status = moderationResult.decision === 'approve' ? 'Approved' : 'Rejected';
+    const status = memory.status.charAt(0).toUpperCase() + memory.status.slice(1);
     
     const emailContent = {
       from: process.env.EMAIL_USER,
       to: process.env.NOTIFICATION_EMAIL || process.env.EMAIL_USER,
-      subject: `${status}: New text memory submitted for review`,
+      subject: `${status}: New ${memory.type} memory submitted for review`,
       text: `
 Memory Review Status: ${status}
 ------------------------
-Content: ${memory.content}
-Title: ${memory.metadata.title}
-Tags: ${memory.tags.length > 0 ? memory.tags.join(', ') : 'No tags'}
+Content: ${memory.content || 'No content'}
+Title: ${memory.metadata?.title || 'No title'}
+Tags: ${memory.tags?.length > 0 ? memory.tags.join(', ') : 'No tags'}
 Submitted at: ${new Date(memory.submittedAt).toLocaleString()}
 ID: ${memory._id}
 
@@ -69,9 +69,9 @@ You can review this submission in the moderation console.
         
         <h3>Submission Details:</h3>
         <ul>
-          <li><strong>Content:</strong> ${memory.content}</li>
-          <li><strong>Title:</strong> ${memory.metadata.title}</li>
-          <li><strong>Tags:</strong> ${memory.tags.length > 0 ? memory.tags.join(', ') : 'No tags'}</li>
+          <li><strong>Content:</strong> ${memory.content || 'No content'}</li>
+          <li><strong>Title:</strong> ${memory.metadata?.title || 'No title'}</li>
+          <li><strong>Tags:</strong> ${memory.tags?.length > 0 ? memory.tags.join(', ') : 'No tags'}</li>
           <li><strong>Submitted at:</strong> ${new Date(memory.submittedAt).toLocaleString()}</li>
           <li><strong>ID:</strong> ${memory._id}</li>
         </ul>
