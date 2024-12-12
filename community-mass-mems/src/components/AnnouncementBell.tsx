@@ -23,8 +23,8 @@ const AnnouncementBell: React.FC = () => {
     setOpen(!open);
   };
 
-  const handleAnnouncementRead = (id: string) => {
-    markAsRead(id);
+  const handleAnnouncementRead = (_id: string) => {
+    markAsRead(_id);
   };
 
   const unreadCount = announcements.filter(a => !a.read).length;
@@ -83,8 +83,8 @@ const AnnouncementBell: React.FC = () => {
             ) : (
               announcements.map((announcement) => (
                 <ListItem
-                  key={announcement.id}
-                  onClick={() => handleAnnouncementRead(announcement.id)}
+                  key={announcement._id}
+                  onClick={() => handleAnnouncementRead(announcement._id)}
                   sx={{
                     cursor: 'pointer',
                     backgroundColor: announcement.read ? 'transparent' : 'action.hover',
