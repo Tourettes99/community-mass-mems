@@ -39,6 +39,11 @@ exports.handler = async (event, context) => {
   let client;
 
   try {
+    // Debug logging
+    console.log('Request method:', event.httpMethod);
+    console.log('Request headers:', event.headers);
+    console.log('Request body:', event.body);
+
     // Initialize services first
     try {
       await initializeServices();
