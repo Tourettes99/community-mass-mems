@@ -102,7 +102,8 @@ exports.handler = async (event, context) => {
       };
     }
 
-    const { type, url, content, tags } = body;
+    const { type, tags } = body;
+    let { url, content } = body;
     
     // Check if we have either URL or content
     if (type === 'url' && !url) {
