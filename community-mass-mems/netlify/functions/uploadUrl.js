@@ -6,6 +6,7 @@ const emailNotification = require('./services/emailNotification');
 const { getUrlMetadata } = require('./utils/urlMetadata');
 const autoModeration = require('./services/autoModeration');
 const groqModeration = require('./services/groqModeration');
+const fileStorage = require('./services/fileStorage');
 
 // Create transporter for sending emails
 const transporter = nodemailer.createTransport({
@@ -29,6 +30,7 @@ let servicesInitialized = false;
 async function initializeServices() {
   if (!servicesInitialized) {
     await groqModeration.initialize();
+    await fileStorage.initialize();
     servicesInitialized = true;
   }
 }
@@ -127,6 +129,21 @@ exports.handler = async (event, context) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
+    }
+
+    // If the URL is from Discord CDN, store it permanently
+    if (url.includes('cdn.discordapp.com')) {
+      try {
+        const { fileId } = await fileStorage.storeFileFromUrl(url, {
+          type: 'discord_cdn',
+          originalMetadata: metadata
+        });
+        // Replace the Discord URL with our permanent URL
+        url = await fileStorage.getFileUrl(fileId);
+      } catch (error) {
+        console.error('Error storing Discord file:', error);
+        // Continue with original URL if storage fails
+      }
     }
 
     // Initialize and run auto moderation
