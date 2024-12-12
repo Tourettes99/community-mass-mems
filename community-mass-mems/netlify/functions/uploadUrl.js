@@ -191,17 +191,20 @@ exports.handler = async (event, context) => {
       const db = client.db('memories');
       const collection = db.collection('memories');
 
+      // Map moderation result to memory status
+      const status = moderationResult.flagged ? 'reject' : 'approve';
+
       // Create memory document
       const memory = {
         type: type,
         url: type === 'url' ? url : undefined,
         content: type === 'text' ? content : undefined,
         tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-        status: moderationResult.decision,  // Use decision directly: 'approve' or 'reject'
+        status: status,
         moderationResult: {
-          decision: moderationResult.decision,
+          decision: status,
           reason: moderationResult.reason,
-          categories: moderationResult.categories,
+          categories: moderationResult.category_scores,
           flagged: moderationResult.flagged,
           category_scores: moderationResult.category_scores
         },
@@ -225,14 +228,14 @@ exports.handler = async (event, context) => {
       await emailNotification.sendModerationNotification(memory, moderationResult);
 
       // Return appropriate response based on moderation decision
-      if (moderationResult.decision === 'reject') {
+      if (moderationResult.flagged) {
         return {
           statusCode: 400,
           headers,
           body: JSON.stringify({ 
             message: 'Content rejected by moderation',
             reason: moderationResult.reason,
-            categories: moderationResult.categories,
+            categories: moderationResult.category_scores,
             category_scores: moderationResult.category_scores,
             id: result.insertedId
           })
