@@ -31,6 +31,7 @@
     "axios": "1.7.9",
     "boxen": "5.1.2",
     "chalk": "4.1.2",
+    "cheerio": "1.0.0",
     "cross-env": "^7.0.3",
     "date-fns": "^2.30.0",
     "domino": "^2.1.6",
