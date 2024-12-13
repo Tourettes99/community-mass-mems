@@ -260,81 +260,95 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Create memory document
-    const memory = {
-      type: type,
-      url: type === 'url' ? url.trim() : undefined,
-      content: type === 'text' ? content.trim() : undefined,
-      tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-      status: 'pending',
-      metadata: metadata,  // Store the complete metadata object
-      votes: { up: 0, down: 0 },
-      userVotes: {},
-      submittedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
     // Connect to MongoDB
-    client = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 10000,
-      family: 4
-    });
+    try {
+      await mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 10000,
+        family: 4
+      });
 
-    const db = client.db('memories');
-    const collection = db.collection('memories');
+      // Create new memory document using Mongoose model
+      const memory = new Memory({
+        type: type,
+        url: type === 'url' ? url.trim() : undefined,
+        content: type === 'text' ? content.trim() : undefined,
+        tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
+        status: 'pending',
+        metadata: metadata,
+        votes: { up: 0, down: 0 },
+        userVotes: {},
+        submittedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
 
-    // Perform moderation
-    const moderationResult = await groqModeration.moderateContent(
-      type === 'url' ? `${url}\n${metadata.basicInfo?.title || ''}\n${metadata.basicInfo?.description || ''}` : content,
-      type
-    );
+      // Perform moderation
+      const moderationResult = await groqModeration.moderateContent(
+        type === 'url' ? `${url}\n${metadata.basicInfo?.title || ''}\n${metadata.basicInfo?.description || ''}` : content,
+        type
+      );
 
-    // Update memory with moderation result
-    memory.status = moderationResult.flagged ? 'rejected' : 'approved';
-    memory.moderationResult = {
-      flagged: moderationResult.flagged,
-      category_scores: moderationResult.category_scores,
-      reason: moderationResult.reason
-    };
+      // Update memory with moderation result
+      memory.status = moderationResult.flagged ? 'rejected' : 'approved';
+      memory.moderationResult = {
+        flagged: moderationResult.flagged,
+        category_scores: moderationResult.category_scores,
+        reason: moderationResult.reason
+      };
 
-    // Save to database
-    const result = await collection.insertOne(memory);
-    memory._id = result.insertedId;
+      // Save using Mongoose
+      await memory.save();
 
-    // Send email notification
-    await emailNotification.sendModerationNotification(memory, moderationResult);
+      // Send email notification
+      await emailNotification.sendModerationNotification(memory.toObject(), moderationResult);
 
-    // Return appropriate response
-    if (moderationResult.flagged) {
+      // Return appropriate response
+      if (moderationResult.flagged) {
+        return {
+          statusCode: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: JSON.stringify({
+            message: 'Content rejected by moderation',
+            reason: moderationResult.reason,
+            category_scores: moderationResult.category_scores,
+            id: memory._id
+          })
+        };
+      }
+
       return {
-        statusCode: 400,
+        statusCode: 200,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
         body: JSON.stringify({
-          message: 'Content rejected by moderation',
-          reason: moderationResult.reason,
-          category_scores: moderationResult.category_scores,
-          id: result.insertedId
+          message: 'Memory submitted successfully',
+          id: memory._id,
+          metadata: metadata
         })
       };
+    } catch (error) {
+      console.error('Error:', error);
+      console.error('Error stack:', error.stack);
+      
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: 'Internal server error',
+          message: error.message,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        })
+      };
+    } finally {
+      // Always close the connection
+      await mongoose.disconnect();
     }
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({
-        message: 'Memory submitted successfully',
-        id: result.insertedId,
-        metadata: metadata  // Include metadata in response
-      })
-    };
   } catch (error) {
     console.error('Error:', error);
     console.error('Error stack:', error.stack);

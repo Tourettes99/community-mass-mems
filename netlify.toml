@@ -1,11 +1,11 @@
 [build]
-  base = "."
-  command = "npm run build"
+  base = "community-mass-mems"
+  command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
   publish = "build"
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18.x"
+  NODE_VERSION = "20.11.1"
   NPM_VERSION = "10.2.4"
   CI = "false"
   NODE_ENV = "production"
@@ -18,11 +18,9 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
   external_node_modules = [
-    "mongodb-client-encryption",
-    "groq-sdk",
-    "jsdom",
     "sharp",
     "fluent-ffmpeg",
+    "mongodb-client-encryption",
     "bson",
     "aws4",
     "mongoose",
@@ -38,9 +36,7 @@
     "express",
     "path",
     "canvas",
-    "fs",
-    "fs-extra",
-    "@netlify/blobs"
+    "jsdom"
   ]
 
 [functions."*"]
@@ -87,11 +83,6 @@
     X-Frame-Options = "DENY"
 
 [[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
@@ -100,11 +91,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-[dev]
-  framework = "#custom"
-  command = "npm run start"
-  targetPort = 3000
-  port = 8888
-  publish = "build"
-  autoLaunch = true
