@@ -1,20 +1,11 @@
 [build]
-<<<<<<< HEAD
-  base = "."
-  command = "npm run build"
+  base = "community-mass-mems"
+  command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
   publish = "build"
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "18.x"
-=======
-  base = "community-mass-mems"
-  command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
-  publish = "build"
-
-[build.environment]
   NODE_VERSION = "20.11.1"
->>>>>>> 2d4727ca882ad7f101b4675d9db26b68336e61fb
   NPM_VERSION = "10.2.4"
   CI = "false"
   NODE_ENV = "production"
@@ -26,22 +17,10 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-<<<<<<< HEAD
-  external_node_modules = [
-    "mongodb-client-encryption",
-    "groq-sdk",
-    "jsdom",
-    "sharp",
-    "fluent-ffmpeg",
-=======
-
-[functions."*"]
-  included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
   external_node_modules = [
     "sharp",
     "fluent-ffmpeg",
     "mongodb-client-encryption",
->>>>>>> 2d4727ca882ad7f101b4675d9db26b68336e61fb
     "bson",
     "aws4",
     "mongoose",
@@ -57,20 +36,12 @@
     "express",
     "path",
     "canvas",
-<<<<<<< HEAD
-    "fs",
-    "fs-extra",
-    "@netlify/blobs"
+    "jsdom"
   ]
 
 [functions."*"]
   included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
 
-=======
-    "jsdom"
-  ]
-
->>>>>>> 2d4727ca882ad7f101b4675d9db26b68336e61fb
 [[headers]]
   for = "/*"
   [headers.values]
@@ -112,16 +83,6 @@
     X-Frame-Options = "DENY"
 
 [[redirects]]
-<<<<<<< HEAD
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-=======
-  from = "/*.mp3"
-  to = "/episode-1-introduktion.mp3"
->>>>>>> 2d4727ca882ad7f101b4675d9db26b68336e61fb
-  status = 200
-
-[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
@@ -130,14 +91,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-<<<<<<< HEAD
-
-[dev]
-  framework = "#custom"
-  command = "npm run start"
-  targetPort = 3000
-  port = 8888
-  publish = "build"
-  autoLaunch = true
-=======
->>>>>>> 2d4727ca882ad7f101b4675d9db26b68336e61fb
