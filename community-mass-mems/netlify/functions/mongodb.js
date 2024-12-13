@@ -22,9 +22,11 @@ async function connectToDatabase() {
         const client = await MongoClient.connect(MONGODB_URI, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
-            serverSelectionTimeoutMS: 5000,
-            socketTimeoutMS: 45000,
-            connectTimeoutMS: 10000
+            serverSelectionTimeoutMS: 30000, // Increased timeout
+            socketTimeoutMS: 75000,
+            connectTimeoutMS: 30000,
+            maxPoolSize: 10,
+            minPoolSize: 5
         });
 
         // These should match what's in the connection string
@@ -39,6 +41,9 @@ async function connectToDatabase() {
         return collection;
     } catch (error) {
         console.error('MongoDB connection error:', error);
+        // Reset cached instances on error
+        cachedDb = null;
+        cachedCollection = null;
         throw error;
     }
 }
