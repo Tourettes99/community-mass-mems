@@ -1,0 +1,110 @@
+[build]
+  base = "."
+  command = "npm run build"
+  publish = "build"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18.x"
+  NPM_VERSION = "10.2.4"
+  CI = "false"
+  NODE_ENV = "production"
+  NETLIFY = "true"
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = [
+    "mongodb-client-encryption",
+    "groq-sdk",
+    "jsdom",
+    "sharp",
+    "fluent-ffmpeg",
+    "bson",
+    "aws4",
+    "mongoose",
+    "file-type",
+    "image-size",
+    "unfurl.js",
+    "page-metadata-parser",
+    "domino",
+    "node-fetch",
+    "busboy",
+    "cors",
+    "dotenv",
+    "express",
+    "path",
+    "canvas",
+    "fs",
+    "fs-extra",
+    "@netlify/blobs"
+  ]
+
+[functions."*"]
+  included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = """
+      default-src 'self';
+      img-src 'self' data: blob: http: https: *.tiktokcdn.com *.fbcdn.net;
+      media-src 'self' data: blob: http: https: *.tiktokcdn.com;
+      object-src 'none';
+      frame-src 'self' 
+        https://www.youtube.com 
+        https://youtube.com
+        https://www.facebook.com 
+        https://platform.twitter.com
+        https://syndication.twitter.com
+        https://www.instagram.com
+        https://player.vimeo.com
+        https://w.soundcloud.com
+        https://open.spotify.com;
+      style-src 'self' 'unsafe-inline';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval'
+        https://www.youtube.com
+        https://s.ytimg.com
+        https://platform.twitter.com
+        https://cdn.syndication.twimg.com;
+      connect-src 'self' 
+        https://api.twitter.com
+        https://syndication.twitter.com
+        https://platform.twitter.com
+        https://vimeo.com
+        https://api.vimeo.com
+        https://w.soundcloud.com
+        https://api.soundcloud.com
+        https://open.spotify.com
+        https://api.spotify.com
+        data: blob: http: https:;"""
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[dev]
+  framework = "#custom"
+  command = "npm run start"
+  targetPort = 3000
+  port = 8888
+  publish = "build"
+  autoLaunch = true
