@@ -15,11 +15,14 @@ class FileStorageService {
         this.client = await MongoClient.connect(process.env.MONGODB_URI, {
           useNewUrlParser: true,
           useUnifiedTopology: true,
-          serverSelectionTimeoutMS: 5000,
-          socketTimeoutMS: 45000,
+          serverSelectionTimeoutMS: 30000,
+          socketTimeoutMS: 75000,
+          connectTimeoutMS: 30000,
+          maxPoolSize: 10,
+          minPoolSize: 5
         });
         
-        const db = this.client.db('community-mass-mems');
+        const db = this.client.db('memories'); 
         this.bucket = new GridFSBucket(db, {
           bucketName: 'media'
         });
@@ -50,56 +53,51 @@ class FileStorageService {
         console.log('File already exists in storage, returning existing ID');
         return {
           fileId: existingFile[0]._id,
-          filename: existingFile[0].filename
+          isExisting: true
         };
       }
 
-      console.log('Downloading file from:', url);
-      // Download the file
+      // Fetch the file
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to fetch file from ${url}: ${response.statusText}`);
+        throw new Error(`Failed to fetch file from URL: ${response.statusText}`);
       }
 
       const buffer = await response.buffer();
-      const filename = `${Date.now()}-${url.split('/').pop()}`;
+      const stream = Readable.from(buffer);
 
-      console.log('Creating readable stream from buffer');
-      // Create a readable stream from the buffer
-      const stream = new Readable();
-      stream.push(buffer);
-      stream.push(null);
-
-      console.log('Storing file in GridFS');
-      // Store in GridFS
-      const uploadStream = this.bucket.openUploadStream(filename, {
+      // Store the file
+      const uploadStream = this.bucket.openUploadStream(url, {
         metadata: {
           ...metadata,
           originalUrl: url,
-          uploadDate: new Date(),
-          source: 'discord'
+          uploadedAt: new Date()
         }
       });
 
       await new Promise((resolve, reject) => {
         stream.pipe(uploadStream)
-          .on('error', (error) => {
-            console.error('Error during file upload:', error);
-            reject(error);
-          })
-          .on('finish', () => {
-            console.log('File upload completed');
-            resolve();
-          });
+          .on('error', reject)
+          .on('finish', resolve);
       });
 
       console.log('File stored successfully');
       return {
         fileId: uploadStream.id,
-        filename: filename
+        isExisting: false
       };
     } catch (error) {
       console.error('Error storing file:', error);
+      throw error;
+    }
+  }
+
+  async getFileById(fileId) {
+    try {
+      await this.initialize();
+      return this.bucket.openDownloadStream(fileId);
+    } catch (error) {
+      console.error('Error getting file:', error);
       throw error;
     }
   }
