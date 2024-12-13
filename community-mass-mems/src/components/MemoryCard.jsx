@@ -69,66 +69,117 @@ const MemoryCard = ({ memory }) => {
 
     switch (metadata.mediaType) {
       case 'video':
+        if (metadata.embedHtml) {
+          return (
+            <Box
+              sx={{
+                width: '100%',
+                position: 'relative',
+                paddingTop: '56.25%', // 16:9 Aspect Ratio
+                '& iframe, & video': {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                }
+              }}
+              dangerouslySetInnerHTML={{ __html: metadata.embedHtml }}
+            />
+          );
+        }
         return (
           <Box
             sx={{
-              position: 'relative',
               width: '100%',
-              paddingTop: '56.25%', // 16:9 aspect ratio
-              bgcolor: 'background.default',
-              overflow: 'hidden',
-              '& iframe': {
+              position: 'relative',
+              paddingTop: '56.25%',
+            }}
+          >
+            <video
+              controls
+              playsInline
+              src={url}
+              style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
                 height: '100%',
-                border: 'none'
-              }
-            }}
-            dangerouslySetInnerHTML={{ __html: metadata.embedHtml }}
-          />
+                objectFit: 'contain',
+              }}
+            />
+          </Box>
         );
 
       case 'image':
         return (
-          <CardMedia
-            component="img"
-            image={metadata.previewUrl || metadata.ogImage}
-            alt={metadata.title || 'Image'}
+          <Box
             sx={{
               width: '100%',
-              height: 'auto',
-              maxHeight: '400px',
-              objectFit: 'contain',
+              position: 'relative',
+              paddingTop: '56.25%',
+              backgroundColor: '#f5f5f5',
             }}
-          />
+          >
+            <img
+              src={metadata.previewUrl || url}
+              alt={metadata.title || 'Image'}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+              }}
+              loading="lazy"
+            />
+          </Box>
         );
 
       case 'audio':
         return (
-          <Box sx={{ width: '100%', p: 2 }}>
+          <Box sx={{ width: '100%', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
             <audio controls style={{ width: '100%' }}>
               <source src={url} type="audio/mpeg" />
               <source src={url} type="audio/wav" />
+              <source src={url} type="audio/ogg" />
               Your browser does not support the audio element.
             </audio>
           </Box>
         );
 
       case 'article':
-        return metadata.previewUrl || metadata.ogImage ? (
-          <CardMedia
-            component="img"
-            image={metadata.previewUrl || metadata.ogImage}
-            alt={metadata.title || 'Article preview'}
-            sx={{
-              width: '100%',
-              height: '200px',
-              objectFit: 'cover',
-            }}
-          />
-        ) : null;
+        return (
+          <Box sx={{ width: '100%' }}>
+            {(metadata.previewUrl || metadata.ogImage) && (
+              <Box
+                sx={{
+                  width: '100%',
+                  position: 'relative',
+                  paddingTop: '52.25%',
+                  backgroundColor: '#f5f5f5',
+                }}
+              >
+                <img
+                  src={metadata.previewUrl || metadata.ogImage}
+                  alt={metadata.title || 'Article preview'}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                  loading="lazy"
+                />
+              </Box>
+            )}
+          </Box>
+        );
 
       case 'rich':
         if (metadata.embedHtml) {
@@ -136,11 +187,16 @@ const MemoryCard = ({ memory }) => {
             <Box
               sx={{
                 width: '100%',
+                position: 'relative',
+                paddingTop: metadata.aspectRatio || '56.25%',
                 overflow: 'hidden',
                 '& iframe': {
-                  border: 'none',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
                   width: '100%',
-                  minHeight: '200px'
+                  height: '100%',
+                  border: 'none',
                 }
               }}
               dangerouslySetInnerHTML={{ __html: metadata.embedHtml }}
