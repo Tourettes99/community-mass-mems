@@ -60,13 +60,13 @@ const MemoryCard = ({ memory }) => {
   };
 
   const renderMedia = () => {
-    if (embedHtml) {
+    if (embedHtml && mediaType === 'video') {
       return (
         <Box
           sx={{
             position: 'relative',
             width: '100%',
-            height: '300px', // Fixed height for embeds
+            paddingTop: '56.25%', // 16:9 aspect ratio
             bgcolor: 'background.default',
             overflow: 'hidden',
             '& iframe': {
