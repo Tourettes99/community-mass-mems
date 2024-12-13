@@ -1,5 +1,16 @@
 const fetch = require('node-fetch');
 const { JSDOM } = require('jsdom');
+const ogs = require('open-graph-scraper');
+const metascraper = require('metascraper')([
+  require('metascraper-author')(),
+  require('metascraper-date')(),
+  require('metascraper-description')(),
+  require('metascraper-image')(),
+  require('metascraper-logo')(),
+  require('metascraper-publisher')(),
+  require('metascraper-title')(),
+  require('metascraper-url')()
+]);
 
 // Media file extensions
 const MEDIA_EXTENSIONS = {
@@ -18,7 +29,8 @@ const PLATFORM_HANDLERS = {
       mediaType: 'video',
       videoId,
       embedUrl: `https://www.youtube.com/embed/${videoId}`,
-      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      embedHtml: `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
     } : null;
   },
   'youtu.be': (url) => {
@@ -28,7 +40,8 @@ const PLATFORM_HANDLERS = {
       mediaType: 'video',
       videoId,
       embedUrl: `https://www.youtube.com/embed/${videoId}`,
-      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      embedHtml: `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
     } : null;
   },
   'vimeo.com': (url) => {
@@ -37,7 +50,8 @@ const PLATFORM_HANDLERS = {
       platform: 'vimeo',
       mediaType: 'video',
       videoId,
-      embedUrl: `https://player.vimeo.com/video/${videoId}`
+      embedUrl: `https://player.vimeo.com/video/${videoId}`,
+      embedHtml: `<iframe src="https://player.vimeo.com/video/${videoId}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`
     } : null;
   },
   'twitter.com': (url) => {
@@ -45,7 +59,8 @@ const PLATFORM_HANDLERS = {
     return tweetId ? {
       platform: 'twitter',
       mediaType: 'rich',
-      embedUrl: `https://platform.twitter.com/embed/Tweet.html?id=${tweetId}`
+      embedUrl: `https://platform.twitter.com/embed/Tweet.html?id=${tweetId}`,
+      embedHtml: `<blockquote class="twitter-tweet" data-dnt="true"><a href="${url.href}"></a></blockquote><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>`
     } : null;
   },
   'x.com': (url) => PLATFORM_HANDLERS['twitter.com'](url),
@@ -57,43 +72,9 @@ const PLATFORM_HANDLERS = {
     return {
       platform: 'reddit',
       mediaType: 'rich',
-      embedUrl: embedUrl.replace('reddit.com', 'redditmedia.com')
+      embedUrl: embedUrl.replace('reddit.com', 'redditmedia.com'),
+      embedHtml: `<iframe id="reddit-embed" src="${embedUrl.replace('reddit.com', 'redditmedia.com')}" sandbox="allow-scripts allow-same-origin allow-popups" style="border: none;" height="100%" width="100%" scrolling="yes"></iframe>`
     };
-  },
-  'instagram.com': (url) => {
-    const match = url.pathname.match(/\/(p|reel|tv)\/([^\/\?]+)/);
-    return match ? {
-      platform: 'instagram',
-      mediaType: 'rich',
-      embedUrl: `https://www.instagram.com/p/${match[2]}/embed/`
-    } : null;
-  },
-  'tiktok.com': (url) => {
-    const videoId = url.pathname.split('/').pop()?.split('?')[0];
-    return videoId ? {
-      platform: 'tiktok',
-      mediaType: 'rich',
-      embedUrl: `https://www.tiktok.com/embed/${videoId}`
-    } : null;
-  },
-  'discord.com': (url) => {
-    const messageMatch = url.pathname.match(/channels\/(\d+)\/(\d+)\/(\d+)/);
-    const inviteMatch = url.pathname.match(/invite\/([a-zA-Z0-9-]+)/);
-    if (messageMatch) {
-      return {
-        platform: 'discord',
-        mediaType: 'rich',
-        embedUrl: `https://discord.com/embed?messageId=${messageMatch[3]}&channelId=${messageMatch[2]}&guildId=${messageMatch[1]}`
-      };
-    }
-    if (inviteMatch) {
-      return {
-        platform: 'discord',
-        mediaType: 'rich',
-        embedUrl: `https://discord.com/widget?id=${inviteMatch[1]}&theme=dark`
-      };
-    }
-    return null;
   }
 };
 
@@ -113,78 +94,105 @@ async function extractMetaTags(urlString) {
         mediaType,
         previewUrl: urlString,
         siteName: isDiscordCdn ? 'Discord' : url.hostname,
-        embedUrl: mediaType === 'video' ? urlString : undefined
+        embedUrl: mediaType === 'video' ? urlString : undefined,
+        embedHtml: mediaType === 'video' ? 
+          `<video controls width="100%" height="100%"><source src="${urlString}" type="video/${extension}"></video>` :
+          mediaType === 'image' ? 
+          `<img src="${urlString}" alt="Image" style="max-width: 100%; height: auto;">` : undefined
       };
     }
 
-    // Check if URL is accessible
-    const response = await fetch(urlString, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    // First try to get metadata using open-graph-scraper
+    try {
+      const { result } = await ogs({ url: urlString });
+      if (result) {
+        return {
+          title: result.ogTitle || result.twitterTitle,
+          description: result.ogDescription || result.twitterDescription,
+          previewUrl: result.ogImage?.[0]?.url || result.twitterImage,
+          mediaType: result.ogType === 'article' ? 'article' : 'rich',
+          siteName: result.ogSiteName || url.hostname,
+          author: result.author,
+          publishedDate: result.articlePublishedTime,
+          favicon: result.favicon,
+          embedHtml: result.ogType === 'article' ? 
+            `<div style="max-width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 8px;">
+              ${result.ogImage?.[0]?.url ? `<img src="${result.ogImage[0].url}" style="max-width: 100%; height: auto; margin-bottom: 16px;">` : ''}
+              <h3 style="margin: 0 0 8px 0;">${result.ogTitle || ''}</h3>
+              <p style="margin: 0 0 8px 0; color: #666;">${result.ogDescription || ''}</p>
+              <small style="color: #999;">${result.ogSiteName || url.hostname}</small>
+            </div>` : undefined
+        };
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('text/html')) {
-      const mediaType = getMediaTypeFromContentType(contentType);
-      return {
-        title: url.pathname.split('/').pop() || urlString,
-        description: `File type: ${contentType || 'unknown'}`,
-        mediaType,
-        previewUrl: urlString,
-        siteName: url.hostname,
-        embedUrl: mediaType === 'video' ? urlString : undefined
-      };
+    } catch (error) {
+      console.warn('Failed to get metadata with open-graph-scraper:', error);
     }
 
+    // Then try metascraper as backup
+    try {
+      const response = await fetch(urlString);
+      const html = await response.text();
+      const metadata = await metascraper({ html, url: urlString });
+      
+      return {
+        title: metadata.title,
+        description: metadata.description,
+        previewUrl: metadata.image,
+        mediaType: 'article',
+        siteName: metadata.publisher || url.hostname,
+        author: metadata.author,
+        publishedDate: metadata.date,
+        embedHtml: `<div style="max-width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 8px;">
+          ${metadata.image ? `<img src="${metadata.image}" style="max-width: 100%; height: auto; margin-bottom: 16px;">` : ''}
+          <h3 style="margin: 0 0 8px 0;">${metadata.title || ''}</h3>
+          <p style="margin: 0 0 8px 0; color: #666;">${metadata.description || ''}</p>
+          <small style="color: #999;">${metadata.publisher || url.hostname}</small>
+        </div>`
+      };
+    } catch (error) {
+      console.warn('Failed to get metadata with metascraper:', error);
+    }
+
+    // Fallback to basic fetch and HTML parsing
+    const response = await fetch(urlString);
     const html = await response.text();
     const dom = new JSDOM(html);
     const doc = dom.window.document;
 
-    // Get all meta tags
-    const metaTags = {};
-    doc.querySelectorAll('meta').forEach(tag => {
-      const name = tag.getAttribute('name') || tag.getAttribute('property');
-      const content = tag.getAttribute('content');
-      if (name && content) {
-        metaTags[name.toLowerCase()] = content;
-      }
-    });
-
-    // Get OpenGraph data
-    const ogData = {
-      title: metaTags['og:title'],
-      description: metaTags['og:description'],
-      image: metaTags['og:image'],
-      type: metaTags['og:type'],
-      site_name: metaTags['og:site_name']
-    };
-
-    // Get Twitter Card data
-    const twitterData = {
-      title: metaTags['twitter:title'],
-      description: metaTags['twitter:description'],
-      image: metaTags['twitter:image'],
-      card: metaTags['twitter:card']
-    };
-
-    return {
-      title: ogData.title || twitterData.title || doc.title || '',
-      description: ogData.description || twitterData.description || metaTags.description || '',
-      previewUrl: ogData.image || twitterData.image || '',
-      mediaType: ogData.type === 'video' ? 'video' : 'rich',
-      siteName: ogData.site_name || url.hostname,
+    // Get OpenGraph and Twitter Card data
+    const metadata = {
+      title: doc.querySelector('meta[property="og:title"]')?.content || 
+             doc.querySelector('meta[name="twitter:title"]')?.content || 
+             doc.title,
+      description: doc.querySelector('meta[property="og:description"]')?.content || 
+                  doc.querySelector('meta[name="twitter:description"]')?.content || 
+                  doc.querySelector('meta[name="description"]')?.content,
+      previewUrl: doc.querySelector('meta[property="og:image"]')?.content || 
+                 doc.querySelector('meta[name="twitter:image"]')?.content,
+      mediaType: doc.querySelector('meta[property="og:type"]')?.content === 'article' ? 'article' : 'rich',
+      siteName: doc.querySelector('meta[property="og:site_name"]')?.content || url.hostname,
+      author: doc.querySelector('meta[property="article:author"]')?.content,
+      publishedDate: doc.querySelector('meta[property="article:published_time"]')?.content,
       favicon: doc.querySelector('link[rel*="icon"]')?.href
     };
+
+    // Generate embed HTML for articles
+    if (metadata.mediaType === 'article') {
+      metadata.embedHtml = `<div style="max-width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 8px;">
+        ${metadata.previewUrl ? `<img src="${metadata.previewUrl}" style="max-width: 100%; height: auto; margin-bottom: 16px;">` : ''}
+        <h3 style="margin: 0 0 8px 0;">${metadata.title || ''}</h3>
+        <p style="margin: 0 0 8px 0; color: #666;">${metadata.description || ''}</p>
+        <small style="color: #999;">${metadata.siteName}</small>
+      </div>`;
+    }
+
+    return metadata;
   } catch (error) {
     console.error('Error extracting meta tags:', error);
     return {
       title: new URL(urlString).pathname.split('/').pop() || urlString,
-      description: `Failed to extract metadata: ${error.message}`
+      description: `Failed to extract metadata: ${error.message}`,
+      mediaType: 'rich'
     };
   }
 }
@@ -192,39 +200,26 @@ async function extractMetaTags(urlString) {
 // Helper function to detect media type from content type
 function getMediaTypeFromContentType(contentType) {
   if (!contentType) return 'rich';
-  
   if (contentType.includes('image/')) return 'image';
   if (contentType.includes('video/')) return 'video';
   if (contentType.includes('audio/')) return 'audio';
-  
   return 'rich';
 }
 
 // Helper function to detect media type from file extension
 function getMediaTypeFromExtension(extension) {
   if (!extension) return 'rich';
-  
   if (MEDIA_EXTENSIONS.images.includes(extension)) return 'image';
   if (MEDIA_EXTENSIONS.videos.includes(extension)) return 'video';
   if (MEDIA_EXTENSIONS.audio.includes(extension)) return 'audio';
   if (MEDIA_EXTENSIONS.documents.includes(extension)) return 'document';
-  
   return 'rich';
 }
 
 // Helper function to detect Discord media type
 function detectDiscordMediaType(url) {
   const extension = url.split('.').pop()?.toLowerCase();
-  
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
-    return 'image';
-  } else if (['mp4', 'webm', 'mov'].includes(extension)) {
-    return 'video';
-  } else if (['mp3', 'ogg', 'wav'].includes(extension)) {
-    return 'audio';
-  }
-  
-  return 'rich';
+  return getMediaTypeFromExtension(extension);
 }
 
 // Get URL metadata including meta tags
@@ -271,52 +266,38 @@ async function getUrlMetadata(urlString) {
       type: 'url',
       error: error.message,
       title: urlString,
-      description: `Failed to process URL: ${error.message}`
+      description: `Failed to process URL: ${error.message}`,
+      mediaType: 'rich'
     };
   }
 }
 
 // Helper function to handle Discord CDN URLs
 async function handleDiscordCdn(urlString) {
-  const url = new URL(urlString);
-  const extension = url.pathname.split('.').pop()?.toLowerCase();
-  
-  const metadata = {
-    platform: 'discord',
-    title: url.pathname.split('/').pop() || urlString,
-    description: 'Discord CDN File',
-    isDiscordCdn: true
-  };
-
-  if (extension) {
-    metadata.mediaType = detectDiscordMediaType(urlString);
-    if (metadata.mediaType === 'video') {
-      metadata.embedUrl = urlString;
-    }
-  }
-
-  // Check if file exists and get expiration info
   try {
-    const response = await fetch(urlString, { method: 'HEAD' });
-    if (!response.ok) {
-      metadata.error = `File not accessible: ${response.status} ${response.statusText}`;
-      metadata.isExpired = true;
-    }
-
-    const exParam = url.searchParams.get('ex');
-    if (exParam) {
-      try {
-        metadata.expiresAt = new Date(parseInt(exParam, 16) * 1000).toISOString();
-      } catch (error) {
-        console.error('Error parsing Discord expiration:', error);
-      }
-    }
+    const url = new URL(urlString);
+    const extension = url.pathname.split('.').pop()?.toLowerCase();
+    const mediaType = getMediaTypeFromExtension(extension);
+    
+    return {
+      title: url.pathname.split('/').pop() || urlString,
+      description: `Discord ${mediaType.toUpperCase()} file`,
+      mediaType,
+      previewUrl: urlString,
+      siteName: 'Discord',
+      embedUrl: mediaType === 'video' ? urlString : undefined,
+      embedHtml: mediaType === 'video' ? 
+        `<video controls width="100%" height="100%"><source src="${urlString}" type="video/${extension}"></video>` :
+        mediaType === 'image' ? 
+        `<img src="${urlString}" alt="Discord Image" style="max-width: 100%; height: auto;">` : undefined
+    };
   } catch (error) {
-    metadata.error = `Failed to access file: ${error.message}`;
-    metadata.isExpired = true;
+    console.error('Error handling Discord CDN URL:', error);
+    return {
+      error: error.message,
+      mediaType: 'rich'
+    };
   }
-
-  return metadata;
 }
 
 module.exports = {
@@ -324,5 +305,6 @@ module.exports = {
   extractMetaTags,
   getMediaTypeFromContentType,
   getMediaTypeFromExtension,
-  detectDiscordMediaType
+  detectDiscordMediaType,
+  handleDiscordCdn
 };
