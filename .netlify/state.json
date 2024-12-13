@@ -1,0 +1,20 @@
+{
+	"geolocation": {
+		"data": {
+			"city": "Hammel",
+			"country": {
+				"code": "DK",
+				"name": "Denmark"
+			},
+			"subdivision": {
+				"code": "82",
+				"name": "Central Jutland"
+			},
+			"timezone": "Europe/Copenhagen",
+			"latitude": 56.2602,
+			"longitude": 9.8655,
+			"postalCode": "8450"
+		},
+		"timestamp": 1734111462051
+	}
+}
