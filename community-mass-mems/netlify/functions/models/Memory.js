@@ -34,22 +34,31 @@ const memorySchema = new mongoose.Schema({
     default: Date.now
   },
   metadata: {
-    title: String,
-    description: String,
-    thumbnailUrl: String,
-    mediaType: String,
-    platform: String,
-    contentUrl: String,
-    fileType: String,
-    domain: String,
-    isSecure: Boolean,
-    createdAt: {
-      type: Date,
-      default: Date.now
+    basicInfo: {
+      title: String,
+      description: String,
+      thumbnailUrl: String,
+      mediaType: String,
+      platform: String,
+      contentUrl: String,
+      fileType: String,
+      domain: String,
+      isSecure: Boolean
     },
-    updatedAt: {
-      type: Date,
-      default: Date.now
+    embed: {
+      embedUrl: String,
+      embedHtml: String,
+      embedType: String
+    },
+    timestamps: {
+      createdAt: {
+        type: Date,
+        default: Date.now
+      },
+      updatedAt: {
+        type: Date,
+        default: Date.now
+      }
     },
     favicon: String,
     ogTitle: String,
@@ -83,8 +92,8 @@ const memorySchema = new mongoose.Schema({
     transform: function(doc, ret) {
       // Format dates as ISO strings
       if (ret.metadata) {
-        ret.metadata.createdAt = ret.metadata.createdAt ? new Date(ret.metadata.createdAt).toISOString() : null;
-        ret.metadata.updatedAt = ret.metadata.updatedAt ? new Date(ret.metadata.updatedAt).toISOString() : null;
+        ret.metadata.timestamps.createdAt = ret.metadata.timestamps.createdAt ? new Date(ret.metadata.timestamps.createdAt).toISOString() : null;
+        ret.metadata.timestamps.updatedAt = ret.metadata.timestamps.updatedAt ? new Date(ret.metadata.timestamps.updatedAt).toISOString() : null;
       }
       // Transform _id to id
       ret.id = ret._id.toString();
@@ -118,9 +127,9 @@ memorySchema.pre('save', function(next) {
       this.metadata = {};
     }
     if (this.isNew) {
-      this.metadata.createdAt = now;
+      this.metadata.timestamps.createdAt = now;
     }
-    this.metadata.updatedAt = now;
+    this.metadata.timestamps.updatedAt = now;
   }
   next();
 });

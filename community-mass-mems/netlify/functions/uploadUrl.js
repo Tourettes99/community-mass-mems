@@ -147,39 +147,59 @@ exports.handler = async (event, context) => {
 
         // Ensure all required metadata fields exist
         metadata = {
-          title: metadata.title || url,
-          description: metadata.description || '',
-          mediaType: metadata.mediaType || 'rich',
-          embedHtml: metadata.embedHtml || '',
-          previewUrl: metadata.previewUrl || metadata.ogImage || '',
-          favicon: metadata.favicon || '',
-          siteName: metadata.siteName || new URL(url).hostname,
-          author: metadata.author || '',
-          publishedDate: metadata.publishedDate || new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          basicInfo: {
+            title: metadata.title || url,
+            description: metadata.description || '',
+            mediaType: metadata.mediaType || 'rich',
+            thumbnailUrl: metadata.thumbnailUrl || metadata.previewUrl || metadata.ogImage || '',
+            platform: metadata.platform || new URL(url).hostname,
+            contentUrl: url,
+            fileType: metadata.fileType || '',
+            domain: new URL(url).hostname,
+            isSecure: url.startsWith('https')
+          },
+          embed: {
+            embedUrl: metadata.embedUrl || '',
+            embedHtml: metadata.embedHtml || '',
+            embedType: metadata.embedType || ''
+          },
+          timestamps: {
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
         };
       } catch (error) {
         console.error('Error fetching metadata:', error);
         // Use basic metadata if fetch fails
         metadata = {
-          title: url,
-          description: '',
-          mediaType: 'rich',
-          siteName: new URL(url).hostname,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          basicInfo: {
+            title: url,
+            description: '',
+            mediaType: 'rich',
+            platform: new URL(url).hostname,
+            contentUrl: url,
+            domain: new URL(url).hostname,
+            isSecure: url.startsWith('https')
+          },
+          timestamps: {
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
         };
       }
     } else {
       metadata = {
-        type: 'text',
-        format: 'text/plain',
-        title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
-        description: content,
-        mediaType: 'text',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        basicInfo: {
+          type: 'text',
+          format: 'text/plain',
+          title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
+          description: content,
+          mediaType: 'text'
+        },
+        timestamps: {
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
       };
     }
 

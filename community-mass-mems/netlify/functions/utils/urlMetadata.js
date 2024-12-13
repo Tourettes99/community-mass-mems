@@ -30,7 +30,16 @@ const PLATFORM_HANDLERS = {
       videoId,
       embedUrl: `https://www.youtube.com/embed/${videoId}`,
       thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      embedHtml: `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+      embedType: 'youtube',
+      embedHtml: `<iframe 
+        width="100%" 
+        height="100%" 
+        src="https://www.youtube.com/embed/${videoId}" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+        allowfullscreen
+        style="aspect-ratio: 16/9;"
+      ></iframe>`
     } : null;
   },
   'youtu.be': (url) => {
@@ -41,7 +50,16 @@ const PLATFORM_HANDLERS = {
       videoId,
       embedUrl: `https://www.youtube.com/embed/${videoId}`,
       thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      embedHtml: `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+      embedType: 'youtube',
+      embedHtml: `<iframe 
+        width="100%" 
+        height="100%" 
+        src="https://www.youtube.com/embed/${videoId}" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+        allowfullscreen
+        style="aspect-ratio: 16/9;"
+      ></iframe>`
     } : null;
   },
   'vimeo.com': (url) => {
