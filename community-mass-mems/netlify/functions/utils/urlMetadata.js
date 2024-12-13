@@ -9,10 +9,97 @@ const MEDIA_EXTENSIONS = {
   documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv', 'md', 'json']
 };
 
+// Platform specific handlers
+const PLATFORM_HANDLERS = {
+  'youtube.com': (url) => {
+    const videoId = url.searchParams.get('v');
+    return videoId ? {
+      platform: 'youtube',
+      mediaType: 'video',
+      videoId,
+      embedUrl: `https://www.youtube.com/embed/${videoId}`,
+      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+    } : null;
+  },
+  'youtu.be': (url) => {
+    const videoId = url.pathname.slice(1);
+    return videoId ? {
+      platform: 'youtube',
+      mediaType: 'video',
+      videoId,
+      embedUrl: `https://www.youtube.com/embed/${videoId}`,
+      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+    } : null;
+  },
+  'vimeo.com': (url) => {
+    const videoId = url.pathname.split('/').pop();
+    return videoId ? {
+      platform: 'vimeo',
+      mediaType: 'video',
+      videoId,
+      embedUrl: `https://player.vimeo.com/video/${videoId}`
+    } : null;
+  },
+  'twitter.com': (url) => {
+    const tweetId = url.pathname.match(/status\/(\d+)/)?.[1];
+    return tweetId ? {
+      platform: 'twitter',
+      mediaType: 'rich',
+      embedUrl: `https://platform.twitter.com/embed/Tweet.html?id=${tweetId}`
+    } : null;
+  },
+  'x.com': (url) => PLATFORM_HANDLERS['twitter.com'](url),
+  'reddit.com': (url) => {
+    const isPost = url.pathname.includes('/comments/');
+    const embedUrl = isPost
+      ? `https://www.redditmedia.com${url.pathname}?ref_source=embed&ref=share&embed=true`
+      : `${url.href}?ref_source=embed&ref=share&embed=true`;
+    return {
+      platform: 'reddit',
+      mediaType: 'rich',
+      embedUrl: embedUrl.replace('reddit.com', 'redditmedia.com')
+    };
+  },
+  'instagram.com': (url) => {
+    const match = url.pathname.match(/\/(p|reel|tv)\/([^\/\?]+)/);
+    return match ? {
+      platform: 'instagram',
+      mediaType: 'rich',
+      embedUrl: `https://www.instagram.com/p/${match[2]}/embed/`
+    } : null;
+  },
+  'tiktok.com': (url) => {
+    const videoId = url.pathname.split('/').pop()?.split('?')[0];
+    return videoId ? {
+      platform: 'tiktok',
+      mediaType: 'rich',
+      embedUrl: `https://www.tiktok.com/embed/${videoId}`
+    } : null;
+  },
+  'discord.com': (url) => {
+    const messageMatch = url.pathname.match(/channels\/(\d+)\/(\d+)\/(\d+)/);
+    const inviteMatch = url.pathname.match(/invite\/([a-zA-Z0-9-]+)/);
+    if (messageMatch) {
+      return {
+        platform: 'discord',
+        mediaType: 'rich',
+        embedUrl: `https://discord.com/embed?messageId=${messageMatch[3]}&channelId=${messageMatch[2]}&guildId=${messageMatch[1]}`
+      };
+    }
+    if (inviteMatch) {
+      return {
+        platform: 'discord',
+        mediaType: 'rich',
+        embedUrl: `https://discord.com/widget?id=${inviteMatch[1]}&theme=dark`
+      };
+    }
+    return null;
+  }
+};
+
 // Extract meta tags from HTML
 async function extractMetaTags(urlString) {
   try {
-    // Don't try to extract meta tags from media files or Discord CDN
     const url = new URL(urlString);
     const extension = url.pathname.split('.').pop()?.toLowerCase();
     const isDiscordCdn = url.hostname.includes('cdn.discordapp.com') || url.hostname.includes('media.discordapp.net');
@@ -26,11 +113,11 @@ async function extractMetaTags(urlString) {
         mediaType,
         previewUrl: urlString,
         siteName: isDiscordCdn ? 'Discord' : url.hostname,
-        embedHtml: mediaType === 'video' ? `<video controls src="${urlString}"></video>` :
-                  mediaType === 'audio' ? `<audio controls src="${urlString}"></audio>` : ''
+        embedUrl: mediaType === 'video' ? urlString : undefined
       };
     }
 
+    // Check if URL is accessible
     const response = await fetch(urlString, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -50,8 +137,7 @@ async function extractMetaTags(urlString) {
         mediaType,
         previewUrl: urlString,
         siteName: url.hostname,
-        embedHtml: mediaType === 'video' ? `<video controls src="${urlString}"></video>` :
-                  mediaType === 'audio' ? `<audio controls src="${urlString}"></audio>` : ''
+        embedUrl: mediaType === 'video' ? urlString : undefined
       };
     }
 
@@ -61,8 +147,7 @@ async function extractMetaTags(urlString) {
 
     // Get all meta tags
     const metaTags = {};
-    const tags = doc.querySelectorAll('meta');
-    tags.forEach(tag => {
+    doc.querySelectorAll('meta').forEach(tag => {
       const name = tag.getAttribute('name') || tag.getAttribute('property');
       const content = tag.getAttribute('content');
       if (name && content) {
@@ -70,19 +155,31 @@ async function extractMetaTags(urlString) {
       }
     });
 
-    // Get title
-    metaTags.title = doc.querySelector('title')?.textContent || '';
+    // Get OpenGraph data
+    const ogData = {
+      title: metaTags['og:title'],
+      description: metaTags['og:description'],
+      image: metaTags['og:image'],
+      type: metaTags['og:type'],
+      site_name: metaTags['og:site_name']
+    };
 
-    // Get description from meta description or first paragraph
-    if (!metaTags.description) {
-      metaTags.description = doc.querySelector('p')?.textContent || '';
-    }
+    // Get Twitter Card data
+    const twitterData = {
+      title: metaTags['twitter:title'],
+      description: metaTags['twitter:description'],
+      image: metaTags['twitter:image'],
+      card: metaTags['twitter:card']
+    };
 
-    // Get main content text
-    const bodyText = doc.body.textContent.replace(/\s+/g, ' ').trim();
-    metaTags.content = bodyText.slice(0, 1000); // First 1000 characters
-
-    return metaTags;
+    return {
+      title: ogData.title || twitterData.title || doc.title || '',
+      description: ogData.description || twitterData.description || metaTags.description || '',
+      previewUrl: ogData.image || twitterData.image || '',
+      mediaType: ogData.type === 'video' ? 'video' : 'rich',
+      siteName: ogData.site_name || url.hostname,
+      favicon: doc.querySelector('link[rel*="icon"]')?.href
+    };
   } catch (error) {
     console.error('Error extracting meta tags:', error);
     return {
@@ -117,11 +214,8 @@ function getMediaTypeFromExtension(extension) {
 
 // Helper function to detect Discord media type
 function detectDiscordMediaType(url) {
-  if (!url) return 'rich';
-  
   const extension = url.split('.').pop()?.toLowerCase();
-  if (!extension) return 'rich';
-
+  
   if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
     return 'image';
   } else if (['mp4', 'webm', 'mov'].includes(extension)) {
@@ -138,10 +232,9 @@ async function getUrlMetadata(urlString) {
   try {
     const url = new URL(urlString);
     const domain = url.hostname.replace('www.', '');
-    const extension = url.pathname.split('.').pop()?.toLowerCase();
     
     // Basic metadata
-    const metadata = {
+    let metadata = {
       url: urlString,
       domain,
       type: 'url',
@@ -150,135 +243,24 @@ async function getUrlMetadata(urlString) {
       updatedAt: new Date().toISOString()
     };
 
+    // Check for platform-specific handler
+    const platformHandler = PLATFORM_HANDLERS[domain];
+    if (platformHandler) {
+      const platformData = platformHandler(url);
+      if (platformData) {
+        metadata = { ...metadata, ...platformData };
+      }
+    }
+
     // Handle Discord CDN
     if (domain.includes('cdn.discordapp.com') || domain.includes('media.discordapp.net')) {
-      metadata.isDiscordCdn = true;
-      metadata.title = url.pathname.split('/').pop() || urlString;
-      metadata.description = 'Discord CDN File';
-      
-      // Handle media files
-      if (extension) {
-        if (MEDIA_EXTENSIONS.videos.includes(extension)) {
-          metadata.mediaType = 'video';
-          metadata.format = `video/${extension}`;
-        } else if (MEDIA_EXTENSIONS.images.includes(extension)) {
-          metadata.mediaType = 'image';
-          metadata.format = `image/${extension}`;
-        } else if (MEDIA_EXTENSIONS.audio.includes(extension)) {
-          metadata.mediaType = 'audio';
-          metadata.format = `audio/${extension}`;
-        }
-        
-        // Add expiration info from URL
-        const exParam = url.searchParams.get('ex');
-        if (exParam) {
-          try {
-            metadata.expiresAt = new Date(parseInt(exParam, 16) * 1000).toISOString();
-          } catch (error) {
-            console.error('Error parsing Discord expiration:', error);
-          }
-        }
-
-        // Check if file exists by doing a HEAD request
-        try {
-          const response = await fetch(urlString, { method: 'HEAD' });
-          if (!response.ok) {
-            metadata.error = `File not accessible: ${response.status} ${response.statusText}`;
-            metadata.isExpired = true;
-          }
-        } catch (error) {
-          metadata.error = `Failed to access file: ${error.message}`;
-          metadata.isExpired = true;
-        }
-      }
-
-      return metadata;
+      const discordData = await handleDiscordCdn(urlString);
+      metadata = { ...metadata, ...discordData };
     }
-    
-    // Handle YouTube
-    else if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-      metadata.platform = 'youtube';
-      metadata.type = 'video';
-      metadata.mediaType = 'video';
-      
-      const videoId = domain.includes('youtu.be') 
-        ? url.pathname.slice(1)
-        : url.searchParams.get('v');
-      
-      if (videoId) {
-        metadata.videoId = videoId;
-        metadata.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-        metadata.embedUrl = `https://www.youtube.com/embed/${videoId}`;
-        
-        try {
-          const response = await fetch(`https://www.youtube.com/oembed?url=${urlString}&format=json`);
-          if (response.ok) {
-            const data = await response.json();
-            metadata.title = data.title;
-            metadata.description = data.description;
-            metadata.width = data.width;
-            metadata.height = data.height;
-            metadata.author = data.author_name;
-            metadata.authorUrl = data.author_url;
-          }
-        } catch (error) {
-          console.error('Error fetching YouTube metadata:', error);
-          metadata.error = `Failed to fetch YouTube metadata: ${error.message}`;
-        }
-      }
-    }
-    
-    // Handle Vimeo
-    else if (domain.includes('vimeo.com')) {
-      metadata.platform = 'vimeo';
-      metadata.type = 'video';
-      metadata.mediaType = 'video';
-      
-      const videoId = url.pathname.split('/').pop();
-      if (videoId) {
-        metadata.videoId = videoId;
-        metadata.embedUrl = `https://player.vimeo.com/video/${videoId}`;
-        
-        try {
-          const response = await fetch(`https://vimeo.com/api/oembed.json?url=${urlString}`);
-          if (response.ok) {
-            const data = await response.json();
-            metadata.title = data.title;
-            metadata.description = data.description;
-            metadata.width = data.width;
-            metadata.height = data.height;
-            metadata.thumbnailUrl = data.thumbnail_url;
-            metadata.author = data.author_name;
-            metadata.authorUrl = data.author_url;
-          }
-        } catch (error) {
-          console.error('Error fetching Vimeo metadata:', error);
-          metadata.error = `Failed to fetch Vimeo metadata: ${error.message}`;
-        }
-      }
-    }
-    
-    // For all other URLs, fetch meta tags
-    else {
-      try {
-        const metaTags = await extractMetaTags(urlString);
-        metadata.metaTags = metaTags;
-        metadata.title = metaTags.title || metadata.title;
-        metadata.description = metaTags.description || metadata.description;
-        
-        // Set content rating if available
-        if (metaTags['rating'] || metaTags['content-rating']) {
-          metadata.contentRating = metaTags['rating'] || metaTags['content-rating'];
-        }
-        
-        // Set age restriction if available
-        if (metaTags['age-rating'] || metaTags['age-restriction']) {
-          metadata.ageRating = metaTags['age-rating'] || metaTags['age-restriction'];
-        }
-      } catch (error) {
-        console.error('Error fetching meta tags:', error);
-        metadata.error = `Failed to fetch meta tags: ${error.message}`;
-      }
+    // For all other URLs
+    else if (!metadata.mediaType) {
+      const metaTags = await extractMetaTags(urlString);
+      metadata = { ...metadata, ...metaTags };
     }
 
     return metadata;
@@ -292,6 +274,49 @@ async function getUrlMetadata(urlString) {
       description: `Failed to process URL: ${error.message}`
     };
   }
+}
+
+// Helper function to handle Discord CDN URLs
+async function handleDiscordCdn(urlString) {
+  const url = new URL(urlString);
+  const extension = url.pathname.split('.').pop()?.toLowerCase();
+  
+  const metadata = {
+    platform: 'discord',
+    title: url.pathname.split('/').pop() || urlString,
+    description: 'Discord CDN File',
+    isDiscordCdn: true
+  };
+
+  if (extension) {
+    metadata.mediaType = detectDiscordMediaType(urlString);
+    if (metadata.mediaType === 'video') {
+      metadata.embedUrl = urlString;
+    }
+  }
+
+  // Check if file exists and get expiration info
+  try {
+    const response = await fetch(urlString, { method: 'HEAD' });
+    if (!response.ok) {
+      metadata.error = `File not accessible: ${response.status} ${response.statusText}`;
+      metadata.isExpired = true;
+    }
+
+    const exParam = url.searchParams.get('ex');
+    if (exParam) {
+      try {
+        metadata.expiresAt = new Date(parseInt(exParam, 16) * 1000).toISOString();
+      } catch (error) {
+        console.error('Error parsing Discord expiration:', error);
+      }
+    }
+  } catch (error) {
+    metadata.error = `Failed to access file: ${error.message}`;
+    metadata.isExpired = true;
+  }
+
+  return metadata;
 }
 
 module.exports = {
