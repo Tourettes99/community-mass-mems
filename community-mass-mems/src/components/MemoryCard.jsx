@@ -65,9 +65,18 @@ const MemoryCard = ({ memory }) => {
         <Box
           sx={{
             position: 'relative',
-            paddingTop: '56.25%',
+            width: '100%',
+            height: '300px', // Fixed height for embeds
             bgcolor: 'background.default',
             overflow: 'hidden',
+            '& iframe': {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              border: 'none'
+            }
           }}
           dangerouslySetInnerHTML={{ __html: embedHtml }}
         />
