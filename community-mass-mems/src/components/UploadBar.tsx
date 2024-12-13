@@ -24,7 +24,7 @@ import { RAL_2005 } from '../theme';
 import { WeeklyStats } from '../types/Memory';
 
 interface UploadBarProps {
-  onUpload: (type: string, content: string, tags: string[]) => Promise<void>;
+  onUpload: (type: string, content: { url?: string; content?: string }, tags: string[]) => Promise<void>;
 }
 
 const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
