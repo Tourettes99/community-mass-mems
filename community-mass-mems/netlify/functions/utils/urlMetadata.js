@@ -120,7 +120,32 @@ async function extractMetaTags(urlString) {
       };
     }
 
-    // First try to get metadata using open-graph-scraper
+    // First try to get metadata using metascraper
+    try {
+      const response = await fetch(urlString);
+      const html = await response.text();
+      const metadata = await metascraper({ html, url: urlString });
+      
+      return {
+        title: metadata.title,
+        description: metadata.description,
+        previewUrl: metadata.image,
+        mediaType: 'article',
+        siteName: metadata.publisher || url.hostname,
+        author: metadata.author,
+        publishedDate: metadata.date,
+        embedHtml: `<div style="max-width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 8px;">
+          ${metadata.image ? `<img src="${metadata.image}" style="max-width: 100%; height: auto; margin-bottom: 16px;">` : ''}
+          <h3 style="margin: 0 0 8px 0;">${metadata.title || ''}</h3>
+          <p style="margin: 0 0 8px 0; color: #666;">${metadata.description || ''}</p>
+          <small style="color: #999;">${metadata.publisher || url.hostname}</small>
+        </div>`
+      };
+    } catch (error) {
+      console.warn('Failed to get metadata with metascraper:', error);
+    }
+
+    // Then try open-graph-scraper as fallback
     try {
       const { result } = await ogs({ url: urlString });
       if (result) {
@@ -144,31 +169,6 @@ async function extractMetaTags(urlString) {
       }
     } catch (error) {
       console.warn('Failed to get metadata with open-graph-scraper:', error);
-    }
-
-    // Then try metascraper as backup
-    try {
-      const response = await fetch(urlString);
-      const html = await response.text();
-      const metadata = await metascraper({ html, url: urlString });
-      
-      return {
-        title: metadata.title,
-        description: metadata.description,
-        previewUrl: metadata.image,
-        mediaType: 'article',
-        siteName: metadata.publisher || url.hostname,
-        author: metadata.author,
-        publishedDate: metadata.date,
-        embedHtml: `<div style="max-width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 8px;">
-          ${metadata.image ? `<img src="${metadata.image}" style="max-width: 100%; height: auto; margin-bottom: 16px;">` : ''}
-          <h3 style="margin: 0 0 8px 0;">${metadata.title || ''}</h3>
-          <p style="margin: 0 0 8px 0; color: #666;">${metadata.description || ''}</p>
-          <small style="color: #999;">${metadata.publisher || url.hostname}</small>
-        </div>`
-      };
-    } catch (error) {
-      console.warn('Failed to get metadata with metascraper:', error);
     }
 
     // Fallback to basic fetch and HTML parsing
