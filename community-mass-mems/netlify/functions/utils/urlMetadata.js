@@ -22,25 +22,62 @@ const MEDIA_EXTENSIONS = {
 
 // Platform specific handlers
 const PLATFORM_HANDLERS = {
-  'youtube.com': (url) => {
+  'youtube.com': async (url) => {
     const videoId = url.searchParams.get('v');
-    return videoId ? {
-      platform: 'youtube',
-      mediaType: 'video',
-      videoId,
-      embedUrl: `https://www.youtube.com/embed/${videoId}`,
-      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      embedType: 'youtube',
-      embedHtml: `<iframe 
-        width="100%" 
-        height="100%" 
-        src="https://www.youtube.com/embed/${videoId}" 
-        frameborder="0" 
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-        allowfullscreen
-        style="aspect-ratio: 16/9;"
-      ></iframe>`
-    } : null;
+    if (!videoId) return null;
+
+    try {
+      // Fetch YouTube page data
+      const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
+      const html = await response.text();
+      
+      // Use metascraper to get video metadata
+      const metadata = await metascraper({ html, url: url.href });
+      
+      return {
+        platform: 'youtube',
+        mediaType: 'video',
+        videoId,
+        title: metadata.title,
+        description: metadata.description,
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        embedUrl: `https://www.youtube.com/embed/${videoId}`,
+        embedType: 'youtube',
+        embedHtml: `<iframe 
+          width="100%" 
+          height="100%" 
+          src="https://www.youtube.com/embed/${videoId}" 
+          frameborder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowfullscreen
+          style="aspect-ratio: 16/9;"
+        ></iframe>`,
+        author: metadata.author,
+        publishedDate: metadata.date
+      };
+    } catch (error) {
+      console.error('Error fetching YouTube metadata:', error);
+      // Return basic metadata if scraping fails
+      return {
+        platform: 'youtube',
+        mediaType: 'video',
+        videoId,
+        title: 'YouTube Video',
+        description: '',
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        embedUrl: `https://www.youtube.com/embed/${videoId}`,
+        embedType: 'youtube',
+        embedHtml: `<iframe 
+          width="100%" 
+          height="100%" 
+          src="https://www.youtube.com/embed/${videoId}" 
+          frameborder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowfullscreen
+          style="aspect-ratio: 16/9;"
+        ></iframe>`
+      };
+    }
   },
   'youtu.be': (url) => {
     const videoId = url.pathname.slice(1);
@@ -244,48 +281,63 @@ function detectDiscordMediaType(url) {
 async function getUrlMetadata(urlString) {
   try {
     const url = new URL(urlString);
-    const domain = url.hostname.replace('www.', '');
     
-    // Basic metadata
-    let metadata = {
-      url: urlString,
-      domain,
-      type: 'url',
-      isSecure: url.protocol === 'https:',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    // Check for platform-specific handler
-    const platformHandler = PLATFORM_HANDLERS[domain];
-    if (platformHandler) {
-      const platformData = platformHandler(url);
-      if (platformData) {
-        metadata = { ...metadata, ...platformData };
+    // First check for platform-specific handlers
+    for (const [domain, handler] of Object.entries(PLATFORM_HANDLERS)) {
+      if (url.hostname.includes(domain)) {
+        const platformMetadata = await handler(url);
+        if (platformMetadata) {
+          return platformMetadata;
+        }
       }
     }
 
-    // Handle Discord CDN
-    if (domain.includes('cdn.discordapp.com') || domain.includes('media.discordapp.net')) {
-      const discordData = await handleDiscordCdn(urlString);
-      metadata = { ...metadata, ...discordData };
-    }
-    // For all other URLs
-    else if (!metadata.mediaType) {
-      const metaTags = await extractMetaTags(urlString);
-      metadata = { ...metadata, ...metaTags };
-    }
-
-    return metadata;
-  } catch (error) {
-    console.error('Error getting URL metadata:', error);
+    // If no platform handler or it failed, try general metadata scraping
+    const response = await fetch(urlString);
+    const html = await response.text();
+    
+    // Try metascraper first
+    const metadata = await metascraper({ html, url: urlString });
+    
+    // Then try open-graph-scraper as backup
+    const { result: ogsData } = await ogs({ html });
+    
+    // Combine metadata from both sources
     return {
-      url: urlString,
-      type: 'url',
-      error: error.message,
-      title: urlString,
-      description: `Failed to process URL: ${error.message}`,
-      mediaType: 'rich'
+      title: metadata.title || ogsData.ogTitle || url.hostname,
+      description: metadata.description || ogsData.ogDescription || '',
+      mediaType: metadata.video ? 'video' : 'rich',
+      thumbnailUrl: metadata.image || ogsData.ogImage?.url || '',
+      platform: url.hostname,
+      contentUrl: urlString,
+      embedUrl: metadata.video || ogsData.ogVideo?.url || '',
+      embedType: metadata.video ? 'video' : 'rich',
+      embedHtml: `<div class="embed-container">
+        ${metadata.image ? `<img src="${metadata.image}" style="max-width: 100%; height: auto;">` : ''}
+        <h3>${metadata.title || ''}</h3>
+        <p>${metadata.description || ''}</p>
+        <small>${metadata.publisher || url.hostname}</small>
+      </div>`,
+      author: metadata.author || ogsData.ogSiteName || '',
+      publishedDate: metadata.date || ogsData.ogPublishedTime || new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error in getUrlMetadata:', error);
+    // Return basic metadata if all scraping attempts fail
+    const url = new URL(urlString);
+    return {
+      title: url.hostname,
+      description: '',
+      mediaType: 'rich',
+      thumbnailUrl: '',
+      platform: url.hostname,
+      contentUrl: urlString,
+      embedUrl: '',
+      embedType: 'rich',
+      embedHtml: `<div class="embed-container">
+        <h3>${url.hostname}</h3>
+        <p>${urlString}</p>
+      </div>`
     };
   }
 }
