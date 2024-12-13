@@ -1,7 +1,8 @@
 [build]
-  base = "."
+  base = "community-mass-mems"
   command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
   publish = "build"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20.11.1"
@@ -16,10 +17,6 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  included_files = ["node_modules/**/*"]
-
-[functions."*"]
-  included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
   external_node_modules = [
     "sharp",
     "fluent-ffmpeg",
@@ -39,11 +36,11 @@
     "express",
     "path",
     "canvas",
-    "jsdom",
-    "fs",
-    "fs-extra",
-    "@netlify/blobs"
+    "jsdom"
   ]
+
+[functions."*"]
+  included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
 
 [[headers]]
   for = "/*"
@@ -84,11 +81,6 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
-
-[[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
 
 [[redirects]]
   from = "/api/*"
