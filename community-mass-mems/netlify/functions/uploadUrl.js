@@ -126,9 +126,42 @@ exports.handler = async (event, context) => {
     let metadata = {};
     if (type === 'url') {
       try {
+        // Validate URL format
+        const urlObj = new URL(url.trim());
+        if (!urlObj.protocol.startsWith('http')) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'Invalid URL protocol. Only HTTP(S) URLs are allowed.' })
+          };
+        }
+
         console.log('Fetching metadata for URL:', url);
         metadata = await getUrlMetadata(url.trim());
         
+        // Moderate URL and metadata content
+        const urlModeration = await groqModeration.moderateContent(url, 'url');
+        const contentModeration = await groqModeration.moderateContent(
+          `Title: ${metadata.basicInfo?.title || ''}\nDescription: ${metadata.basicInfo?.description || ''}`,
+          'text'
+        );
+
+        // Check moderation results
+        if (urlModeration.flagged || contentModeration.flagged) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({
+              error: 'Content moderation failed',
+              reason: urlModeration.flagged ? urlModeration.reason : contentModeration.reason,
+              scores: {
+                url: urlModeration.category_scores,
+                content: contentModeration.category_scores
+              }
+            })
+          };
+        }
+
         // Check if the URL is accessible
         if (metadata.error) {
           return {
@@ -227,122 +260,83 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Run content moderation
-    try {
-      console.log('Starting content moderation...');
-      await groqModeration.initialize();
-      console.log('Initialized groqModeration service');
-      
-      const contentToModerate = type === 'url' ? url : content;
-      console.log('Content to moderate:', contentToModerate);
-      console.log('Type:', type);
-      
-      const moderationResult = await groqModeration.moderateContent(contentToModerate, type);
-      console.log('Moderation result:', JSON.stringify(moderationResult, null, 2));
+    // Create memory document
+    const memory = {
+      type: type,
+      url: type === 'url' ? url.trim() : undefined,
+      content: type === 'text' ? content.trim() : undefined,
+      tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
+      status: 'pending',
+      metadata: metadata,  // Store the complete metadata object
+      votes: { up: 0, down: 0 },
+      userVotes: {},
+      submittedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-      // Connect to MongoDB using Mongoose
-      console.log('Connecting to MongoDB...');
-      await mongoose.connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 10000,
-        family: 4
-      });
-      console.log('Connected to MongoDB');
+    // Connect to MongoDB
+    client = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 10000,
+      family: 4
+    });
 
-      // Map moderation result to memory status
-      const status = moderationResult.flagged ? 'rejected' : 'approved';
-      console.log('Mapped status:', status);
+    const db = client.db('memories');
+    const collection = db.collection('memories');
 
-      // Create memory document
-      const memory = new Memory({
-        type: type,
-        url: type === 'url' ? url : undefined,
-        content: type === 'text' ? content : undefined,
-        tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-        status: status,
-        moderationResult: {
-          decision: status,
-          reason: moderationResult.reason,
-          categories: moderationResult.category_scores,
-          flagged: moderationResult.flagged,
-          category_scores: moderationResult.category_scores
-        },
-        metadata: {
-          ...metadata,
-          type: metadata.type || type,
-          mediaType: metadata.mediaType || 'rich',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        },
-        votes: { up: 0, down: 0 },
-        userVotes: {},
-        submittedAt: new Date()
-      });
+    // Perform moderation
+    const moderationResult = await groqModeration.moderateContent(
+      type === 'url' ? `${url}\n${metadata.basicInfo?.title || ''}\n${metadata.basicInfo?.description || ''}` : content,
+      type
+    );
 
-      // Save to database
-      await memory.save();
-      
-      // Send notification email
-      await emailNotification.sendModerationNotification(memory, moderationResult);
+    // Update memory with moderation result
+    memory.status = moderationResult.flagged ? 'rejected' : 'approved';
+    memory.moderationResult = {
+      flagged: moderationResult.flagged,
+      category_scores: moderationResult.category_scores,
+      reason: moderationResult.reason
+    };
 
-      // Return appropriate response based on moderation decision
-      if (moderationResult.flagged) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ 
-            message: 'Content rejected by moderation',
-            reason: moderationResult.reason || 'Content violates community guidelines',
-            details: {
-              categories: moderationResult.category_scores,
-              scores: Object.entries(moderationResult.category_scores)
-                .map(([category, score]) => `${category}: ${(score * 100).toFixed(1)}%`)
-                .join(', ')
-            },
-            id: memory._id
-          })
-        };
-      }
+    // Save to database
+    const result = await collection.insertOne(memory);
+    memory._id = result.insertedId;
 
+    // Send email notification
+    await emailNotification.sendModerationNotification(memory, moderationResult);
+
+    // Return appropriate response
+    if (moderationResult.flagged) {
       return {
-        statusCode: 200,
-        headers,
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
         body: JSON.stringify({
-          message: 'Content submitted successfully',
-          id: memory._id,
-          memory: {
-            ...memory.toObject(),
-            metadata: {
-              ...memory.metadata,
-              embedHtml: memory.metadata.embedHtml || '',
-              previewUrl: memory.metadata.previewUrl || memory.metadata.ogImage || '',
-              favicon: memory.metadata.favicon || '',
-              siteName: memory.metadata.siteName || new URL(url).hostname
-            }
-          }
+          message: 'Content rejected by moderation',
+          reason: moderationResult.reason,
+          category_scores: moderationResult.category_scores,
+          id: result.insertedId
         })
       };
-    } catch (error) {
-      console.error('Error:', error);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          message: 'Error submitting content',
-          error: error.message 
-        })
-      };
-    } finally {
-      // Clean up MongoDB connections
-      try {
-        await fileStorage.cleanup();
-      } catch (error) {
-        console.error('Error cleaning up file storage:', error);
-      }
-      await mongoose.disconnect();
     }
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({
+        message: 'Memory submitted successfully',
+        id: result.insertedId,
+        metadata: metadata  // Include metadata in response
+      })
+    };
   } catch (error) {
-    console.error('Error in main handler:', error);
+    console.error('Error:', error);
     console.error('Error stack:', error.stack);
     
     // Close MongoDB connection if it exists
@@ -357,5 +351,13 @@ exports.handler = async (event, context) => {
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
+  } finally {
+    // Clean up MongoDB connections
+    try {
+      await fileStorage.cleanup();
+    } catch (error) {
+      console.error('Error cleaning up file storage:', error);
+    }
+    await mongoose.disconnect();
   }
 };
