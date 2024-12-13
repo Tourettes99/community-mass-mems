@@ -35,14 +35,14 @@ function App() {
     }
   }, []);
 
-  const handleUpload = async (type: string, content: string, tags: string[]) => {
+  const handleUpload = async (type: string, content: { url?: string; content?: string }, tags: string[]) => {
     try {
       const response = await fetch('/.netlify/functions/uploadUrl', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ type, content, tags }),
+        body: JSON.stringify({ type, ...content, tags }),
       });
 
       const data = await response.json();

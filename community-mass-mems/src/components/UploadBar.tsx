@@ -75,7 +75,7 @@ const UploadBar: React.FC<UploadBarProps> = ({ onUpload }) => {
 
     try {
       const type = content.startsWith('http') ? 'url' : 'text';
-      await onUpload(type, content, tags);
+      await onUpload(type, type === 'url' ? { url: content } : { content }, tags);
       setContent('');
       setTags([]);
       setError(null);
