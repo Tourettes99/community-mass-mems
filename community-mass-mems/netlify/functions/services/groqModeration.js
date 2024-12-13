@@ -78,7 +78,8 @@ class GroqModerationService {
                   sexual: { type: "number" },
                   violence: { type: "number" },
                   self_harm: { type: "number" },
-                  spam: { type: "number" }
+                  spam: { type: "number" },
+                  malicious: { type: "number", description: "Score for potentially malicious URLs or content" }
                 }
               },
               reason: {
@@ -94,7 +95,11 @@ class GroqModerationService {
       const messages = [
         {
           role: "system",
-          content: `You are a content moderation assistant. Analyze the following ${type} content for inappropriate or harmful material. Consider hate speech, harassment, sexual content, violence, self-harm, and spam. Rate each category from 0 to 1, where 0 is safe and 1 is extreme violation. Be strict but fair in your assessment.`
+          content: `You are a content moderation assistant. Analyze the following ${type} content for inappropriate or harmful material. ${
+            type === 'url' ? 
+            'Pay special attention to the URL structure, domain reputation, and potential phishing or malicious indicators.' :
+            'Consider hate speech, harassment, sexual content, violence, self-harm, and spam.'
+          } Rate each category from 0 to 1, where 0 is safe and 1 is extreme violation. Be strict but fair in your assessment.`
         },
         {
           role: "user",
