@@ -13,8 +13,28 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-[[functions.external_node_modules]]
-  module = ["sharp", "fluent-ffmpeg", "mongodb-client-encryption", "bson", "aws4", "mongoose", "file-type", "image-size", "unfurl.js", "page-metadata-parser", "domino", "node-fetch", "busboy", "cors", "dotenv", "express", "path", "canvas", "jsdom"]
+[functions."*"]
+  external_node_modules = [
+    "sharp",
+    "fluent-ffmpeg",
+    "mongodb-client-encryption",
+    "bson",
+    "aws4",
+    "mongoose",
+    "file-type",
+    "image-size",
+    "unfurl.js",
+    "page-metadata-parser",
+    "domino",
+    "node-fetch",
+    "busboy",
+    "cors",
+    "dotenv",
+    "express",
+    "path",
+    "canvas",
+    "jsdom"
+  ]
 
 [[headers]]
   for = "/*"
