@@ -21,7 +21,8 @@ import {
 } from '@mui/icons-material';
 
 interface Memory {
-  id: string;
+  _id?: string;
+  id?: string;
   type: string;
   url?: string;
   content?: string;
@@ -58,6 +59,24 @@ interface MemoryCardProps {
   memory: Memory;
   selectedTags?: string[];
   onTagClick?: (tag: string) => void;
+}
+
+declare module 'react' {
+  interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
+    // Add custom attributes here
+    playsInline?: boolean;
+  }
+}
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      video: React.DetailedHTMLProps<React.VideoHTMLAttributes<HTMLVideoElement>, HTMLVideoElement>;
+      audio: React.DetailedHTMLProps<React.AudioHTMLAttributes<HTMLAudioElement>, HTMLAudioElement>;
+      source: React.DetailedHTMLProps<React.SourceHTMLAttributes<HTMLSourceElement>, HTMLSourceElement>;
+      img: React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
+    }
+  }
 }
 
 const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): React.ReactElement => {
