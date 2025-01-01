@@ -1,4 +1,4 @@
-import React, { useState, CSSProperties } from 'react';
+import React, { useState, CSSProperties, ReactElement } from 'react';
 import {
   Box,
   Typography,
@@ -33,7 +33,7 @@ declare module 'react' {
   }
 }
 
-const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.Element => {
+const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): ReactElement => {
   const [voteState, setVoteState] = useState({ up: false, down: false });
   const [voteCount, setVoteCount] = useState(memory.votes);
 
