@@ -59,13 +59,25 @@
         https://www.instagram.com
         https://player.vimeo.com
         https://w.soundcloud.com
-        https://open.spotify.com;
-      style-src 'self' 'unsafe-inline';
+        https://open.spotify.com
+        https://www.tiktok.com;
+      style-src 'self' 'unsafe-inline' 
+        https://fonts.googleapis.com
+        https://cdnjs.cloudflare.com
+        https://use.fontawesome.com;
+      font-src 'self' 
+        https://fonts.gstatic.com
+        https://cdnjs.cloudflare.com
+        https://use.fontawesome.com;
       script-src 'self' 'unsafe-inline' 'unsafe-eval'
         https://www.youtube.com
         https://s.ytimg.com
         https://platform.twitter.com
-        https://cdn.syndication.twimg.com;
+        https://cdn.syndication.twimg.com
+        https://connect.facebook.net
+        https://www.instagram.com
+        https://www.tiktok.com
+        https://cdnjs.cloudflare.com;
       connect-src 'self' 
         https://api.twitter.com
         https://syndication.twitter.com
@@ -76,6 +88,12 @@
         https://api.soundcloud.com
         https://open.spotify.com
         https://api.spotify.com
+        https://www.facebook.com
+        https://graph.facebook.com
+        https://www.instagram.com
+        https://api.instagram.com
+        https://www.tiktok.com
+        https://api.tiktok.com
         data: blob: http: https:;"""
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Referrer-Policy = "strict-origin-when-cross-origin"
