@@ -94,6 +94,11 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
     const { metadata } = memory;
     if (!metadata) return null;
 
+    const siteName = metadata.siteName || metadata.ogTitle || metadata.twitterTitle;
+    const author = metadata.author || metadata.authorUrl;
+    const description = metadata.description || metadata.ogDescription || metadata.twitterDescription;
+    const publishedDate = metadata.publishedDate || metadata.createdAt;
+
     return (
       <Stack 
         direction="row" 
@@ -108,27 +113,27 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
           flexWrap: 'wrap'
         }}
       >
-        {metadata.platform && (
+        {siteName && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <PublicIcon fontSize="small" color="action" />
             <Typography variant="body2" color="text.secondary">
-              {metadata.platform}
+              {siteName}
             </Typography>
           </Box>
         )}
-        {metadata.author && (
+        {author && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <PersonIcon fontSize="small" color="action" />
             <Typography variant="body2" color="text.secondary">
-              {metadata.author}
+              {author}
             </Typography>
           </Box>
         )}
-        {metadata.publishedDate && (
+        {publishedDate && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <ScheduleIcon fontSize="small" color="action" />
             <Typography variant="body2" color="text.secondary">
-              {new Date(metadata.publishedDate).toLocaleDateString()}
+              {new Date(publishedDate).toLocaleDateString()}
             </Typography>
           </Box>
         )}
@@ -138,13 +143,15 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
   const renderEmbed = () => {
     const { metadata } = memory;
-    if (!metadata?.embedHtml && !metadata?.thumbnailUrl) return null;
+    if (!metadata) return null;
 
     const mediaType = metadata.mediaType;
     const embedHtml = metadata.embedHtml;
-    const thumbnailUrl = metadata.thumbnailUrl;
+    const thumbnailUrl = metadata.thumbnailUrl || metadata.ogImage || metadata.twitterImage;
     const contentUrl = metadata.contentUrl;
     const platform = metadata.platform?.toLowerCase();
+    const title = metadata.title || metadata.ogTitle || metadata.twitterTitle;
+    const description = metadata.description || metadata.ogDescription || metadata.twitterDescription;
 
     const containerStyle = {
       position: 'relative' as const,
@@ -186,9 +193,14 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
             />
           </Box>
           <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)' }}>
-            <Typography variant="caption" color="text.secondary">
-              YouTube Video Player
+            <Typography variant="subtitle2" color="text.primary">
+              {title}
             </Typography>
+            {description && (
+              <Typography variant="caption" color="text.secondary">
+                {description}
+              </Typography>
+            )}
           </Box>
         </Paper>
       );
@@ -234,7 +246,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
         >
           <Box sx={{ p: 2, bgcolor: '#ff7700', color: 'white' }}>
             <Typography variant="subtitle2">
-              SoundCloud Track
+              {title || 'SoundCloud Track'}
             </Typography>
           </Box>
           <Box
@@ -262,6 +274,18 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
               dangerouslySetInnerHTML={{ __html: embedHtml }}
             />
           </Box>
+          {title && (
+            <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)' }}>
+              <Typography variant="subtitle2" color="text.primary">
+                {title}
+              </Typography>
+              {description && (
+                <Typography variant="caption" color="text.secondary">
+                  {description}
+                </Typography>
+              )}
+            </Box>
+          )}
         </Paper>
       );
     }
@@ -290,11 +314,15 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
                 onPause={() => setIsPlaying(false)}
               />
             </Box>
-            <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PlayArrowIcon color={isPlaying ? 'primary' : 'action'} />
-              <Typography variant="caption" color="text.secondary">
-                Video Player
+            <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)' }}>
+              <Typography variant="subtitle2" color="text.primary">
+                {title || 'Video'}
               </Typography>
+              {description && (
+                <Typography variant="caption" color="text.secondary">
+                  {description}
+                </Typography>
+              )}
             </Box>
           </Paper>
         );
@@ -317,7 +345,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
               </Avatar>
               <Box>
                 <Typography variant="subtitle2">
-                  {metadata.title || 'Audio Track'}
+                  {title || 'Audio Track'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {metadata.author || 'Unknown Artist'}
@@ -350,16 +378,23 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
             <Box sx={containerStyle}>
               <img
                 src={thumbnailUrl || contentUrl}
-                alt={metadata.title || 'Image'}
+                alt={title || 'Image'}
                 style={contentStyle}
                 loading="lazy"
               />
             </Box>
-            {metadata.image?.caption && (
+            {(title || description) && (
               <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)' }}>
-                <Typography variant="caption" color="text.secondary">
-                  {metadata.image.caption}
-                </Typography>
+                {title && (
+                  <Typography variant="subtitle2" color="text.primary">
+                    {title}
+                  </Typography>
+                )}
+                {description && (
+                  <Typography variant="caption" color="text.secondary">
+                    {description}
+                  </Typography>
+                )}
               </Box>
             )}
           </Paper>
@@ -380,11 +415,25 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
               <Box sx={containerStyle}>
                 <img
                   src={thumbnailUrl}
-                  alt={metadata.title || 'Preview'}
+                  alt={title || 'Preview'}
                   style={contentStyle}
                   loading="lazy"
                 />
               </Box>
+              {(title || description) && (
+                <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)' }}>
+                  {title && (
+                    <Typography variant="subtitle2" color="text.primary">
+                      {title}
+                    </Typography>
+                  )}
+                  {description && (
+                    <Typography variant="caption" color="text.secondary">
+                      {description}
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Paper>
           );
         }
@@ -395,6 +444,9 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
   const renderContent = () => {
     const { metadata } = memory;
     if (!metadata) return null;
+
+    const title = metadata.title || metadata.ogTitle || metadata.twitterTitle || memory.url;
+    const description = metadata.description || metadata.ogDescription || metadata.twitterDescription;
 
     return (
       <CardContent sx={{ p: 3 }}>
@@ -412,7 +464,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
             {getMediaIcon()}
           </Box>
           <Typography variant="h6" component="h2" noWrap>
-            {metadata.title || memory.url}
+            {title}
           </Typography>
         </Box>
 
@@ -420,7 +472,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
         {renderMetadata()}
 
         {/* Description */}
-        {metadata.description && (
+        {description && (
           <Typography
             variant="body2"
             color="text.secondary"
@@ -432,7 +484,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
               overflow: 'hidden'
             }}
           >
-            {metadata.description}
+            {description}
           </Typography>
         )}
 
