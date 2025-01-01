@@ -8,7 +8,9 @@ import {
   CardContent,
   Link,
   Tooltip,
-  CardActionArea
+  CardActionArea,
+  CardMedia,
+  Paper
 } from '@mui/material';
 import {
   ThumbUp as ThumbUpIcon,
@@ -18,7 +20,8 @@ import {
   Image as ImageIcon,
   VideoLibrary as VideoIcon,
   Article as ArticleIcon,
-  AudioFile as AudioIcon
+  AudioFile as AudioIcon,
+  OpenInNew as OpenInNewIcon
 } from '@mui/icons-material';
 import { Memory } from '../types/Memory';
 
@@ -81,6 +84,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
     const embedHtml = metadata.embedHtml;
     const thumbnailUrl = metadata.thumbnailUrl;
     const contentUrl = metadata.contentUrl;
+    const platform = metadata.platform?.toLowerCase();
 
     const containerStyle = {
       position: 'relative' as const,
@@ -88,7 +92,8 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
       paddingTop: '56.25%', // 16:9 aspect ratio
       backgroundColor: '#000',
       overflow: 'hidden',
-      borderRadius: 1
+      borderRadius: 1,
+      mb: 2
     };
 
     const contentStyle: CSSProperties = {
@@ -101,73 +106,184 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
       objectFit: 'contain'
     };
 
-    if (embedHtml) {
+    // Special handling for YouTube
+    if (platform === 'youtube' && embedHtml) {
       return (
-        <Box 
-          sx={containerStyle} 
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            overflow: 'hidden',
+            mb: 2
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Box sx={containerStyle}>
+            <Box
+              sx={contentStyle}
+              dangerouslySetInnerHTML={{ __html: embedHtml }}
+            />
+          </Box>
+        </Paper>
+      );
+    }
+
+    // Special handling for Twitter/X
+    if ((platform === 'twitter' || platform === 'x') && embedHtml) {
+      return (
+        <Paper 
+          elevation={0}
+          sx={{ 
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            p: 2,
+            mb: 2
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           <Box
-            sx={contentStyle}
             dangerouslySetInnerHTML={{ __html: embedHtml }}
           />
-        </Box>
+        </Paper>
+      );
+    }
+
+    // Special handling for SoundCloud
+    if (platform === 'soundcloud' && embedHtml) {
+      return (
+        <Paper 
+          elevation={0}
+          sx={{ 
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            overflow: 'hidden',
+            mb: 2
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Box
+            dangerouslySetInnerHTML={{ __html: embedHtml }}
+          />
+        </Paper>
+      );
+    }
+
+    if (embedHtml) {
+      return (
+        <Paper 
+          elevation={0}
+          sx={{ 
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            overflow: 'hidden',
+            mb: 2
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Box sx={containerStyle}>
+            <Box
+              sx={contentStyle}
+              dangerouslySetInnerHTML={{ __html: embedHtml }}
+            />
+          </Box>
+        </Paper>
       );
     }
 
     switch (mediaType) {
       case 'video':
         return (
-          <Box 
-            sx={containerStyle}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              overflow: 'hidden',
+              mb: 2
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <video
-              controls
-              playsInline
-              src={contentUrl}
-              style={contentStyle}
-              poster={thumbnailUrl}
-            />
-          </Box>
+            <Box sx={containerStyle}>
+              <video
+                controls
+                playsInline
+                src={contentUrl}
+                style={contentStyle}
+                poster={thumbnailUrl}
+              />
+            </Box>
+          </Paper>
         );
 
       case 'audio':
         return (
-          <Box 
-            sx={{ width: '100%', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              p: 2,
+              mb: 2
+            }}
             onClick={(e) => e.stopPropagation()}
           >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+              <AudioIcon color="primary" />
+              <Typography variant="subtitle2" color="text.secondary">
+                Audio Player
+              </Typography>
+            </Box>
             <audio controls style={{ width: '100%' }}>
               <source src={contentUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
-          </Box>
+          </Paper>
         );
 
       case 'image':
         return (
-          <Box sx={containerStyle}>
-            <img
-              src={thumbnailUrl || contentUrl}
-              alt={metadata.title || 'Image'}
-              style={contentStyle}
-              loading="lazy"
-            />
-          </Box>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              overflow: 'hidden',
+              mb: 2
+            }}
+          >
+            <Box sx={containerStyle}>
+              <img
+                src={thumbnailUrl || contentUrl}
+                alt={metadata.title || 'Image'}
+                style={contentStyle}
+                loading="lazy"
+              />
+            </Box>
+          </Paper>
         );
 
       default:
         if (thumbnailUrl) {
           return (
-            <Box sx={containerStyle}>
-              <img
-                src={thumbnailUrl}
-                alt={metadata.title || 'Preview'}
-                style={contentStyle}
-                loading="lazy"
-              />
-            </Box>
+            <Paper 
+              elevation={0}
+              sx={{ 
+                bgcolor: 'background.paper',
+                borderRadius: 2,
+                overflow: 'hidden',
+                mb: 2
+              }}
+            >
+              <Box sx={containerStyle}>
+                <img
+                  src={thumbnailUrl}
+                  alt={metadata.title || 'Preview'}
+                  style={contentStyle}
+                  loading="lazy"
+                />
+              </Box>
+            </Paper>
           );
         }
         return null;
@@ -179,10 +295,20 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
     if (!metadata) return null;
 
     return (
-      <CardContent>
+      <CardContent sx={{ p: 3 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-          {getMediaIcon()}
+          <Box sx={{ 
+            bgcolor: 'primary.main', 
+            color: 'primary.contrastText',
+            p: 1,
+            borderRadius: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            {getMediaIcon()}
+          </Box>
           <Typography variant="h6" component="h2" noWrap>
             {metadata.title || memory.url}
           </Typography>
@@ -190,9 +316,11 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
         {/* Platform info */}
         {metadata.platform && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {metadata.platform}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              From {metadata.platform}
+            </Typography>
+          </Box>
         )}
 
         {/* Description */}
@@ -218,7 +346,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
         {/* Tags */}
         {memory.tags && memory.tags.length > 0 && (
           <Box 
-            sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}
+            sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}
             onClick={(e) => e.stopPropagation()}
           >
             {memory.tags.map((tag) => (
@@ -243,35 +371,41 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
           </Box>
         )}
 
-        {/* Voting */}
+        {/* Footer */}
         <Box 
-          sx={{ mt: 2, display: 'flex', gap: 1, alignItems: 'center' }}
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mt: 2,
+            pt: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider'
+          }}
           onClick={(e) => e.stopPropagation()}
         >
-          <IconButton
-            size="small"
-            color={voteState.up ? 'primary' : 'default'}
-            onClick={(e) => handleVote('up', e)}
-          >
-            <ThumbUpIcon fontSize="small" />
-          </IconButton>
-          <Typography variant="body2">{voteCount.up}</Typography>
+          {/* Voting */}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              color={voteState.up ? 'primary' : 'default'}
+              onClick={(e) => handleVote('up', e)}
+            >
+              <ThumbUpIcon fontSize="small" />
+            </IconButton>
+            <Typography variant="body2">{voteCount.up}</Typography>
 
-          <IconButton
-            size="small"
-            color={voteState.down ? 'primary' : 'default'}
-            onClick={(e) => handleVote('down', e)}
-          >
-            <ThumbDownIcon fontSize="small" />
-          </IconButton>
-          <Typography variant="body2">{voteCount.down}</Typography>
-        </Box>
+            <IconButton
+              size="small"
+              color={voteState.down ? 'primary' : 'default'}
+              onClick={(e) => handleVote('down', e)}
+            >
+              <ThumbDownIcon fontSize="small" />
+            </IconButton>
+            <Typography variant="body2">{voteCount.down}</Typography>
+          </Box>
 
-        {/* Visit Link Button */}
-        <Box 
-          sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}
-          onClick={(e) => e.stopPropagation()}
-        >
+          {/* Visit Link Button */}
           <Link
             href={memory.url}
             target="_blank"
@@ -287,7 +421,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
               }
             }}
           >
-            <LinkIcon fontSize="small" />
+            <OpenInNewIcon fontSize="small" />
             <Typography variant="body2">Visit Site</Typography>
           </Link>
         </Box>
@@ -296,8 +430,19 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
   };
 
   return (
-    <Card>
-      <CardActionArea>
+    <Card 
+      sx={{ 
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: 2,
+        '&:hover': {
+          boxShadow: 6
+        },
+        transition: 'box-shadow 0.2s'
+      }}
+    >
+      <CardActionArea sx={{ flexGrow: 1 }}>
         {renderContent()}
       </CardActionArea>
     </Card>
