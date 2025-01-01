@@ -10,7 +10,10 @@ import {
   Tooltip,
   CardActionArea,
   CardMedia,
-  Paper
+  Paper,
+  Avatar,
+  Stack,
+  Divider
 } from '@mui/material';
 import {
   ThumbUp as ThumbUpIcon,
@@ -21,7 +24,11 @@ import {
   VideoLibrary as VideoIcon,
   Article as ArticleIcon,
   AudioFile as AudioIcon,
-  OpenInNew as OpenInNewIcon
+  OpenInNew as OpenInNewIcon,
+  PlayArrow as PlayArrowIcon,
+  Schedule as ScheduleIcon,
+  Person as PersonIcon,
+  Public as PublicIcon
 } from '@mui/icons-material';
 import { Memory } from '../types/Memory';
 
@@ -40,6 +47,7 @@ declare module 'react' {
 const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): ReactElement => {
   const [voteState, setVoteState] = useState({ up: false, down: false });
   const [voteCount, setVoteCount] = useState(memory.votes);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const handleVote = (type: 'up' | 'down', event: React.MouseEvent) => {
     event.preventDefault();
@@ -62,18 +70,70 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
   const getMediaIcon = () => {
     const mediaType = memory.metadata?.mediaType;
+    const platform = memory.metadata?.platform?.toLowerCase();
+
+    if (platform === 'youtube') return <YouTubeIcon sx={{ color: 'red' }} />;
+    if (platform === 'soundcloud') return <AudioIcon sx={{ color: '#ff7700' }} />;
+    if (platform === 'twitter' || platform === 'x') return <img src="/x-logo.png" alt="X" style={{ width: 24, height: 24 }} />;
+
     switch (mediaType) {
       case 'image':
-        return <ImageIcon />;
+        return <ImageIcon color="primary" />;
       case 'video':
-        return <VideoIcon />;
+        return <VideoIcon color="secondary" />;
       case 'audio':
-        return <AudioIcon />;
+        return <AudioIcon color="success" />;
       case 'article':
-        return <ArticleIcon />;
+        return <ArticleIcon color="info" />;
       default:
         return <LinkIcon />;
     }
+  };
+
+  const renderMetadata = () => {
+    const { metadata } = memory;
+    if (!metadata) return null;
+
+    return (
+      <Stack 
+        direction="row" 
+        spacing={2} 
+        divider={<Divider orientation="vertical" flexItem />}
+        sx={{ 
+          mb: 2, 
+          px: 2, 
+          py: 1, 
+          bgcolor: 'background.paper',
+          borderRadius: 1,
+          flexWrap: 'wrap'
+        }}
+      >
+        {metadata.platform && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PublicIcon fontSize="small" color="action" />
+            <Typography variant="body2" color="text.secondary">
+              {metadata.platform}
+            </Typography>
+          </Box>
+        )}
+        {metadata.author && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PersonIcon fontSize="small" color="action" />
+            <Typography variant="body2" color="text.secondary">
+              {metadata.author}
+            </Typography>
+          </Box>
+        )}
+        {metadata.publishedDate && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ScheduleIcon fontSize="small" color="action" />
+            <Typography variant="body2" color="text.secondary">
+              {new Date(metadata.publishedDate).toLocaleDateString()}
+            </Typography>
+          </Box>
+        )}
+      </Stack>
+    );
   };
 
   const renderEmbed = () => {
@@ -125,6 +185,11 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
               dangerouslySetInnerHTML={{ __html: embedHtml }}
             />
           </Box>
+          <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)' }}>
+            <Typography variant="caption" color="text.secondary">
+              YouTube Video Player
+            </Typography>
+          </Box>
         </Paper>
       );
     }
@@ -142,6 +207,11 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Tweet from {metadata.author || 'Twitter'}
+            </Typography>
+          </Box>
           <Box
             dangerouslySetInnerHTML={{ __html: embedHtml }}
           />
@@ -162,6 +232,11 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          <Box sx={{ p: 2, bgcolor: '#ff7700', color: 'white' }}>
+            <Typography variant="subtitle2">
+              SoundCloud Track
+            </Typography>
+          </Box>
           <Box
             dangerouslySetInnerHTML={{ __html: embedHtml }}
           />
@@ -211,7 +286,15 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
                 src={contentUrl}
                 style={contentStyle}
                 poster={thumbnailUrl}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
               />
+            </Box>
+            <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PlayArrowIcon color={isPlaying ? 'primary' : 'action'} />
+              <Typography variant="caption" color="text.secondary">
+                Video Player
+              </Typography>
             </Box>
           </Paper>
         );
@@ -229,12 +312,24 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
             onClick={(e) => e.stopPropagation()}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-              <AudioIcon color="primary" />
-              <Typography variant="subtitle2" color="text.secondary">
-                Audio Player
-              </Typography>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <AudioIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle2">
+                  {metadata.title || 'Audio Track'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {metadata.author || 'Unknown Artist'}
+                </Typography>
+              </Box>
             </Box>
-            <audio controls style={{ width: '100%' }}>
+            <audio 
+              controls 
+              style={{ width: '100%' }}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+            >
               <source src={contentUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
@@ -260,6 +355,13 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
                 loading="lazy"
               />
             </Box>
+            {metadata.image?.caption && (
+              <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.03)' }}>
+                <Typography variant="caption" color="text.secondary">
+                  {metadata.image.caption}
+                </Typography>
+              </Box>
+            )}
           </Paper>
         );
 
@@ -314,14 +416,8 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
           </Typography>
         </Box>
 
-        {/* Platform info */}
-        {metadata.platform && (
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              From {metadata.platform}
-            </Typography>
-          </Box>
-        )}
+        {/* Metadata */}
+        {renderMetadata()}
 
         {/* Description */}
         {metadata.description && (
