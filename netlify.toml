@@ -41,6 +41,12 @@
 
 [functions."*"]
   included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
+  node_bundler = "esbuild"
+  external_node_modules = ["sharp", "canvas"]
+
+[functions.uploadUrl]
+  included_files = ["node_modules/**/*"]
+  external_node_modules = ["sharp", "canvas", "node-fetch", "mongoose"]
 
 [[headers]]
   for = "/*"
@@ -118,3 +124,5 @@
   ONEDRIVE_FOLDER_ID = "OneDrive folder ID for storing files"
   EMAIL_USER = "Email address for notifications"
   EMAIL_PASSWORD = "Email password for notifications"
+  MONGODB_URI = "Your MongoDB connection string"
+  GROQ_API_KEY = "Your GROQ API key for content moderation"

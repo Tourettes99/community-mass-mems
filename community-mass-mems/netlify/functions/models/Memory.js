@@ -4,12 +4,12 @@ const memorySchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['url', 'text', 'image', 'video', 'audio', 'document']
+    enum: ['url', 'text', 'image', 'video', 'audio']
   },
   url: {
     type: String,
     required: function() {
-      return this.type === 'url' || this.type === 'image' || this.type === 'video' || this.type === 'audio' || this.type === 'document';
+      return this.type === 'url' || this.type === 'image' || this.type === 'video' || this.type === 'audio';
     }
   },
   content: {
@@ -18,27 +18,12 @@ const memorySchema = new mongoose.Schema({
       return this.type === 'text';
     }
   },
-  tags: {
-    type: [String],
-    default: []
-  },
-  status: {
-    type: String,
-    required: true,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
-  },
-  submittedAt: {
-    type: Date,
-    required: true,
-    default: Date.now
-  },
   metadata: {
     basicInfo: {
       title: String,
       description: String,
-      thumbnailUrl: String,
       mediaType: String,
+      thumbnailUrl: String,
       platform: String,
       contentUrl: String,
       fileType: String,
@@ -51,34 +36,19 @@ const memorySchema = new mongoose.Schema({
       embedType: String
     },
     timestamps: {
-      createdAt: {
-        type: Date,
-        default: Date.now
-      },
-      updatedAt: {
-        type: Date,
-        default: Date.now
-      }
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
     },
-    favicon: String,
-    ogTitle: String,
-    ogDescription: String,
-    ogImage: String,
-    ogType: String,
-    twitterTitle: String,
-    twitterDescription: String,
-    twitterImage: String,
-    twitterCard: String
+    tags: [String]
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
   },
   votes: {
-    up: {
-      type: Number,
-      default: 0
-    },
-    down: {
-      type: Number,
-      default: 0
-    }
+    up: { type: Number, default: 0 },
+    down: { type: Number, default: 0 }
   },
   userVotes: {
     type: Map,
@@ -87,52 +57,14 @@ const memorySchema = new mongoose.Schema({
   }
 }, {
   timestamps: true,
-  toJSON: {
-    virtuals: true,
-    transform: function(doc, ret) {
-      // Format dates as ISO strings
-      if (ret.metadata) {
-        ret.metadata.timestamps.createdAt = ret.metadata.timestamps.createdAt ? new Date(ret.metadata.timestamps.createdAt).toISOString() : null;
-        ret.metadata.timestamps.updatedAt = ret.metadata.timestamps.updatedAt ? new Date(ret.metadata.timestamps.updatedAt).toISOString() : null;
-      }
-      // Transform _id to id
-      ret.id = ret._id.toString();
-      delete ret._id;
-      // Remove MongoDB-specific fields
-      delete ret.__v;
-      // Convert userVotes Map to object for JSON
-      if (ret.userVotes instanceof Map) {
-        ret.userVotes = Object.fromEntries(ret.userVotes);
-      }
-      return ret;
-    }
-  },
-  toObject: {
-    virtuals: true,
-    transform: function(doc, ret) {
-      ret.id = ret._id.toString();
-      if (!(ret.userVotes instanceof Map)) {
-        ret.userVotes = new Map(Object.entries(ret.userVotes || {}));
-      }
-      return ret;
-    }
-  }
+  versionKey: false
 });
 
-// Update metadata timestamps before saving
-memorySchema.pre('save', function(next) {
-  if (this.isModified()) {
-    const now = new Date();
-    if (!this.metadata) {
-      this.metadata = {};
-    }
-    if (this.isNew) {
-      this.metadata.timestamps.createdAt = now;
-    }
-    this.metadata.timestamps.updatedAt = now;
-  }
-  next();
-});
+// Add indexes
+memorySchema.index({ type: 1 });
+memorySchema.index({ status: 1 });
+memorySchema.index({ 'metadata.tags': 1 });
+memorySchema.index({ createdAt: -1 });
 
 const Memory = mongoose.model('Memory', memorySchema);
 
