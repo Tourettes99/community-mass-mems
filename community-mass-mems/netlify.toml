@@ -1,51 +1,25 @@
 [build]
   base = "community-mass-mems"
-  command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
+  command = "npm install && npm run build"
   publish = "build"
-  functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "20.11.1"
-  NPM_VERSION = "10.2.4"
+  NODE_VERSION = "18.17.0"
+  NPM_VERSION = "9.0.0"
   CI = "false"
-  NODE_ENV = "production"
-  NETLIFY = "true"
-
-[[plugins]]
-  package = "@netlify/plugin-functions-install-core"
+  DISABLE_ESLINT_PLUGIN = "true"
 
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = [
-    "sharp",
-    "fluent-ffmpeg",
-    "mongodb-client-encryption",
-    "bson",
-    "aws4",
-    "mongoose",
-    "file-type",
-    "image-size",
-    "unfurl.js",
-    "page-metadata-parser",
-    "domino",
-    "node-fetch",
-    "busboy",
-    "cors",
-    "dotenv",
-    "express",
-    "path",
-    "canvas",
-    "jsdom"
-  ]
 
-[functions."*"]
-  included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
+[[functions.external_node_modules]]
+  module = ["sharp", "fluent-ffmpeg", "mongodb-client-encryption", "bson", "aws4", "mongoose", "file-type", "image-size", "unfurl.js", "page-metadata-parser", "domino", "node-fetch", "busboy", "cors", "dotenv", "express", "path", "canvas", "jsdom"]
 
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = """
+    Content-Security-Policy = '''
       default-src 'self';
       img-src 'self' data: blob: http: https: *.tiktokcdn.com *.fbcdn.net;
       media-src 'self' data: blob: http: https: *.tiktokcdn.com;
@@ -76,7 +50,8 @@
         https://api.soundcloud.com
         https://open.spotify.com
         https://api.spotify.com
-        data: blob: http: https:;"""
+        data: blob: http: https:;
+    '''
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
