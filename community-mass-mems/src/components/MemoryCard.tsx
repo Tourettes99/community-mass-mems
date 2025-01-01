@@ -27,7 +27,13 @@ interface MemoryCardProps {
   onTagClick?: (tag: string) => void;
 }
 
-const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): React.ReactElement => {
+declare module 'react' {
+  interface HTMLAttributes<T> {
+    playsInline?: boolean;
+  }
+}
+
+const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.Element => {
   const [voteState, setVoteState] = useState({ up: false, down: false });
   const [voteCount, setVoteCount] = useState(memory.votes);
 
@@ -104,7 +110,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
         return (
           <Box sx={{ width: '100%', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
             <audio controls style={{ width: '100%' }}>
-              <source src={contentUrl} />
+              <source src={contentUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
           </Box>

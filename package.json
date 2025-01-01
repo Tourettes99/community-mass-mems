@@ -11,6 +11,7 @@
     "@chakra-ui/react": "3.2.3",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@mui/icons-material": "^5.16.7",
     "@mui/material": "^5.16.7",
     "@netlify/blobs": "8.1.0",
@@ -22,8 +23,6 @@
     "@types/date-fns": "^2.5.3",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.18.119",
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
     "@types/react-helmet": "6.1.11",
     "ajv": "8.0.0",
     "ajv-keywords": "5.0.0",
@@ -72,8 +71,7 @@
     "wavesurfer.js": "^7.3.2",
     "web-vitals": "^2.1.4",
     "yargs": "17.7.2",
-    "zustand": "^4.4.1",
-    "@microsoft/microsoft-graph-client": "^3.0.7"
+    "zustand": "^4.4.1"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -100,6 +98,8 @@
     ]
   },
   "devDependencies": {
+    "@types/react": "19.0.2",
+    "@types/react-dom": "19.0.2",
     "sharp": "^0.33.5"
   }
 }
