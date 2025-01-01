@@ -7,7 +7,8 @@ import {
   Card,
   CardContent,
   Link,
-  Tooltip
+  Tooltip,
+  CardActionArea
 } from '@mui/material';
 import {
   ThumbUp as ThumbUpIcon,
@@ -36,6 +37,25 @@ declare module 'react' {
 const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): ReactElement => {
   const [voteState, setVoteState] = useState({ up: false, down: false });
   const [voteCount, setVoteCount] = useState(memory.votes);
+
+  const handleVote = (type: 'up' | 'down', event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (type === 'up') {
+      setVoteState({ up: !voteState.up, down: false });
+      setVoteCount({
+        up: voteCount.up + (voteState.up ? -1 : 1),
+        down: voteCount.down
+      });
+    } else {
+      setVoteState({ up: false, down: !voteState.down });
+      setVoteCount({
+        up: voteCount.up,
+        down: voteCount.down + (voteState.down ? -1 : 1)
+      });
+    }
+  };
 
   const getMediaIcon = () => {
     const mediaType = memory.metadata?.mediaType;
@@ -83,7 +103,10 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
     if (embedHtml) {
       return (
-        <Box sx={containerStyle}>
+        <Box 
+          sx={containerStyle} 
+          onClick={(e) => e.stopPropagation()}
+        >
           <Box
             sx={contentStyle}
             dangerouslySetInnerHTML={{ __html: embedHtml }}
@@ -95,7 +118,10 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
     switch (mediaType) {
       case 'video':
         return (
-          <Box sx={containerStyle}>
+          <Box 
+            sx={containerStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
             <video
               controls
               playsInline
@@ -108,7 +134,10 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
       case 'audio':
         return (
-          <Box sx={{ width: '100%', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+          <Box 
+            sx={{ width: '100%', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <audio controls style={{ width: '100%' }}>
               <source src={contentUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
@@ -188,13 +217,20 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
         {/* Tags */}
         {memory.tags && memory.tags.length > 0 && (
-          <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Box 
+            sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {memory.tags.map((tag) => (
               <Chip
                 key={tag}
                 label={tag}
                 size="small"
-                onClick={() => onTagClick?.(tag)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTagClick?.(tag);
+                }}
                 sx={{
                   bgcolor: selectedTags?.includes(tag) ? 'primary.main' : 'background.default',
                   color: selectedTags?.includes(tag) ? 'primary.contrastText' : 'text.primary',
@@ -208,17 +244,14 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
         )}
 
         {/* Voting */}
-        <Box sx={{ mt: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+        <Box 
+          sx={{ mt: 2, display: 'flex', gap: 1, alignItems: 'center' }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <IconButton
             size="small"
             color={voteState.up ? 'primary' : 'default'}
-            onClick={() => {
-              setVoteState({ up: !voteState.up, down: false });
-              setVoteCount({
-                up: voteCount.up + (voteState.up ? -1 : 1),
-                down: voteCount.down
-              });
-            }}
+            onClick={(e) => handleVote('up', e)}
           >
             <ThumbUpIcon fontSize="small" />
           </IconButton>
@@ -227,17 +260,36 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
           <IconButton
             size="small"
             color={voteState.down ? 'primary' : 'default'}
-            onClick={() => {
-              setVoteState({ up: false, down: !voteState.down });
-              setVoteCount({
-                up: voteCount.up,
-                down: voteCount.down + (voteState.down ? -1 : 1)
-              });
-            }}
+            onClick={(e) => handleVote('down', e)}
           >
             <ThumbDownIcon fontSize="small" />
           </IconButton>
           <Typography variant="body2">{voteCount.down}</Typography>
+        </Box>
+
+        {/* Visit Link Button */}
+        <Box 
+          sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Link
+            href={memory.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="none"
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              color: 'primary.main',
+              '&:hover': {
+                color: 'primary.dark'
+              }
+            }}
+          >
+            <LinkIcon fontSize="small" />
+            <Typography variant="body2">Visit Site</Typography>
+          </Link>
         </Box>
       </CardContent>
     );
@@ -245,15 +297,9 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
   return (
     <Card>
-      <Link
-        href={memory.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        underline="none"
-        color="inherit"
-      >
+      <CardActionArea>
         {renderContent()}
-      </Link>
+      </CardActionArea>
     </Card>
   );
 };
