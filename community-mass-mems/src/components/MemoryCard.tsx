@@ -19,41 +19,7 @@ import {
   Article as ArticleIcon,
   AudioFile as AudioIcon
 } from '@mui/icons-material';
-
-interface Memory {
-  _id?: string;
-  id?: string;
-  type: string;
-  url?: string;
-  content?: string;
-  metadata: {
-    basicInfo: {
-      title: string;
-      description: string;
-      mediaType: string;
-      thumbnailUrl: string;
-      platform: string;
-      contentUrl: string;
-      fileType?: string;
-      domain?: string;
-      isSecure?: boolean;
-    };
-    embed: {
-      embedUrl?: string;
-      embedHtml?: string;
-      embedType?: string;
-    };
-    timestamps: {
-      createdAt: string;
-      updatedAt: string;
-    };
-    tags: string[];
-  };
-  votes: {
-    up: number;
-    down: number;
-  };
-}
+import { Memory } from '../types/Memory';
 
 interface MemoryCardProps {
   memory: Memory;
@@ -61,30 +27,12 @@ interface MemoryCardProps {
   onTagClick?: (tag: string) => void;
 }
 
-declare module 'react' {
-  interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
-    // Add custom attributes here
-    playsInline?: boolean;
-  }
-}
-
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      video: React.DetailedHTMLProps<React.VideoHTMLAttributes<HTMLVideoElement>, HTMLVideoElement>;
-      audio: React.DetailedHTMLProps<React.AudioHTMLAttributes<HTMLAudioElement>, HTMLAudioElement>;
-      source: React.DetailedHTMLProps<React.SourceHTMLAttributes<HTMLSourceElement>, HTMLSourceElement>;
-      img: React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
-    }
-  }
-}
-
 const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): React.ReactElement => {
   const [voteState, setVoteState] = useState({ up: false, down: false });
   const [voteCount, setVoteCount] = useState(memory.votes);
 
   const getMediaIcon = () => {
-    const mediaType = memory.metadata?.basicInfo?.mediaType;
+    const mediaType = memory.metadata?.mediaType;
     switch (mediaType) {
       case 'image':
         return <ImageIcon />;
@@ -101,12 +49,12 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
 
   const renderEmbed = () => {
     const { metadata } = memory;
-    if (!metadata?.embed?.embedHtml && !metadata?.basicInfo?.thumbnailUrl) return null;
+    if (!metadata?.embedHtml && !metadata?.thumbnailUrl) return null;
 
-    const mediaType = metadata.basicInfo.mediaType;
-    const embedHtml = metadata.embed.embedHtml;
-    const thumbnailUrl = metadata.basicInfo.thumbnailUrl;
-    const contentUrl = metadata.basicInfo.contentUrl;
+    const mediaType = metadata.mediaType;
+    const embedHtml = metadata.embedHtml;
+    const thumbnailUrl = metadata.thumbnailUrl;
+    const contentUrl = metadata.contentUrl;
 
     const containerStyle = {
       position: 'relative' as const,
@@ -167,7 +115,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
           <Box sx={containerStyle}>
             <img
               src={thumbnailUrl || contentUrl}
-              alt={metadata.basicInfo.title || 'Image'}
+              alt={metadata.title || 'Image'}
               style={contentStyle}
               loading="lazy"
             />
@@ -180,7 +128,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
             <Box sx={containerStyle}>
               <img
                 src={thumbnailUrl}
-                alt={metadata.basicInfo.title || 'Preview'}
+                alt={metadata.title || 'Preview'}
                 style={contentStyle}
                 loading="lazy"
               />
@@ -201,19 +149,19 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
           {getMediaIcon()}
           <Typography variant="h6" component="h2" noWrap>
-            {metadata.basicInfo.title || memory.url}
+            {metadata.title || memory.url}
           </Typography>
         </Box>
 
         {/* Platform info */}
-        {metadata.basicInfo.platform && (
+        {metadata.platform && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {metadata.basicInfo.platform}
+            {metadata.platform}
           </Typography>
         )}
 
         {/* Description */}
-        {metadata.basicInfo.description && (
+        {metadata.description && (
           <Typography
             variant="body2"
             color="text.secondary"
@@ -225,7 +173,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
               overflow: 'hidden'
             }}
           >
-            {metadata.basicInfo.description}
+            {metadata.description}
           </Typography>
         )}
 
@@ -233,9 +181,9 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): Reac
         {renderEmbed()}
 
         {/* Tags */}
-        {metadata.tags && metadata.tags.length > 0 && (
+        {memory.tags && memory.tags.length > 0 && (
           <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {metadata.tags.map((tag) => (
+            {memory.tags.map((tag) => (
               <Chip
                 key={tag}
                 label={tag}
