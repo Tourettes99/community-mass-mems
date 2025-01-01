@@ -25,19 +25,53 @@ const MEDIA_EXTENSIONS = {
   documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv', 'md', 'json']
 };
 
+// Initialize MongoDB connection
+let conn = null;
+const connectDb = async () => {
+  try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
+    
+    if (conn == null) {
+      conn = await mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+      });
+      console.log('Successfully connected to MongoDB');
+    }
+    return conn;
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    throw err;
+  }
+};
+
 // Initialize services
 let servicesInitialized = false;
 async function initializeServices() {
   if (!servicesInitialized) {
-    await groqModeration.initialize();
-    await fileStorage.initialize();
-    servicesInitialized = true;
+    try {
+      console.log('Initializing services...');
+      await connectDb();
+      await fileStorage.initialize();
+      servicesInitialized = true;
+      console.log('Services initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize services:', error);
+      throw error;
+    }
   }
 }
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
-  let client;
+
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json'
+  };
 
   try {
     // Debug logging
@@ -45,38 +79,12 @@ exports.handler = async (event, context) => {
     console.log('Request headers:', event.headers);
     console.log('Request body:', event.body);
 
-    // Initialize services first
-    try {
-      await initializeServices();
-    } catch (error) {
-      console.error('Error initializing services:', error);
-      return {
-        statusCode: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          error: 'Failed to initialize services',
-          details: error.message 
-        })
-      };
-    }
-
-    const headers = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Content-Type': 'application/json'
-    };
-
     // Handle OPTIONS request for CORS
     if (event.httpMethod === 'OPTIONS') {
       return {
         statusCode: 204,
         headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          ...headers,
           'Access-Control-Allow-Methods': 'POST, OPTIONS'
         },
         body: ''
@@ -92,21 +100,49 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Initialize services
+    try {
+      await initializeServices();
+    } catch (error) {
+      console.error('Service initialization failed:', error);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: 'Failed to initialize services',
+          details: error.message
+        })
+      };
+    }
+
+    // Parse request body
     let body;
     try {
       body = JSON.parse(event.body);
     } catch (error) {
+      console.error('Failed to parse request body:', error);
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Invalid request body' })
+        body: JSON.stringify({
+          error: 'Invalid request body',
+          details: error.message
+        })
       };
     }
 
     const { type, tags } = body;
     let { url, content } = body;
-    
-    // Check if we have either URL or content
+
+    // Validate required fields
+    if (!type) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Type is required' })
+      };
+    }
+
     if (type === 'url' && !url) {
       return {
         statusCode: 400,
@@ -114,6 +150,7 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ error: 'URL is required for URL type' })
       };
     }
+
     if (type === 'text' && !content) {
       return {
         statusCode: 400,
@@ -122,8 +159,8 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Get metadata based on type
-    let metadata = {};
+    // Process the upload based on type
+    let result;
     if (type === 'url') {
       try {
         // Validate URL format
@@ -136,228 +173,75 @@ exports.handler = async (event, context) => {
           };
         }
 
-        console.log('Fetching metadata for URL:', url);
-        metadata = await getUrlMetadata(url.trim());
+        // Get metadata
+        const metadata = await getUrlMetadata(url.trim());
         
-        // Moderate URL and metadata content
-        const urlModeration = await groqModeration.moderateContent(url, 'url');
-        const contentModeration = await groqModeration.moderateContent(
-          `Title: ${metadata.basicInfo?.title || ''}\nDescription: ${metadata.basicInfo?.description || ''}`,
-          'text'
-        );
-
-        // Check moderation results
-        if (urlModeration.flagged || contentModeration.flagged) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({
-              error: 'Content moderation failed',
-              reason: urlModeration.flagged ? urlModeration.reason : contentModeration.reason,
-              scores: {
-                url: urlModeration.category_scores,
-                content: contentModeration.category_scores
-              }
-            })
-          };
-        }
-
-        // Check if the URL is accessible
-        if (metadata.error) {
-          return {
-            statusCode: 400,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({ 
-              error: 'URL validation failed',
-              details: metadata.error,
-              isExpired: metadata.isExpired
-            })
-          };
-        }
-
-        // Ensure all required metadata fields exist
-        metadata = {
-          basicInfo: {
-            title: metadata.title || url,
-            description: metadata.description || '',
-            mediaType: metadata.mediaType || 'rich',
-            thumbnailUrl: metadata.thumbnailUrl || metadata.previewUrl || metadata.ogImage || '',
-            platform: metadata.platform || new URL(url).hostname,
-            contentUrl: url,
-            fileType: metadata.fileType || '',
-            domain: new URL(url).hostname,
-            isSecure: url.startsWith('https')
-          },
-          embed: {
-            embedUrl: metadata.embedUrl || '',
-            embedHtml: metadata.embedHtml || '',
-            embedType: metadata.embedType || ''
-          },
-          timestamps: {
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+        // Create memory document
+        const memory = new Memory({
+          type: 'url',
+          url: url.trim(),
+          metadata: {
+            ...metadata,
+            tags: tags || []
           }
-        };
-      } catch (error) {
-        console.error('Error fetching metadata:', error);
-        // Use basic metadata if fetch fails
-        metadata = {
-          basicInfo: {
-            title: url,
-            description: '',
-            mediaType: 'rich',
-            platform: new URL(url).hostname,
-            contentUrl: url,
-            domain: new URL(url).hostname,
-            isSecure: url.startsWith('https')
-          },
-          timestamps: {
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        };
-      }
-    } else {
-      metadata = {
-        basicInfo: {
-          type: 'text',
-          format: 'text/plain',
-          title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
-          description: content,
-          mediaType: 'text'
-        },
-        timestamps: {
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      };
-    }
+        });
 
-    // Process Discord CDN URLs
-    if (url && url.includes('cdn.discordapp.com')) {
-      try {
-        console.log('Processing Discord CDN URL:', url);
-        const storedFile = await fileStorage.storeFileFromUrl(url);
-        console.log('File stored successfully:', storedFile);
-        
-        // Replace the Discord URL with our permanent URL
-        const permanentUrl = await fileStorage.getFileUrl(storedFile.fileId);
-        console.log('Generated permanent URL:', permanentUrl);
-        url = permanentUrl;
+        await memory.save();
+        result = memory;
+
       } catch (error) {
-        console.error('Error processing Discord CDN URL:', error);
+        console.error('URL processing error:', error);
         return {
           statusCode: 500,
           headers,
-          body: JSON.stringify({ 
-            error: 'Failed to process Discord CDN URL',
-            details: error.message 
+          body: JSON.stringify({
+            error: 'Failed to process URL',
+            details: error.message
+          })
+        };
+      }
+    } else if (type === 'text') {
+      try {
+        // Create memory document for text content
+        const memory = new Memory({
+          type: 'text',
+          content: content.trim(),
+          metadata: {
+            tags: tags || []
+          }
+        });
+
+        await memory.save();
+        result = memory;
+
+      } catch (error) {
+        console.error('Text processing error:', error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            error: 'Failed to process text content',
+            details: error.message
           })
         };
       }
     }
 
-    // Create memory document
-    const memory = {
-      type: type,
-      url: type === 'url' ? url.trim() : undefined,
-      content: type === 'text' ? content.trim() : undefined,
-      tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-      status: 'pending',
-      metadata: metadata,  // Store the complete metadata object
-      votes: { up: 0, down: 0 },
-      userVotes: {},
-      submittedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    // Connect to MongoDB
-    client = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 10000,
-      family: 4
-    });
-
-    const db = client.db('memories');
-    const collection = db.collection('memories');
-
-    // Perform moderation
-    const moderationResult = await groqModeration.moderateContent(
-      type === 'url' ? `${url}\n${metadata.basicInfo?.title || ''}\n${metadata.basicInfo?.description || ''}` : content,
-      type
-    );
-
-    // Update memory with moderation result
-    memory.status = moderationResult.flagged ? 'rejected' : 'approved';
-    memory.moderationResult = {
-      flagged: moderationResult.flagged,
-      category_scores: moderationResult.category_scores,
-      reason: moderationResult.reason
-    };
-
-    // Save to database
-    const result = await collection.insertOne(memory);
-    memory._id = result.insertedId;
-
-    // Send email notification
-    await emailNotification.sendModerationNotification(memory, moderationResult);
-
-    // Return appropriate response
-    if (moderationResult.flagged) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          message: 'Content rejected by moderation',
-          reason: moderationResult.reason,
-          category_scores: moderationResult.category_scores,
-          id: result.insertedId
-        })
-      };
-    }
-
     return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({
-        message: 'Memory submitted successfully',
-        id: result.insertedId,
-        metadata: metadata  // Include metadata in response
-      })
+      statusCode: 201,
+      headers,
+      body: JSON.stringify(result)
     };
-  } catch (error) {
-    console.error('Error:', error);
-    console.error('Error stack:', error.stack);
-    
-    // Close MongoDB connection if it exists
-    await mongoose.disconnect();
 
+  } catch (error) {
+    console.error('Unexpected error:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         error: 'Internal server error',
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: error.message
       })
     };
-  } finally {
-    // Clean up MongoDB connections
-    try {
-      await fileStorage.cleanup();
-    } catch (error) {
-      console.error('Error cleaning up file storage:', error);
-    }
-    await mongoose.disconnect();
   }
 };
