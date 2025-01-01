@@ -174,18 +174,44 @@ exports.handler = async (event, context) => {
         }
 
         // Get metadata
-        const metadata = await getUrlMetadata(url.trim());
+        const urlMetadata = await getUrlMetadata(url.trim());
+        console.log('URL Metadata:', urlMetadata);
+
+        // Structure metadata according to schema
+        const metadata = {
+          basicInfo: {
+            title: urlMetadata.basicInfo.title,
+            description: urlMetadata.basicInfo.description,
+            mediaType: urlMetadata.basicInfo.mediaType,
+            thumbnailUrl: urlMetadata.basicInfo.thumbnailUrl,
+            platform: urlMetadata.basicInfo.platform,
+            contentUrl: urlMetadata.basicInfo.contentUrl,
+            fileType: urlMetadata.basicInfo.fileType,
+            domain: urlMetadata.basicInfo.domain,
+            isSecure: urlMetadata.basicInfo.isSecure
+          },
+          embed: {
+            embedUrl: urlMetadata.embed?.embedUrl,
+            embedHtml: urlMetadata.embed?.embedHtml,
+            embedType: urlMetadata.embed?.embedType
+          },
+          timestamps: {
+            createdAt: new Date(),
+            updatedAt: new Date()
+          },
+          tags: tags || []
+        };
         
         // Create memory document
         const memory = new Memory({
           type: 'url',
           url: url.trim(),
-          metadata: {
-            ...metadata,
-            tags: tags || []
-          }
+          metadata: metadata,
+          status: 'approved',
+          votes: { up: 0, down: 0 }
         });
 
+        console.log('Saving memory:', memory);
         await memory.save();
         result = memory;
 
@@ -207,8 +233,20 @@ exports.handler = async (event, context) => {
           type: 'text',
           content: content.trim(),
           metadata: {
+            basicInfo: {
+              title: 'Text Post',
+              description: content.trim().substring(0, 200) + (content.length > 200 ? '...' : ''),
+              mediaType: 'text',
+              platform: 'community'
+            },
+            timestamps: {
+              createdAt: new Date(),
+              updatedAt: new Date()
+            },
             tags: tags || []
-          }
+          },
+          status: 'approved',
+          votes: { up: 0, down: 0 }
         });
 
         await memory.save();
