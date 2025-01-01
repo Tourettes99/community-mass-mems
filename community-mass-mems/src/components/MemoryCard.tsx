@@ -1,601 +1,296 @@
 import React, { useState } from 'react';
 import {
   Box,
+  Typography,
+  IconButton,
+  Chip,
   Card,
   CardContent,
-  Chip,
-  IconButton,
   Link,
-  CardMedia,
-  Divider,
-  Typography,
-  Avatar
+  Tooltip
 } from '@mui/material';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
-import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import PersonIcon from '@mui/icons-material/Person';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import PublicIcon from '@mui/icons-material/Public';
-import YouTubeIcon from '@mui/icons-material/YouTube';
-import { Memory } from '../types/Memory';
-import useMemoryStore from '../stores/memoryStore';
-import EmbedPlayer from './EmbedPlayer';
+import {
+  ThumbUp as ThumbUpIcon,
+  ThumbDown as ThumbDownIcon,
+  YouTube as YouTubeIcon,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  VideoLibrary as VideoIcon,
+  Article as ArticleIcon,
+  AudioFile as AudioIcon
+} from '@mui/icons-material';
 
-const detectDiscordMediaType = (url: string): string => {
-  if (!url) return 'rich';
-  
-  const extension = url.split('.').pop()?.toLowerCase();
-  if (!extension) return 'rich';
-
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
-    return 'image';
-  } else if (['mp4', 'webm', 'mov'].includes(extension)) {
-    return 'video';
-  } else if (['mp3', 'ogg', 'wav'].includes(extension)) {
-    return 'audio';
-  }
-  
-  return 'rich';
-};
+interface Memory {
+  id: string;
+  type: string;
+  url?: string;
+  content?: string;
+  metadata: {
+    basicInfo: {
+      title: string;
+      description: string;
+      mediaType: string;
+      thumbnailUrl: string;
+      platform: string;
+      contentUrl: string;
+      fileType?: string;
+      domain?: string;
+      isSecure?: boolean;
+    };
+    embed: {
+      embedUrl?: string;
+      embedHtml?: string;
+      embedType?: string;
+    };
+    timestamps: {
+      createdAt: string;
+      updatedAt: string;
+    };
+    tags: string[];
+  };
+  votes: {
+    up: number;
+    down: number;
+  };
+}
 
 interface MemoryCardProps {
   memory: Memory;
-  selectedTags: string[];
-  onTagClick: (tag: string) => void;
+  selectedTags?: string[];
+  onTagClick?: (tag: string) => void;
 }
 
-const MemoryCard: React.FC<MemoryCardProps> = ({ memory, selectedTags, onTagClick }) => {
-  const updateMemory = useMemoryStore(state => state.updateMemory);
-  const [userVote, setUserVote] = React.useState<string | null>(
-    localStorage.getItem(`vote_${memory.id || memory._id}`)
-  );
-  const [faviconError, setFaviconError] = React.useState(false);
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      video: React.DetailedHTMLProps<React.VideoHTMLAttributes<HTMLVideoElement>, HTMLVideoElement>;
+      audio: React.DetailedHTMLProps<React.AudioHTMLAttributes<HTMLAudioElement>, HTMLAudioElement>;
+      source: React.DetailedHTMLProps<React.SourceHTMLAttributes<HTMLSourceElement>, HTMLSourceElement>;
+      img: React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
+    }
+  }
+}
 
-  const isValidUrl = (urlString: string): boolean => {
-    try {
-      const url = new URL(urlString);
-      return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-      return false;
+const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.Element => {
+  const [voteState, setVoteState] = useState({ up: false, down: false });
+  const [voteCount, setVoteCount] = useState(memory.votes);
+
+  const getMediaIcon = () => {
+    const mediaType = memory.metadata?.basicInfo?.mediaType;
+    switch (mediaType) {
+      case 'image':
+        return <ImageIcon />;
+      case 'video':
+        return <VideoIcon />;
+      case 'audio':
+        return <AudioIcon />;
+      case 'article':
+        return <ArticleIcon />;
+      default:
+        return <LinkIcon />;
     }
   };
 
-  const handleFaviconError = () => {
-    setFaviconError(true);
-  };
+  const renderEmbed = () => {
+    const { metadata } = memory;
+    if (!metadata?.embed?.embedHtml && !metadata?.basicInfo?.thumbnailUrl) return null;
 
-  const handleVote = async (type: 'up' | 'down') => {
-    try {
-      let userId = localStorage.getItem('userId');
-      if (!userId) {
-        userId = 'user_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('userId', userId);
-      }
+    const mediaType = metadata.basicInfo.mediaType;
+    const embedHtml = metadata.embed.embedHtml;
+    const thumbnailUrl = metadata.basicInfo.thumbnailUrl;
+    const contentUrl = metadata.basicInfo.contentUrl;
 
-      const response = await fetch('/.netlify/functions/vote-memory', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          memoryId: memory.id || memory._id,
-          voteType: type,
-          userId
-        }),
-      });
+    const containerStyle = {
+      position: 'relative',
+      width: '100%',
+      paddingTop: '56.25%', // 16:9 aspect ratio
+      backgroundColor: '#000',
+      overflow: 'hidden',
+      borderRadius: 1
+    };
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to vote');
-      }
+    const contentStyle = {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      border: 'none'
+    };
 
-      const result = await response.json();
-      const { votes, userVote, userVotes } = result;
-      
-      if (userVote) {
-        localStorage.setItem(`vote_${memory.id || memory._id}`, userVote);
-      } else {
-        localStorage.removeItem(`vote_${memory.id || memory._id}`);
-      }
-      
-      setUserVote(userVote);
-      
-      // Create updated memory with new votes while preserving all other properties
-      const updatedMemory: Memory = {
-        ...memory,
-        id: memory.id || memory._id, // Ensure we have a consistent ID
-        votes: { ...votes },
-        userVotes: new Map(Object.entries(userVotes || {}))
-      };
-
-      // Update the memory in the store
-      updateMemory(updatedMemory);
-    } catch (error) {
-      console.error('Error voting:', error);
-    }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'No date available';
-    
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-      
-      if (isNaN(date.getTime())) {
-        return 'Invalid date';
-      }
-
-      if (diffInSeconds < 60) {
-        return 'just now';
-      } else if (diffInSeconds < 3600) {
-        const minutes = Math.floor(diffInSeconds / 60);
-        return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
-      } else if (diffInSeconds < 86400) {
-        const hours = Math.floor(diffInSeconds / 3600);
-        return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
-      } else if (diffInSeconds < 604800) {
-        const days = Math.floor(diffInSeconds / 86400);
-        return `${days} ${days === 1 ? 'day' : 'days'} ago`;
-      }
-
-      return new Intl.DateTimeFormat('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      }).format(date);
-    } catch (error) {
-      console.error('Error formatting date:', error, dateString);
-      return 'Invalid date';
-    }
-  };
-
-  const renderContent = (memory: Memory) => {
-    if (!memory) return null;
-
-    const title = memory.metadata?.title || memory.url || 'No title';
-    const description = memory.metadata?.description;
-    const author = memory.metadata?.author;
-    const publishedDate = memory.metadata?.publishedDate;
-    const siteName = memory.metadata?.siteName;
-    const mediaType = memory.metadata?.mediaType || memory.type;
-    const showFavicon = memory.metadata?.favicon && isValidUrl(memory.metadata.favicon) && !faviconError;
-
-    const renderFavicon = showFavicon && (
-      <img 
-        src={memory.metadata?.favicon}
-        alt=""
-        onError={handleFaviconError}
-        style={{ 
-          width: 20, 
-          height: 20, 
-          objectFit: 'contain',
-          marginRight: 8,
-          flexShrink: 0,
-          borderRadius: '4px'
-        }} 
-      />
-    );
-
-    const renderHeader = (
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        gap: 1,
-        mb: 2
-      }}>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 1
-        }}>
-          {renderFavicon}
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              fontSize: '1.1rem',
-              fontWeight: 500,
-              lineHeight: 1.3,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              width: '100%'
-            }}
-          >
-            {title}
-          </Typography>
-        </Box>
-        {(author || publishedDate || siteName) && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', fontSize: '0.875rem' }}>
-            {author && (
-              <>
-                <PersonIcon sx={{ fontSize: '1rem' }} />
-                <Typography variant="body2">{author}</Typography>
-                {(publishedDate || siteName) && <Divider orientation="vertical" flexItem />}
-              </>
-            )}
-            {publishedDate && (
-              <>
-                <CalendarTodayIcon sx={{ fontSize: '1rem' }} />
-                <Typography variant="body2">{new Date(publishedDate).toLocaleDateString()}</Typography>
-                {siteName && <Divider orientation="vertical" flexItem />}
-              </>
-            )}
-            {siteName && (
-              <>
-                <PublicIcon sx={{ fontSize: '1rem' }} />
-                <Typography variant="body2">{siteName}</Typography>
-              </>
-            )}
-          </Box>
-        )}
-        {description && (
-          <Typography 
-            variant="body2" 
-            color="text.secondary"
-            sx={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: 'vertical'
-            }}
-          >
-            {description}
-          </Typography>
-        )}
-      </Box>
-    );
-
-    const renderFooter = (
-      <Box sx={{ 
-        mt: 2,
-        pt: 2,
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton
-              size="small"
-              onClick={() => handleVote('up')}
-              color={userVote === 'up' ? 'primary' : 'default'}
-            >
-              <ThumbUpIcon fontSize="small" />
-            </IconButton>
-            <Typography variant="body2" sx={{ mx: 1 }}>
-              {memory.votes?.up || 0}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton
-              size="small"
-              onClick={() => handleVote('down')}
-              color={userVote === 'down' ? 'error' : 'default'}
-            >
-              <ThumbDownIcon fontSize="small" />
-            </IconButton>
-            <Typography variant="body2" sx={{ mx: 1 }}>
-              {memory.votes?.down || 0}
-            </Typography>
-          </Box>
-        </Box>
-        
-        <Typography 
-          variant="caption" 
-          color="text.secondary"
-          sx={{ 
-            display: 'flex',
-            alignItems: 'center'
-          }}
-        >
-          {formatDate(memory.submittedAt)}
-        </Typography>
-      </Box>
-    );
-
-    // Handle text posts first
-    if (memory.type === 'text') {
+    if (embedHtml) {
       return (
-        <>
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: 2
-          }}>
-            <Typography variant="body1">
-              {memory.content}
-            </Typography>
-          </Box>
-          {renderFooter}
-        </>
-      );
-    }
-
-    // Handle YouTube and other embeds
-    if (memory.metadata?.embedHtml && memory.metadata?.mediaType !== 'image') {
-      return (
-        <>
-          {renderHeader}
-          <Box sx={{ 
-            position: 'relative',
-            width: '100%',
-            pt: '56.25%', // 16:9 aspect ratio
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            overflow: 'hidden',
-            mb: 2
-          }}>
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-              }}
-            >
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                }}
-                dangerouslySetInnerHTML={{ 
-                  __html: memory.metadata.embedHtml || ''
-                }}
-              />
-            </div>
-          </Box>
-          {renderFooter}
-        </>
-      );
-    }
-
-    // Handle media preview (images, GIFs, videos)
-    const metadata = memory.metadata;
-    if (!metadata) return renderHeader;
-
-    const mediaUrl = metadata.previewUrl || metadata.ogImage || memory.url;
-    if (!mediaUrl && !metadata.embedHtml) return renderHeader;
-
-    const isVideo = metadata.mediaType === 'video';
-    const isGif = mediaUrl?.toLowerCase().endsWith('.gif');
-    const hasEmbed = Boolean(metadata.embedHtml?.trim());
-
-    // Handle rich previews (website cards)
-    if (metadata.mediaType === 'rich' && hasEmbed && metadata.embedHtml) {
-      return (
-        <>
-          {renderHeader}
-          <Box sx={{ mb: 2 }}>
-            <div dangerouslySetInnerHTML={{ __html: metadata.embedHtml }} />
-          </Box>
-          {renderFooter}
-        </>
-      );
-    }
-
-    // Handle video content (YouTube, GIFs, or other videos)
-    if (isVideo || isGif || hasEmbed) {
-      return (
-        <>
-          {renderHeader}
-          <Box sx={{ 
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            overflow: 'hidden',
-            mb: 2
-          }}>
-            {/* Video Title and Source */}
-            <Box sx={{ 
-              p: 2, 
-              display: 'flex', 
-              alignItems: 'center',
-              gap: 1
-            }}>
-              {metadata.siteName === 'YouTube' && (
-                <Box 
-                  component="span"
-                  sx={{ 
-                    bgcolor: 'error.main',
-                    color: 'white',
-                    p: 0.5,
-                    borderRadius: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 24,
-                    height: 24
-                  }}
-                >
-                  <YouTubeIcon sx={{ fontSize: 16 }} />
-                </Box>
-              )}
-              <Typography variant="body2" color="text.secondary">
-                {metadata.siteName || 'Video'}
-              </Typography>
-            </Box>
-
-            {/* Video Preview */}
-            <Box sx={{ 
-              position: 'relative',
-              width: '100%',
-              pt: '56.25%', // 16:9 aspect ratio
-              bgcolor: 'background.paper',
-              overflow: 'hidden',
-            }}>
-              {hasEmbed ? (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                    }}
-                    dangerouslySetInnerHTML={{ 
-                      __html: metadata.embedHtml || ''
-                    }}
-                  />
-                </div>
-              ) : (
-                isVideo ? (
-                  <video
-                    controls={isVideo}
-                    loop={isGif}
-                    autoPlay={isGif}
-                    muted={isGif}
-                    playsInline
-                    src={mediaUrl}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                ) : (
-                  <img
-                    src={mediaUrl}
-                    alt={metadata.title || 'Preview'}
-                    loading="lazy"
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                )
-              )}
-            </Box>
-
-            {/* Video Description */}
-            {metadata.title && (
-              <Box sx={{ p: 2 }}>
-                <Typography variant="subtitle1">
-                  {metadata.title}
-                </Typography>
-                {metadata.description && (
-                  <Typography 
-                    variant="body2" 
-                    color="text.secondary"
-                    sx={{ 
-                      mt: 1,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
-                  >
-                    {metadata.description}
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </Box>
-          {renderFooter}
-        </>
-      );
-    }
-
-    // Handle regular images
-    return (
-      <>
-        {renderHeader}
-        <Box
-          sx={{
-            position: 'relative',
-            width: '100%',
-            pt: metadata.dimensions?.height && metadata.dimensions?.width
-              ? `${(metadata.dimensions.height / metadata.dimensions.width) * 100}%`
-              : '56.25%', // Default 16:9 aspect ratio
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            overflow: 'hidden',
-            mb: 2,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}
-        >
-          <img
-            src={mediaUrl}
-            alt={metadata.title || 'Preview'}
-            loading="lazy"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain'
-            }}
+        <Box sx={containerStyle}>
+          <Box
+            sx={contentStyle}
+            dangerouslySetInnerHTML={{ __html: embedHtml }}
           />
         </Box>
-        {renderFooter}
-      </>
+      );
+    }
+
+    switch (mediaType) {
+      case 'video':
+        return (
+          <Box sx={containerStyle}>
+            <video
+              controls
+              playsInline
+              src={contentUrl}
+              style={contentStyle}
+              poster={thumbnailUrl}
+            />
+          </Box>
+        );
+
+      case 'audio':
+        return (
+          <Box sx={{ width: '100%', p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+            <audio controls style={{ width: '100%' }}>
+              <source src={contentUrl} />
+              Your browser does not support the audio element.
+            </audio>
+          </Box>
+        );
+
+      case 'image':
+        return (
+          <Box sx={containerStyle}>
+            <img
+              src={thumbnailUrl || contentUrl}
+              alt={metadata.basicInfo.title || 'Image'}
+              style={{ ...contentStyle, objectFit: 'contain' }}
+              loading="lazy"
+            />
+          </Box>
+        );
+
+      default:
+        if (thumbnailUrl) {
+          return (
+            <Box sx={containerStyle}>
+              <img
+                src={thumbnailUrl}
+                alt={metadata.basicInfo.title || 'Preview'}
+                style={{ ...contentStyle, objectFit: 'cover' }}
+                loading="lazy"
+              />
+            </Box>
+          );
+        }
+        return null;
+    }
+  };
+
+  const renderContent = () => {
+    const { metadata } = memory;
+    if (!metadata) return null;
+
+    return (
+      <CardContent>
+        {/* Header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+          {getMediaIcon()}
+          <Typography variant="h6" component="h2" noWrap>
+            {metadata.basicInfo.title || memory.url}
+          </Typography>
+        </Box>
+
+        {/* Platform info */}
+        {metadata.basicInfo.platform && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {metadata.basicInfo.platform}
+          </Typography>
+        )}
+
+        {/* Description */}
+        {metadata.basicInfo.description && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              mb: 2,
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden'
+            }}
+          >
+            {metadata.basicInfo.description}
+          </Typography>
+        )}
+
+        {/* Embed/Media */}
+        {renderEmbed()}
+
+        {/* Tags */}
+        {metadata.tags && metadata.tags.length > 0 && (
+          <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {metadata.tags.map((tag) => (
+              <Chip
+                key={tag}
+                label={tag}
+                size="small"
+                onClick={() => onTagClick?.(tag)}
+                sx={{
+                  bgcolor: selectedTags?.includes(tag) ? 'primary.main' : 'background.default',
+                  color: selectedTags?.includes(tag) ? 'primary.contrastText' : 'text.primary',
+                  '&:hover': {
+                    bgcolor: selectedTags?.includes(tag) ? 'primary.dark' : 'background.paper'
+                  }
+                }}
+              />
+            ))}
+          </Box>
+        )}
+
+        {/* Voting */}
+        <Box sx={{ mt: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+          <IconButton
+            size="small"
+            color={voteState.up ? 'primary' : 'default'}
+            onClick={() => {
+              setVoteState({ up: !voteState.up, down: false });
+              setVoteCount({
+                up: voteCount.up + (voteState.up ? -1 : 1),
+                down: voteCount.down
+              });
+            }}
+          >
+            <ThumbUpIcon fontSize="small" />
+          </IconButton>
+          <Typography variant="body2">{voteCount.up}</Typography>
+
+          <IconButton
+            size="small"
+            color={voteState.down ? 'primary' : 'default'}
+            onClick={() => {
+              setVoteState({ up: false, down: !voteState.down });
+              setVoteCount({
+                up: voteCount.up,
+                down: voteCount.down + (voteState.down ? -1 : 1)
+              });
+            }}
+          >
+            <ThumbDownIcon fontSize="small" />
+          </IconButton>
+          <Typography variant="body2">{voteCount.down}</Typography>
+        </Box>
+      </CardContent>
     );
   };
 
   return (
-    <Card 
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        borderRadius: '12px',
-        '&:hover': {
-          boxShadow: 3
-        },
-        transition: 'box-shadow 0.2s'
-      }}
-    >
-      <CardContent sx={{ flexGrow: 1, p: 3 }}>
-        {renderContent(memory)}
-        
-        <Box sx={{ 
-          mt: 2, 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: 1 
-        }}>
-          {memory.tags?.map((tag) => (
-            <Chip
-              key={tag}
-              label={tag}
-              size="small"
-              onClick={() => onTagClick(tag)}
-              sx={{
-                borderRadius: '16px',
-                backgroundColor: selectedTags.includes(tag) ? 'primary.main' : 'action.selected',
-                color: selectedTags.includes(tag) ? 'primary.contrastText' : 'text.primary',
-                '&:hover': {
-                  backgroundColor: selectedTags.includes(tag) ? 'primary.dark' : 'action.hover'
-                },
-                transition: 'all 0.2s'
-              }}
-            />
-          ))}
-        </Box>
-      </CardContent>
+    <Card>
+      <Link
+        href={memory.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        underline="none"
+        color="inherit"
+      >
+        {renderContent()}
+      </Link>
     </Card>
   );
 };
