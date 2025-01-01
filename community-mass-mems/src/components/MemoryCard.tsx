@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, CSSProperties } from 'react';
 import {
   Box,
   Typography,
@@ -60,18 +60,7 @@ interface MemoryCardProps {
   onTagClick?: (tag: string) => void;
 }
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      video: React.DetailedHTMLProps<React.VideoHTMLAttributes<HTMLVideoElement>, HTMLVideoElement>;
-      audio: React.DetailedHTMLProps<React.AudioHTMLAttributes<HTMLAudioElement>, HTMLAudioElement>;
-      source: React.DetailedHTMLProps<React.SourceHTMLAttributes<HTMLSourceElement>, HTMLSourceElement>;
-      img: React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
-    }
-  }
-}
-
-const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.Element => {
+const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): React.ReactElement => {
   const [voteState, setVoteState] = useState({ up: false, down: false });
   const [voteCount, setVoteCount] = useState(memory.votes);
 
@@ -101,7 +90,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.
     const contentUrl = metadata.basicInfo.contentUrl;
 
     const containerStyle = {
-      position: 'relative',
+      position: 'relative' as const,
       width: '100%',
       paddingTop: '56.25%', // 16:9 aspect ratio
       backgroundColor: '#000',
@@ -109,13 +98,14 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.
       borderRadius: 1
     };
 
-    const contentStyle = {
+    const contentStyle: CSSProperties = {
       position: 'absolute',
       top: 0,
       left: 0,
       width: '100%',
       height: '100%',
-      border: 'none'
+      border: 'none',
+      objectFit: 'contain'
     };
 
     if (embedHtml) {
@@ -159,7 +149,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.
             <img
               src={thumbnailUrl || contentUrl}
               alt={metadata.basicInfo.title || 'Image'}
-              style={{ ...contentStyle, objectFit: 'contain' }}
+              style={contentStyle}
               loading="lazy"
             />
           </Box>
@@ -172,7 +162,7 @@ const MemoryCard = ({ memory, selectedTags, onTagClick }: MemoryCardProps): JSX.
               <img
                 src={thumbnailUrl}
                 alt={metadata.basicInfo.title || 'Preview'}
-                style={{ ...contentStyle, objectFit: 'cover' }}
+                style={contentStyle}
                 loading="lazy"
               />
             </Box>
