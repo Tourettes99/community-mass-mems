@@ -7,7 +7,7 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@azure/identity": "^3.3.0",
     "@chakra-ui/react": "3.2.3",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.0",
@@ -72,7 +72,8 @@
     "wavesurfer.js": "^7.3.2",
     "web-vitals": "^2.1.4",
     "yargs": "17.7.2",
-    "zustand": "^4.4.1"
+    "zustand": "^4.4.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7"
   },
   "scripts": {
     "start": "react-scripts start",
