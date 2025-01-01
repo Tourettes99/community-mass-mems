@@ -137,7 +137,9 @@ async function getUrlMetadata(urlString) {
             mediaType: platformData.mediaType,
             thumbnailUrl: platformData.thumbnailUrl || '',
             platform: platformData.platform,
-            contentUrl: urlString
+            contentUrl: urlString,
+            domain: hostname,
+            isSecure: url.protocol === 'https:'
           },
           embed: {
             embedUrl: platformData.embedUrl,
@@ -152,14 +154,19 @@ async function getUrlMetadata(urlString) {
     const extension = url.pathname.split('.').pop()?.toLowerCase();
     if (extension && Object.values(MEDIA_EXTENSIONS).flat().includes(extension)) {
       const mediaType = getMediaTypeFromExtension(extension);
+      const filename = url.pathname.split('/').pop() || urlString;
+      
       return {
         basicInfo: {
-          title: url.pathname.split('/').pop() || urlString,
+          title: filename,
           description: `${mediaType.toUpperCase()} file`,
           mediaType,
           thumbnailUrl: mediaType === 'image' ? urlString : '',
-          platform: url.hostname,
-          contentUrl: urlString
+          platform: hostname,
+          contentUrl: urlString,
+          fileType: extension,
+          domain: hostname,
+          isSecure: url.protocol === 'https:'
         },
         embed: {
           embedUrl: urlString,
@@ -168,7 +175,7 @@ async function getUrlMetadata(urlString) {
             mediaType === 'audio' ?
             `<audio controls style="width: 100%;"><source src="${urlString}" type="audio/${extension}"></audio>` :
             mediaType === 'image' ?
-            `<img src="${urlString}" alt="Image" style="max-width: 100%; max-height: 80vh; object-fit: contain;">` :
+            `<img src="${urlString}" alt="${filename}" style="max-width: 100%; max-height: 80vh; object-fit: contain;">` :
             undefined,
           embedType: mediaType
         }
@@ -176,7 +183,9 @@ async function getUrlMetadata(urlString) {
     }
 
     // Fallback to generic metadata
-    const metadata = await metascraper({ url: urlString, html: await (await fetch(urlString)).text() });
+    const response = await fetch(urlString);
+    const html = await response.text();
+    const metadata = await metascraper({ url: urlString, html });
     
     return {
       basicInfo: {
@@ -184,8 +193,10 @@ async function getUrlMetadata(urlString) {
         description: metadata.description || '',
         mediaType: 'article',
         thumbnailUrl: metadata.image || '',
-        platform: metadata.publisher || url.hostname,
-        contentUrl: urlString
+        platform: metadata.publisher || hostname,
+        contentUrl: urlString,
+        domain: hostname,
+        isSecure: url.protocol === 'https:'
       },
       embed: {
         embedUrl: urlString,
@@ -193,20 +204,23 @@ async function getUrlMetadata(urlString) {
           ${metadata.image ? `<img src="${metadata.image}" alt="${metadata.title}" style="max-width: 100%; height: auto;">` : ''}
           <h3>${metadata.title || ''}</h3>
           <p>${metadata.description || ''}</p>
-          <small>${metadata.publisher || url.hostname}</small>
+          <small>${metadata.publisher || hostname}</small>
         </div>`,
         embedType: 'article'
       }
     };
   } catch (error) {
     console.error('Error getting URL metadata:', error);
+    const hostname = new URL(urlString).hostname;
     return {
       basicInfo: {
         title: urlString,
         description: 'Failed to load preview',
         mediaType: 'url',
-        platform: new URL(urlString).hostname,
-        contentUrl: urlString
+        platform: hostname,
+        contentUrl: urlString,
+        domain: hostname,
+        isSecure: urlString.startsWith('https://')
       },
       embed: {
         embedUrl: urlString,
