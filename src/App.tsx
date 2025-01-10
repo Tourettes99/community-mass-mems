@@ -8,7 +8,7 @@ const theme = createTheme();
 const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/" element={<TestUpload />} />
           <Route path="/test-upload" element={<TestUpload />} />
