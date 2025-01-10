@@ -1,10 +1,12 @@
 require('dotenv').config();
 const chalk = require('chalk');
+const { MongoClient } = require('mongodb');
 const { handler: uploadTextHandler } = require('../netlify/functions/uploadText');
 const { handler: uploadUrlHandler } = require('../netlify/functions/uploadUrl');
+const { testDatabaseHealth } = require('../netlify/functions/utils/dbErrors');
 
 // Test cases with different types of content
-const testCases = [
+const moderationTestCases = [
   {
     name: 'Safe Content',
     type: 'text',
@@ -37,16 +39,78 @@ const testCases = [
   }
 ];
 
-async function testModeration() {
-  console.log(chalk.blue('Testing moderation error handling...\n'));
+async function runDatabaseTests() {
+  console.log(chalk.blue('\nRunning Database Health Checks...\n'));
 
-  for (const testCase of testCases) {
+  try {
+    // Test with valid connection
+    const client = new MongoClient(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+
+    console.log(chalk.yellow('Connecting to MongoDB...'));
+    await client.connect();
+    console.log(chalk.green('Successfully connected to MongoDB\n'));
+
+    // Run health checks
+    console.log(chalk.yellow('Running Health Checks...'));
+    const healthResults = await testDatabaseHealth(client);
+
+    // Print results
+    console.log(chalk.cyan('\nDatabase Health Check Results:'));
+    console.log(chalk.cyan('Overall Status:'), 
+      healthResults.overall_status === 'healthy' 
+        ? chalk.green(healthResults.overall_status)
+        : chalk.red(healthResults.overall_status)
+    );
+
+    healthResults.tests.forEach(test => {
+      console.log(
+        chalk.cyan(`\n${test.name}:`),
+        test.status === 'passed' 
+          ? chalk.green(test.status)
+          : chalk.red(test.status)
+      );
+      if (test.message) console.log(chalk.gray(test.message));
+      if (test.error) console.log(chalk.red('Error:'), test.error);
+    });
+
+    await client.close();
+    console.log(chalk.gray('\nDatabase connection closed'));
+
+  } catch (error) {
+    console.error(chalk.red('\nDatabase Test Error:'), error.message);
+    console.error(chalk.gray(error.stack));
+  }
+
+  console.log(chalk.gray('\n' + '='.repeat(80) + '\n'));
+}
+
+async function runModerationTests() {
+  console.log(chalk.blue('Running Content Moderation Tests...\n'));
+
+  const context = {
+    callbackWaitsForEmptyEventLoop: true,
+    functionName: 'test',
+    functionVersion: '$LATEST',
+    invokedFunctionArn: 'test',
+    memoryLimitInMB: '128',
+    awsRequestId: 'test',
+    logGroupName: 'test',
+    logStreamName: 'test',
+    identity: null,
+    clientContext: null,
+    getRemainingTimeInMillis: () => 30000
+  };
+
+  for (const testCase of moderationTestCases) {
     console.log(chalk.yellow(`\nTesting: ${testCase.name}`));
     console.log(chalk.cyan('Content Type:'), testCase.type);
     console.log(chalk.cyan('Content:'), testCase.type === 'url' ? testCase.url : testCase.content);
 
     try {
-      // Create mock event and context
+      // Create mock event
       const event = {
         httpMethod: 'POST',
         headers: {
@@ -57,20 +121,6 @@ async function testModeration() {
           type: testCase.type,
           content: testCase.type === 'url' ? testCase.url : testCase.content
         })
-      };
-
-      const context = {
-        callbackWaitsForEmptyEventLoop: true,
-        functionName: 'test',
-        functionVersion: '$LATEST',
-        invokedFunctionArn: 'test',
-        memoryLimitInMB: '128',
-        awsRequestId: 'test',
-        logGroupName: 'test',
-        logStreamName: 'test',
-        identity: null,
-        clientContext: null,
-        getRemainingTimeInMillis: () => 30000
       };
 
       // Call appropriate handler
@@ -135,5 +185,21 @@ async function testModeration() {
   }
 }
 
+async function runAllTests() {
+  console.log(chalk.blue.bold('Starting System Tests\n'));
+  console.log(chalk.gray('='.repeat(80)));
+
+  // Run database tests first
+  await runDatabaseTests();
+
+  // Then run moderation tests
+  await runModerationTests();
+
+  console.log(chalk.blue.bold('\nSystem Tests Complete'));
+}
+
 // Run the tests
-testModeration().catch(console.error);
+runAllTests().catch(error => {
+  console.error(chalk.red('\nFatal Error:'), error);
+  process.exit(1);
+});
