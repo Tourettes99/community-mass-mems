@@ -14,14 +14,11 @@ const router = createBrowserRouter(
     }
   ],
   {
-    // Enable v7 behavior and additional features
+    // Basic router configuration
     future: {
       v7_startTransition: true,
       v7_relativeSplatPath: true
-    },
-    // Enable scroll restoration
-    basename: '/',
-    window: typeof window === 'undefined' ? undefined : window
+    }
   }
 );
 
