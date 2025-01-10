@@ -6,20 +6,6 @@ const { getUrlMetadata } = require('./utils/urlMetadata');
 const groqModeration = require('./services/groqModeration');
 const fileStorage = require('./services/fileStorage');
 
-// Initialize services
-let servicesInitialized = false;
-async function initializeServices() {
-  if (!servicesInitialized) {
-    if (!process.env.GROQ_API_KEY) {
-      console.warn('GROQ_API_KEY not set, content moderation will be skipped');
-    } else {
-      await groqModeration.initialize();
-    }
-    await fileStorage.initialize();
-    servicesInitialized = true;
-  }
-}
-
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
@@ -28,25 +14,6 @@ exports.handler = async (event, context) => {
     console.log('Request method:', event.httpMethod);
     console.log('Request headers:', event.headers);
     console.log('Request body:', event.body);
-
-    // Initialize services first
-    try {
-      await initializeServices();
-    } catch (error) {
-      console.error('Error initializing services:', error);
-      return {
-        statusCode: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          error: 'Failed to initialize services',
-          details: error.message 
-        })
-      };
-    }
 
     const headers = {
       'Access-Control-Allow-Origin': '*',
@@ -121,101 +88,46 @@ exports.handler = async (event, context) => {
         }
 
         console.log('Fetching metadata for URL:', url);
-        metadata = await getUrlMetadata(url.trim());
+        const urlMetadata = await getUrlMetadata(url.trim());
         
-        // Only perform moderation if GROQ_API_KEY is set
-        if (process.env.GROQ_API_KEY) {
-          const urlModeration = await groqModeration.moderateContent(url, 'url');
-          const contentModeration = await groqModeration.moderateContent(
-            `Title: ${metadata.basicInfo?.title || ''}\nDescription: ${metadata.basicInfo?.description || ''}`,
-            'text'
-          );
-
-          // Check moderation results
-          if (urlModeration.flagged || contentModeration.flagged) {
-            return {
-              statusCode: 400,
-              headers,
-              body: JSON.stringify({
-                error: 'Content moderation failed',
-                reason: urlModeration.flagged ? urlModeration.reason : contentModeration.reason,
-                scores: {
-                  url: urlModeration.category_scores,
-                  content: contentModeration.category_scores
-                }
-              })
-            };
-          }
-        }
-
-        // Check if the URL is accessible
-        if (metadata.error) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ 
-              error: 'URL validation failed',
-              details: metadata.error,
-              isExpired: metadata.isExpired
-            })
-          };
-        }
-
         // Ensure all required metadata fields exist
         metadata = {
-          basicInfo: {
-            title: metadata.title || url,
-            description: metadata.description || '',
-            mediaType: metadata.mediaType || 'rich',
-            thumbnailUrl: metadata.thumbnailUrl || metadata.previewUrl || metadata.ogImage || '',
-            platform: metadata.platform || new URL(url).hostname,
-            contentUrl: url,
-            fileType: metadata.fileType || '',
-            domain: new URL(url).hostname,
-            isSecure: url.startsWith('https')
-          },
-          embed: {
-            embedUrl: metadata.embedUrl || '',
-            embedHtml: metadata.embedHtml || '',
-            embedType: metadata.embedType || ''
-          },
-          timestamps: {
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
+          title: urlMetadata.title || url,
+          description: urlMetadata.description || '',
+          mediaType: urlMetadata.mediaType || 'rich',
+          thumbnailUrl: urlMetadata.thumbnailUrl || urlMetadata.previewUrl || urlMetadata.ogImage || '',
+          platform: urlMetadata.platform || new URL(url).hostname,
+          contentUrl: url,
+          fileType: urlMetadata.fileType || '',
+          domain: new URL(url).hostname,
+          isSecure: url.startsWith('https'),
+          siteName: urlMetadata.siteName || new URL(url).hostname,
+          embedHtml: urlMetadata.embedHtml || '',
+          dimensions: urlMetadata.dimensions || { width: 560, height: 315 },
+          ogImage: urlMetadata.ogImage,
+          previewUrl: urlMetadata.previewUrl,
+          publishedDate: urlMetadata.publishedDate,
+          author: urlMetadata.author
         };
       } catch (error) {
         console.error('Error fetching metadata:', error);
         // Use basic metadata if fetch fails
         metadata = {
-          basicInfo: {
-            title: url,
-            description: '',
-            mediaType: 'rich',
-            platform: new URL(url).hostname,
-            contentUrl: url,
-            domain: new URL(url).hostname,
-            isSecure: url.startsWith('https')
-          },
-          timestamps: {
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
+          title: url,
+          description: '',
+          mediaType: 'rich',
+          platform: new URL(url).hostname,
+          contentUrl: url,
+          domain: new URL(url).hostname,
+          isSecure: url.startsWith('https')
         };
       }
     } else {
       metadata = {
-        basicInfo: {
-          type: 'text',
-          format: 'text/plain',
-          title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
-          description: content,
-          mediaType: 'text'
-        },
-        timestamps: {
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
+        title: content.slice(0, 50) + (content.length > 50 ? '...' : ''),
+        description: content,
+        mediaType: 'text',
+        format: 'text/plain'
       };
     }
 
@@ -230,6 +142,7 @@ exports.handler = async (event, context) => {
         const permanentUrl = await fileStorage.getFileUrl(storedFile.fileId);
         console.log('Generated permanent URL:', permanentUrl);
         url = permanentUrl;
+        metadata.isDiscordCdn = true;
       } catch (error) {
         console.error('Error processing Discord CDN URL:', error);
         return {
@@ -244,29 +157,26 @@ exports.handler = async (event, context) => {
     }
 
     try {
-      // Use mass-mems database for user uploads
       const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
 
       // Create new memory document
       const memory = {
         _id: new ObjectId(),
-        type: type,
+        type,
         url: type === 'url' ? url.trim() : undefined,
         content: type === 'text' ? content.trim() : undefined,
         tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-        status: process.env.GROQ_API_KEY ? 'pending' : 'approved', // Auto-approve if no moderation
-        metadata: metadata,
+        status: process.env.GROQ_API_KEY ? 'pending' : 'approved',
+        metadata,
+        submittedAt: new Date().toISOString(),
         votes: { up: 0, down: 0 },
-        userVotes: {},
-        submittedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
+        userVotes: new Map()
       };
 
       // Perform moderation if GROQ_API_KEY is set
       if (process.env.GROQ_API_KEY) {
         const moderationResult = await groqModeration.moderateContent(
-          type === 'url' ? `${url}\n${metadata.basicInfo?.title || ''}\n${metadata.basicInfo?.description || ''}` : content,
+          type === 'url' ? `${url}\n${metadata.title || ''}\n${metadata.description || ''}` : content,
           type
         );
 
@@ -343,12 +253,5 @@ exports.handler = async (event, context) => {
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
-  } finally {
-    // Clean up resources
-    try {
-      await fileStorage.cleanup();
-    } catch (error) {
-      console.error('Error cleaning up file storage:', error);
-    }
   }
 };
