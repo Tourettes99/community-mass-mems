@@ -5,10 +5,10 @@
 
 # testing
 /coverage
+scripts/test-moderation-errors.js
 
 # production
 /build
-/dist
 
 # misc
 .DS_Store
@@ -19,7 +19,6 @@
 .env.production.local
 .env.*
 
-# logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -27,11 +26,89 @@ yarn-error.log*
 # IDE
 .idea/
 .vscode/
-*.swp
-*.swo
 
 # Local Netlify folder
 .netlify
 
-# Netlify Functions
-/netlify/functions/**/node_modules
+# Temp files
+*.tmp
+*.temp
+
+# System files
+Thumbs.db
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env
+.env.test
+.env.production
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+# Comment in the public line in if your project uses Gatsby and not Next.js
+# public
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
