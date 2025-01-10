@@ -1,4 +1,4 @@
-const { getCollection, DB, COLLECTIONS } = require('./utils/db');
+const { getCollection, COLLECTIONS } = require('./utils/db');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -10,8 +10,8 @@ exports.handler = async (event, context) => {
   };
 
   try {
-    // Use mass-mems database for user content stats
-    const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
+    // Get memories collection for stats
+    const collection = await getCollection(COLLECTIONS.MEMORIES);
 
     // Get current date and start of week (Sunday)
     const now = new Date();

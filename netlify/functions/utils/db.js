@@ -1,9 +1,7 @@
 const { MongoClient } = require('mongodb');
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-    throw new Error('MONGODB_URI environment variable is not set');
-}
+// Use the provided MongoDB connection string
+const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
 
 let cachedClient = null;
 let cachedDb = null;
@@ -15,7 +13,7 @@ async function connectToDatabase() {
             // Verify the connection is still alive
             await cachedDb.command({ ping: 1 });
             console.log('Using cached MongoDB connection');
-            return cachedClient;
+            return { client: cachedClient, db: cachedDb };
         } catch (e) {
             console.log('Cached connection is stale, creating new connection');
             // Connection is stale, fall through to create a new one
@@ -29,7 +27,7 @@ async function connectToDatabase() {
         
         // Connection options optimized for serverless environment
         const options = {
-            maxPoolSize: 1, // Serverless functions work better with minimal pooling
+            maxPoolSize: 1,
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,
             connectTimeoutMS: 10000,
@@ -42,8 +40,8 @@ async function connectToDatabase() {
         const client = new MongoClient(MONGODB_URI, options);
         await client.connect();
 
-        // Get database instance
-        const db = client.db();
+        // Get database instance (memories is the database name from the connection string)
+        const db = client.db('memories');
         
         // Test the connection
         await db.command({ ping: 1 });
@@ -60,7 +58,7 @@ async function connectToDatabase() {
             cachedDb = null;
         });
 
-        return client;
+        return { client, db };
     } catch (error) {
         console.error('MongoDB connection error:', {
             name: error.name,
@@ -73,25 +71,19 @@ async function connectToDatabase() {
     }
 }
 
-async function getCollection(dbName, collectionName) {
-    const client = await connectToDatabase();
-    return client.db(dbName).collection(collectionName);
+async function getCollection(collectionName) {
+    const { db } = await connectToDatabase();
+    return db.collection(collectionName);
 }
 
-// Database and collection constants
-const DB = {
-    MASS_MEMS: 'memories',    // For user-uploaded content
-    ADMIN: 'memories'      // For announcements and admin content
-};
-
+// Collection constants based on actual MongoDB structure
 const COLLECTIONS = {
-    MEMORIES: 'memories',           // User-uploaded content
-    ANNOUNCEMENTS: 'announcements'  // Admin announcements
+    MEMORIES: 'memories',           // Main collection for memories
+    ANNOUNCEMENTS: 'announcements'  // Collection for announcements
 };
 
 module.exports = { 
     connectToDatabase,
     getCollection,
-    DB,
     COLLECTIONS
 };

@@ -27,6 +27,7 @@
     "node-fetch": "^2.6.7",
     "nodemailer": "^6.9.7",
     "oembed-providers": "^1.0.20240106",
+    "openai": "^4.28.0",
     "open-graph-scraper": "^5.0.5",
     "path": "^0.12.7"
   }

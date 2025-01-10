@@ -1,9 +1,4 @@
-const { MongoClient } = require('mongodb');
-
-// MongoDB connection
-const MONGODB_URI = 'mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0';
-const DB_NAME = 'memories';
-const COLLECTION_NAME = 'memories';
+const { getCollection, COLLECTIONS } = require('./utils/db');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -16,14 +11,8 @@ exports.handler = async (event, context) => {
   };
 
   try {
-    console.log('Connecting to MongoDB...');
-    const client = await MongoClient.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-
-    const db = client.db(DB_NAME);
-    const collection = db.collection(COLLECTION_NAME);
+    console.log('Getting memories collection...');
+    const collection = await getCollection(COLLECTIONS.MEMORIES);
 
     // Get collection stats
     const stats = await collection.stats();
@@ -43,15 +32,14 @@ exports.handler = async (event, context) => {
       return cleanDoc;
     });
 
-    await client.close();
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         message: 'Database check completed',
-        databaseName: DB_NAME,
-        collectionName: COLLECTION_NAME,
+        databaseName: 'memories',
+        collectionName: COLLECTIONS.MEMORIES,
         stats: {
           documentCount: stats.count,
           totalSize: stats.size,
