@@ -151,9 +151,16 @@ class GroqModerationService {
       const analysis = response.choices[0].message.content;
       
       // Parse the analysis to determine if content is appropriate
-      const isInappropriate = analysis.toLowerCase().includes('inappropriate') ||
-                            analysis.toLowerCase().includes('harmful') ||
-                            analysis.toLowerCase().includes('offensive');
+      // Look for actual indicators of inappropriate content, not just the words in the analysis
+      const isInappropriate = (
+        analysis.toLowerCase().includes('contains inappropriate') ||
+        analysis.toLowerCase().includes('contains harmful') ||
+        analysis.toLowerCase().includes('contains offensive') ||
+        analysis.toLowerCase().includes('rating: 1') ||
+        /\b[4-9]\/10\b/.test(analysis) ||  // Matches ratings 4-9 out of 10
+        /\b10\/10\b/.test(analysis)     // Matches 10/10
+      ) && !analysis.toLowerCase().includes('rating: 0') &&
+          !analysis.toLowerCase().includes('safe and appropriate');
 
       console.log(chalk.yellow('\nModeration Analysis:'));
       console.log(chalk.cyan('Content Type:'), type);

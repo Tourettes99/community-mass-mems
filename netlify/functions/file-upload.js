@@ -1,7 +1,6 @@
-const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 const { extractUrlMetadata, extractFileMetadata } = require('./utils/metadata');
-const { connectToDatabase } = require('./mongodb');
+const { getCollection, DB, COLLECTIONS } = require('./utils/db');
 const logger = require('./utils/logger');
 const fetch = require('node-fetch');
 
@@ -10,44 +9,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
-
-const memorySchema = new mongoose.Schema({
-  type: {
-    type: String,
-    enum: ['url', 'image', 'video', 'audio', 'text', 'static', 'social'],
-    required: true
-  },
-  url: String,
-  content: String,
-  tags: [String],
-  metadata: {
-    title: String,
-    description: String,
-    siteName: String,
-    mediaType: String,
-    image: String,
-    playbackHtml: String,
-    fileName: String,
-    format: String,
-    dimensions: {
-      width: Number,
-      height: Number
-    },
-    size: {
-      original: Number,
-      compressed: Number
-    },
-    contentType: String,
-    oEmbed: Object,
-    openGraph: Object,
-    twitterCard: Object
-  }
-}, {
-  timestamps: true,
-  strict: false 
-});
-
-let Memory = mongoose.models.Memory || mongoose.model('Memory', memorySchema);
 
 exports.handler = async (event, context) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -256,7 +217,7 @@ exports.handler = async (event, context) => {
       }
 
       logger.info('Saving memory to database');
-      const collection = await connectToDatabase();
+      const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
       const result = await collection.insertOne(memory);
       
       logger.info('Memory saved successfully', { id: result.insertedId });
