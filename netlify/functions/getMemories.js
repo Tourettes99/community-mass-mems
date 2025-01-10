@@ -1,4 +1,4 @@
-const { getCollection, DB_NAME } = require('./utils/db');
+const { getCollection, DB, COLLECTIONS } = require('./utils/db');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -30,7 +30,8 @@ exports.handler = async (event, context) => {
   }
   
   try {
-    const collection = await getCollection(DB_NAME, 'memories');
+    // Use mass-mems database for user-uploaded content
+    const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
 
     // Fetch memories with proper error handling
     const memories = await collection

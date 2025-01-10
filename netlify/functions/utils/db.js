@@ -30,8 +30,20 @@ async function getCollection(dbName, collectionName) {
     return client.db(dbName).collection(collectionName);
 }
 
+// Database and collection constants
+const DB = {
+    MASS_MEMS: 'mass-mems',    // For user-uploaded content
+    ADMIN: 'admin-content'      // For announcements and admin content
+};
+
+const COLLECTIONS = {
+    MEMORIES: 'memories',           // User-uploaded content
+    ANNOUNCEMENTS: 'announcements'  // Admin announcements
+};
+
 module.exports = { 
     connectToDatabase,
     getCollection,
-    DB_NAME: 'mass-mems'  // Centralize database name
+    DB,
+    COLLECTIONS
 };

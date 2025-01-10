@@ -1,4 +1,4 @@
-const { getCollection, DB_NAME } = require('./utils/db');
+const { getCollection, DB, COLLECTIONS } = require('./utils/db');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -10,7 +10,8 @@ exports.handler = async (event, context) => {
   };
 
   try {
-    const collection = await getCollection(DB_NAME, 'memories');
+    // Use mass-mems database for user content stats
+    const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
 
     // Get current date and start of week (Sunday)
     const now = new Date();
@@ -45,11 +46,16 @@ exports.handler = async (event, context) => {
                             error.message.includes('timeout') ||
                             error.message.includes('network');
     
+    const statusCode = isConnectionError ? 503 : 500;
+    const message = isConnectionError 
+      ? 'Database connection error. Please try again later.'
+      : 'Internal server error while fetching stats.';
+
     return {
-      statusCode: isConnectionError ? 503 : 500,
+      statusCode,
       headers,
       body: JSON.stringify({ 
-        error: 'Failed to get weekly stats',
+        error: message,
         details: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };

@@ -1,11 +1,12 @@
-const { getCollection, DB_NAME } = require('./utils/db');
+const { getCollection, DB, COLLECTIONS } = require('./utils/db');
 const { getUrlMetadata } = require('./utils/urlMetadata');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
 
   try {
-    const collection = await getCollection(DB_NAME, 'announcements');
+    // Use admin database and announcements collection
+    const collection = await getCollection(DB.ADMIN, COLLECTIONS.ANNOUNCEMENTS);
 
     // Get announcements, sorted by date
     const announcements = await collection
