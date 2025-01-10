@@ -34,16 +34,6 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = """
-      default-src 'self' https: 'unsafe-inline' 'unsafe-eval';
-      img-src 'self' data: blob: https: http:;
-      media-src 'self' data: blob: https: http:;
-      object-src 'none';
-      frame-src 'self' https:;
-      style-src 'self' 'unsafe-inline' https:;
-      font-src 'self' data: https:;
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
-      connect-src 'self' https: data: blob:;"""
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
