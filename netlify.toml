@@ -35,60 +35,15 @@
   for = "/*"
   [headers.values]
     Content-Security-Policy = """
-      default-src 'self';
-      img-src 'self' data: blob: http: https: *.tiktokcdn.com *.fbcdn.net;
-      media-src 'self' data: blob: http: https: *.tiktokcdn.com;
+      default-src 'self' https: 'unsafe-inline' 'unsafe-eval';
+      img-src 'self' data: blob: https: http:;
+      media-src 'self' data: blob: https: http:;
       object-src 'none';
-      frame-src 'self' 
-        https://*.youtube.com 
-        https://*.facebook.com 
-        https://*.twitter.com
-        https://*.instagram.com
-        https://*.vimeo.com
-        https://*.soundcloud.com
-        https://*.spotify.com
-        https://*.tiktok.com;
-      style-src 'self' 'unsafe-inline' https://*.googleapis.com https://*.cloudflare.com https://*.fontawesome.com;
-      style-src-elem 'self' 'unsafe-inline' https://*.googleapis.com https://*.cloudflare.com https://*.fontawesome.com;
-      font-src 'self' data: https://*.gstatic.com https://*.cloudflare.com https://*.fontawesome.com;
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' 
-        https://*.youtube.com
-        https://*.facebook.com
-        https://*.twitter.com
-        https://*.instagram.com
-        https://*.tiktok.com
-        https://*.cloudflare.com
-        https://connect.facebook.net;
-      script-src-elem 'self' 'unsafe-inline'
-        https://*.youtube.com
-        https://*.facebook.com
-        https://*.twitter.com
-        https://*.instagram.com
-        https://*.tiktok.com
-        https://*.cloudflare.com
-        https://connect.facebook.net;
-      connect-src 'self' 
-        https://api.twitter.com
-        https://syndication.twitter.com
-        https://platform.twitter.com
-        https://vimeo.com
-        https://api.vimeo.com
-        https://w.soundcloud.com
-        https://api.soundcloud.com
-        https://open.spotify.com
-        https://api.spotify.com
-        https://www.facebook.com
-        https://graph.facebook.com
-        https://www.instagram.com
-        https://api.instagram.com
-        https://www.tiktok.com
-        https://api.tiktok.com
-        https://*.mongodb.net
-        https://*.mongodb-api.com
-        https://r1memories.com
-        https://www.r1memories.com
-        https://shiny-jalebi-9ccb2b.netlify.app
-        data: blob: http: https:;"""
+      frame-src 'self' https:;
+      style-src 'self' 'unsafe-inline' https:;
+      font-src 'self' data: https:;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+      connect-src 'self' https: data: blob:;"""
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
