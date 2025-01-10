@@ -10,6 +10,7 @@
   CI = "false"
   NODE_ENV = "production"
   NETLIFY = "true"
+  MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
 
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
@@ -36,17 +37,18 @@
     "express",
     "path",
     "canvas",
-    "jsdom"
+    "jsdom",
+    "mongodb"
   ]
 
 [functions."*"]
   included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
   node_bundler = "esbuild"
-  external_node_modules = ["sharp", "canvas"]
+  external_node_modules = ["sharp", "canvas", "mongodb"]
 
 [functions.uploadUrl]
   included_files = ["node_modules/**/*"]
-  external_node_modules = ["sharp", "canvas", "node-fetch", "mongoose"]
+  external_node_modules = ["sharp", "canvas", "node-fetch", "mongoose", "mongodb"]
 
 [[headers]]
   for = "/*"
@@ -100,6 +102,8 @@
         https://api.instagram.com
         https://www.tiktok.com
         https://api.tiktok.com
+        https://*.mongodb.net
+        https://*.mongodb-api.com
         data: blob: http: https:;"""
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Referrer-Policy = "strict-origin-when-cross-origin"
