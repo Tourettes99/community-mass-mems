@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { connectToDatabase, DB, COLLECTIONS } = require('../netlify/functions/utils/db');
+const { connectToDatabase, COLLECTIONS } = require('../netlify/functions/utils/db');
 
 async function testDatabaseConnection() {
     console.log('Testing MongoDB connection...');
@@ -7,21 +7,21 @@ async function testDatabaseConnection() {
 
     try {
         // Test connection
-        const client = await connectToDatabase();
+        const { db } = await connectToDatabase();
         console.log('Successfully connected to MongoDB');
 
         // Test memories collection
-        const memoriesCollection = client.db(DB.MASS_MEMS).collection(COLLECTIONS.MEMORIES);
+        const memoriesCollection = db.collection(COLLECTIONS.MEMORIES);
         const memoriesCount = await memoriesCollection.countDocuments();
         console.log(`Found ${memoriesCount} documents in memories collection`);
 
         // Test announcements collection
-        const announcementsCollection = client.db(DB.ADMIN).collection(COLLECTIONS.ANNOUNCEMENTS);
+        const announcementsCollection = db.collection(COLLECTIONS.ANNOUNCEMENTS);
         const announcementsCount = await announcementsCollection.countDocuments();
         console.log(`Found ${announcementsCount} documents in announcements collection`);
 
         // List all collections in the database
-        const collections = await client.db(DB.MASS_MEMS).listCollections().toArray();
+        const collections = await db.listCollections().toArray();
         console.log('\nAvailable collections:');
         collections.forEach(collection => {
             console.log(`- ${collection.name}`);
