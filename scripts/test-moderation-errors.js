@@ -1,6 +1,7 @@
 require('dotenv').config();
-const fetch = require('node-fetch');
 const chalk = require('chalk');
+const { handler: uploadTextHandler } = require('../netlify/functions/uploadText');
+const { handler: uploadUrlHandler } = require('../netlify/functions/uploadUrl');
 
 // Test cases with different types of content
 const testCases = [
@@ -12,7 +13,7 @@ const testCases = [
   {
     name: 'Hate Speech',
     type: 'text',
-    content: '[HATE SPEECH CONTENT REMOVED]'
+    content: 'I hate all people from that country, they are terrible!'
   },
   {
     name: 'Safe URL',
@@ -22,25 +23,22 @@ const testCases = [
   {
     name: 'Violent Content',
     type: 'text',
-    content: '[VIOLENT CONTENT REMOVED]'
+    content: 'I want to hurt them all, they deserve to suffer!'
   },
   {
     name: 'Self-Harm Content',
     type: 'text',
-    content: '[SELF-HARM CONTENT REMOVED]'
+    content: 'I feel like ending it all, no one would miss me anyway.'
   },
   {
     name: 'Multiple Violations',
     type: 'text',
-    content: '[MULTIPLE VIOLATION CONTENT REMOVED]'
+    content: 'I hate them and want to hurt them all! They should die!'
   }
 ];
 
 async function testModeration() {
   console.log(chalk.blue('Testing moderation error handling...\n'));
-
-  const NETLIFY_URL = process.env.SITE_URL || 'https://shiny-jalebi-9ccb2b.netlify.app';
-  const API_ENDPOINT = `${NETLIFY_URL}/.netlify/functions/uploadText`;
 
   for (const testCase of testCases) {
     console.log(chalk.yellow(`\nTesting: ${testCase.name}`));
@@ -48,22 +46,26 @@ async function testModeration() {
     console.log(chalk.cyan('Content:'), testCase.type === 'url' ? testCase.url : testCase.content);
 
     try {
-      const response = await fetch(API_ENDPOINT, {
-        method: 'POST',
+      // Create mock event
+      const event = {
+        httpMethod: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': 'test-user-123' // For testing user tracking
+          'x-user-id': 'test-user-123'
         },
         body: JSON.stringify({
           type: testCase.type,
           content: testCase.type === 'url' ? testCase.url : testCase.content
         })
-      });
+      };
 
-      const result = await response.json();
+      // Call appropriate handler
+      const response = await (testCase.type === 'url' ? uploadUrlHandler : uploadTextHandler)(event);
 
       console.log(chalk.magenta('\nResponse:'));
-      console.log('Status Code:', chalk.cyan(response.status));
+      console.log('Status Code:', chalk.cyan(response.statusCode));
+
+      const result = JSON.parse(response.body);
 
       if (result.error) {
         // Moderation rejection or other error
@@ -108,7 +110,10 @@ async function testModeration() {
 
       console.log('\nRequest ID:', chalk.cyan(result.requestId));
     } catch (error) {
-      console.error(chalk.red('\nError making request:'), error.message);
+      console.error(chalk.red('\nError running test:'), error.message);
+      if (error.stack) {
+        console.error(chalk.gray(error.stack));
+      }
     }
 
     // Add a separator between test cases
