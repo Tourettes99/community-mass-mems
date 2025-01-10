@@ -1,10 +1,7 @@
-require('dotenv').config();
-const { MongoClient } = require('mongodb');
+const { getCollection, DB_NAME } = require('./utils/db');
 
 exports.handler = async (event, context) => {
-  // Prevent function from waiting for connections to close
   context.callbackWaitsForEmptyEventLoop = false;
-  let client;
   
   // Set default headers
   const headers = {
@@ -33,16 +30,7 @@ exports.handler = async (event, context) => {
   }
   
   try {
-    // Connect to MongoDB with increased timeouts
-    client = await MongoClient.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 75000,
-      connectTimeoutMS: 30000,
-      family: 4
-    });
-
-    const db = client.db('mass-mems');
-    const collection = db.collection('memories');
+    const collection = await getCollection(DB_NAME, 'memories');
 
     // Fetch memories with proper error handling
     const memories = await collection
@@ -93,9 +81,5 @@ exports.handler = async (event, context) => {
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 };

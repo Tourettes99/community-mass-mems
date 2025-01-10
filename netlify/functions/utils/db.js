@@ -1,24 +1,37 @@
-const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
 
-let cachedDb = null;
+let cachedClient = null;
 
 async function connectToDatabase() {
-    if (cachedDb) {
-        return cachedDb;
+    if (cachedClient) {
+        return cachedClient;
     }
 
     try {
-        const connection = await mongoose.connect(process.env.MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
+        // Connect with increased timeouts
+        cachedClient = await MongoClient.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 30000,
+            socketTimeoutMS: 75000,
+            connectTimeoutMS: 30000,
+            family: 4
         });
 
-        cachedDb = connection;
-        return cachedDb;
+        console.log('Successfully connected to MongoDB');
+        return cachedClient;
     } catch (error) {
         console.error('MongoDB connection error:', error);
+        cachedClient = null;
         throw error;
     }
 }
 
-module.exports = { connectToDatabase };
+async function getCollection(dbName, collectionName) {
+    const client = await connectToDatabase();
+    return client.db(dbName).collection(collectionName);
+}
+
+module.exports = { 
+    connectToDatabase,
+    getCollection,
+    DB_NAME: 'mass-mems'  // Centralize database name
+};

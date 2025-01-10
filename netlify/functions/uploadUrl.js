@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { MongoClient, ObjectId } = require('mongodb');
+const { getCollection, DB_NAME } = require('./utils/db');
+const { ObjectId } = require('mongodb');
 const fetch = require('node-fetch');
 const { getUrlMetadata } = require('./utils/urlMetadata');
 const groqModeration = require('./services/groqModeration');
@@ -21,7 +22,6 @@ async function initializeServices() {
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
-  let client;
 
   try {
     // Debug logging
@@ -243,17 +243,8 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Connect to MongoDB with increased timeouts
     try {
-      client = await MongoClient.connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 30000,
-        socketTimeoutMS: 75000,
-        connectTimeoutMS: 30000,
-        family: 4
-      });
-
-      const db = client.db('mass-mems');
-      const collection = db.collection('memories');
+      const collection = await getCollection(DB_NAME, 'memories');
 
       // Create new memory document
       const memory = {
@@ -316,19 +307,24 @@ exports.handler = async (event, context) => {
       console.error('Error:', error);
       console.error('Error stack:', error.stack);
       
+      // Determine if it's a connection error
+      const isConnectionError = error.message.includes('connect') || 
+                              error.message.includes('timeout') ||
+                              error.message.includes('network');
+      
+      const statusCode = isConnectionError ? 503 : 500;
+      const message = isConnectionError 
+        ? 'Database connection error. Please try again later.'
+        : 'Internal server error while saving memory.';
+
       return {
-        statusCode: 500,
+        statusCode,
         headers,
         body: JSON.stringify({
-          error: 'Internal server error',
-          message: error.message,
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+          error: message,
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
         })
       };
-    } finally {
-      if (client) {
-        await client.close();
-      }
     }
   } catch (error) {
     console.error('Error:', error);
@@ -352,9 +348,6 @@ exports.handler = async (event, context) => {
       await fileStorage.cleanup();
     } catch (error) {
       console.error('Error cleaning up file storage:', error);
-    }
-    if (client) {
-      await client.close();
     }
   }
 };

@@ -1,7 +1,8 @@
-const { connectToDatabase } = require('./utils/db');
-const Memory = require('./models/Memory');
+const { getCollection, DB_NAME } = require('./utils/db');
 
 exports.handler = async (event, context) => {
+  context.callbackWaitsForEmptyEventLoop = false;
+  
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -9,7 +10,7 @@ exports.handler = async (event, context) => {
   };
 
   try {
-    await connectToDatabase();
+    const collection = await getCollection(DB_NAME, 'memories');
 
     // Get current date and start of week (Sunday)
     const now = new Date();
@@ -22,8 +23,8 @@ exports.handler = async (event, context) => {
     nextReset.setDate(nextReset.getDate() + 7);
 
     // Count posts this week
-    const postsThisWeek = await Memory.countDocuments({
-      submittedAt: { $gte: startOfWeek.toISOString() },
+    const postsThisWeek = await collection.countDocuments({
+      submittedAt: { $gte: startOfWeek },
       status: 'approved'  // Only count approved posts
     });
 
@@ -38,10 +39,19 @@ exports.handler = async (event, context) => {
     };
   } catch (error) {
     console.error('Error getting weekly stats:', error);
+    
+    // Determine if it's a connection error
+    const isConnectionError = error.message.includes('connect') || 
+                            error.message.includes('timeout') ||
+                            error.message.includes('network');
+    
     return {
-      statusCode: 500,
+      statusCode: isConnectionError ? 503 : 500,
       headers,
-      body: JSON.stringify({ error: 'Failed to get weekly stats' })
+      body: JSON.stringify({ 
+        error: 'Failed to get weekly stats',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      })
     };
   }
 };
