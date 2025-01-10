@@ -1,6 +1,6 @@
 const { Buffer } = require('buffer');
 const { extractUrlMetadata, extractFileMetadata } = require('./utils/metadata');
-const { getCollection, DB, COLLECTIONS } = require('./utils/db');
+const { getCollection, COLLECTIONS } = require('./utils/db');
 const logger = require('./utils/logger');
 const fetch = require('node-fetch');
 
@@ -217,7 +217,7 @@ exports.handler = async (event, context) => {
       }
 
       logger.info('Saving memory to database');
-      const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
+      const collection = await getCollection(COLLECTIONS.MEMORIES);
       const result = await collection.insertOne(memory);
       
       logger.info('Memory saved successfully', { id: result.insertedId });

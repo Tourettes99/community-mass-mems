@@ -1,21 +1,6 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const Memory = require('./models/Memory');
+const { getCollection, COLLECTIONS } = require('./utils/db');
 const busboy = require('busboy');
-
-let conn = null;
-
-const connectDb = async () => {
-  if (conn == null) {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is not set');
-    }
-    conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
-    });
-  }
-  return conn;
-};
 
 const processFormData = async (event) => {
   return new Promise((resolve, reject) => {
@@ -97,21 +82,30 @@ exports.handler = async (event, context) => {
     const fileUrl = `data:${file.mimeType};base64,${file.content.toString('base64')}`;
 
     // Save to MongoDB
-    await connectDb();
+    const collection = await getCollection(COLLECTIONS.MEMORIES);
     const fileType = file.mimeType.startsWith('image/') ? 
       (file.mimeType.includes('gif') ? 'gif' : 'image') : 
       (file.mimeType.startsWith('audio/') ? 'audio' : 'url');
 
-    const memory = new Memory({
+    const memory = {
       type: fileType,
       url: fileUrl,
       metadata: {
         fileName: file.filename,
-        format: file.mimeType
-      }
-    });
+        format: file.mimeType,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      status: 'pending',
+      votes: { up: 0, down: 0 },
+      userVotes: {},
+      submittedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-    await memory.save();
+    const result = await collection.insertOne(memory);
+    memory._id = result.insertedId;
     
     return {
       statusCode: 201,

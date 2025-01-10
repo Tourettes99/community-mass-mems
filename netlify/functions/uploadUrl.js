@@ -94,16 +94,7 @@ exports.handler = async (event, context) => {
         };
       } catch (error) {
         logError('METADATA_FETCH_ERROR', error, { url });
-        // Use basic metadata if fetch fails
-        metadata = {
-          title: url,
-          description: '',
-          mediaType: 'rich',
-          platform: new URL(url).hostname,
-          contentUrl: url,
-          domain: new URL(url).hostname,
-          isSecure: url.startsWith('https')
-        };
+        return createErrorResponse('METADATA_FETCH_ERROR', error.message);
       }
     } else {
       metadata = {

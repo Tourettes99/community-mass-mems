@@ -1,20 +1,5 @@
-require('dotenv').config();
-const mongoose = require('mongoose');
-const Memory = require('./models/Memory');
-
-let conn = null;
-
-const connectDb = async () => {
-  if (conn == null) {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is not set');
-    }
-    conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
-    });
-  }
-  return conn;
-};
+const { getCollection, COLLECTIONS } = require('./utils/db');
+const { ObjectId } = require('mongodb');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -63,10 +48,10 @@ exports.handler = async (event, context) => {
       };
     }
 
-    await connectDb();
+    const collection = await getCollection(COLLECTIONS.MEMORIES);
 
     // Find the memory first
-    const memory = await Memory.findById(memoryId).exec();
+    const memory = await collection.findOne({ _id: new ObjectId(memoryId) });
     if (!memory) {
       return {
         statusCode: 404,
@@ -75,53 +60,56 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Initialize votes if they don't exist
-    if (!memory.votes) {
-      memory.votes = { up: 0, down: 0 };
-    }
-
-    // Initialize userVotes if it doesn't exist
-    if (!memory.userVotes || !(memory.userVotes instanceof Map)) {
-      memory.userVotes = new Map();
-    }
+    // Initialize votes and userVotes if they don't exist
+    const votes = memory.votes || { up: 0, down: 0 };
+    const userVotes = memory.userVotes || {};
 
     // Get current user's vote
-    const currentVote = memory.userVotes.get(userId);
+    const currentVote = userVotes[userId];
 
     // Calculate vote changes
+    let update;
     if (!currentVote) {
       // New vote
-      memory.votes[voteType] += 1;
-      memory.userVotes.set(userId, voteType);
+      update = {
+        $inc: { [`votes.${voteType}`]: 1 },
+        $set: { [`userVotes.${userId}`]: voteType }
+      };
     } else if (currentVote === voteType) {
       // Undo vote
-      memory.votes[voteType] -= 1;
-      memory.userVotes.delete(userId);
+      update = {
+        $inc: { [`votes.${voteType}`]: -1 },
+        $unset: { [`userVotes.${userId}`]: "" }
+      };
     } else {
       // Change vote (e.g., from up to down)
-      memory.votes[currentVote] -= 1;
-      memory.votes[voteType] += 1;
-      memory.userVotes.set(userId, voteType);
+      update = {
+        $inc: {
+          [`votes.${currentVote}`]: -1,
+          [`votes.${voteType}`]: 1
+        },
+        $set: { [`userVotes.${userId}`]: voteType }
+      };
     }
 
     try {
-      // Save the updated memory
-      await memory.save();
+      // Update the memory with atomic operations
+      const result = await collection.findOneAndUpdate(
+        { _id: new ObjectId(memoryId) },
+        update,
+        { returnDocument: 'after' }
+      );
 
-      // Convert userVotes to object for JSON response
-      const userVotesObj = {};
-      memory.userVotes.forEach((value, key) => {
-        userVotesObj[key] = value;
-      });
+      const updatedMemory = result.value;
 
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           message: 'Vote recorded successfully',
-          votes: memory.votes,
-          userVote: memory.userVotes.get(userId) || null,
-          userVotes: userVotesObj
+          votes: updatedMemory.votes,
+          userVote: updatedMemory.userVotes[userId] || null,
+          userVotes: updatedMemory.userVotes
         })
       };
     } catch (updateError) {

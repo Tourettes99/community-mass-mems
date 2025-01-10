@@ -1,6 +1,7 @@
-const { MongoClient } = require('mongodb');
+const { getCollection, COLLECTIONS } = require('./utils/db');
 
 exports.handler = async (event, context) => {
+  context.callbackWaitsForEmptyEventLoop = false;
   // Add CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -46,20 +47,15 @@ exports.handler = async (event, context) => {
       };
     }
 
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-
-    const db = client.db('mass-mems');
-    const collection = db.collection('announcements');
+    const collection = await getCollection(COLLECTIONS.ANNOUNCEMENTS);
 
     const announcement = {
       message,
       timestamp: new Date().toISOString(),
-      createdAt: new Date(),
+      createdAt: new Date()
     };
 
     await collection.insertOne(announcement);
-    await client.close();
 
     return {
       statusCode: 200,

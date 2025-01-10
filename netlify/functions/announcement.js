@@ -1,7 +1,7 @@
-// In-memory storage for development
-let currentAnnouncement = { message: '', active: false };
+const { getCollection, COLLECTIONS } = require('./utils/db');
 
 exports.handler = async (event, context) => {
+    context.callbackWaitsForEmptyEventLoop = false;
     console.log('Function invoked with method:', event.httpMethod);
     try {
         if (event.httpMethod === 'OPTIONS') {
@@ -17,14 +17,19 @@ exports.handler = async (event, context) => {
 
         if (event.httpMethod === 'GET') {
             console.log('Processing GET request');
-            console.log('Current announcement:', currentAnnouncement);
+            const collection = await getCollection(COLLECTIONS.ANNOUNCEMENTS);
+            
+            // Get the most recent active announcement
+            const announcement = await collection
+                .findOne({ active: true }, { sort: { createdAt: -1 } });
+
             return {
                 statusCode: 200,
                 headers: {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
                 },
-                body: JSON.stringify(currentAnnouncement)
+                body: JSON.stringify(announcement || { message: '', active: false })
             };
         }
 
@@ -33,13 +38,19 @@ exports.handler = async (event, context) => {
             const body = JSON.parse(event.body);
             console.log('Parsed body:', body);
             
-            // Update the announcement
-            currentAnnouncement = {
+            const collection = await getCollection(COLLECTIONS.ANNOUNCEMENTS);
+
+            // Create new announcement
+            const announcement = {
                 message: body.message || '',
-                active: body.active || false
+                active: body.active || false,
+                createdAt: new Date(),
+                updatedAt: new Date()
             };
             
-            console.log('Updated announcement:', currentAnnouncement);
+            // Insert the announcement
+            await collection.insertOne(announcement);
+            console.log('Created new announcement:', announcement);
             return {
                 statusCode: 200,
                 headers: {
