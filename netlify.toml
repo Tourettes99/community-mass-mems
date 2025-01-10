@@ -20,37 +20,16 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = [
-    "sharp",
-    "fluent-ffmpeg",
-    "mongodb-client-encryption",
-    "bson",
-    "aws4",
-    "mongoose",
-    "file-type",
-    "image-size",
-    "unfurl.js",
-    "page-metadata-parser",
-    "domino",
-    "node-fetch",
-    "busboy",
-    "cors",
-    "dotenv",
-    "express",
-    "path",
-    "canvas",
-    "jsdom",
-    "mongodb"
-  ]
+  external_node_modules = ["mongodb", "@mongodb-js/zstd", "bson", "mongodb-client-encryption", "snappy", "aws4"]
 
 [functions."*"]
-  included_files = ["node_modules/sharp/**/*", "node_modules/fluent-ffmpeg/**/*"]
+  included_files = ["node_modules/mongodb/**/*", "node_modules/@mongodb-js/**/*", "node_modules/bson/**/*"]
   node_bundler = "esbuild"
-  external_node_modules = ["sharp", "canvas", "mongodb"]
+  external_node_modules = ["mongodb", "@mongodb-js/zstd", "bson", "mongodb-client-encryption"]
 
 [functions.uploadUrl]
-  included_files = ["node_modules/**/*"]
-  external_node_modules = ["sharp", "canvas", "node-fetch", "mongoose", "mongodb"]
+  included_files = ["node_modules/mongodb/**/*", "node_modules/@mongodb-js/**/*", "node_modules/bson/**/*"]
+  external_node_modules = ["mongodb", "@mongodb-js/zstd", "bson", "mongodb-client-encryption"]
 
 [[headers]]
   for = "/*"
