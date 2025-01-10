@@ -6,10 +6,11 @@ exports.handler = async (event, context) => {
   let client;
 
   try {
-    // Connect to MongoDB
+    // Connect to MongoDB with increased timeouts
     client = await MongoClient.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 75000,
+      connectTimeoutMS: 30000,
       family: 4
     });
 
