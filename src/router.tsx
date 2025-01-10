@@ -14,13 +14,14 @@ const router = createBrowserRouter(
     }
   ],
   {
-    // Enable v7 behavior
+    // Enable v7 behavior and additional features
     future: {
-      // Use React 18's startTransition for navigation updates
-      startTransition: true,
-      // Use new relative splat path resolution
-      relativeSplatPath: true,
+      v7_startTransition: true,
+      v7_relativeSplatPath: true
     },
+    // Enable scroll restoration
+    basename: '/',
+    window: typeof window === 'undefined' ? undefined : window
   }
 );
 
