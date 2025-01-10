@@ -166,39 +166,45 @@ exports.handler = async (event, context) => {
         url: type === 'url' ? url.trim() : undefined,
         content: type === 'text' ? content.trim() : undefined,
         tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-        status: process.env.GROQ_API_KEY ? 'pending' : 'approved',
+        status: 'approved', // Default to approved if no moderation
         metadata,
         submittedAt: new Date().toISOString(),
         votes: { up: 0, down: 0 },
         userVotes: new Map()
       };
 
-      // Perform moderation if GROQ_API_KEY is set
-      if (process.env.GROQ_API_KEY) {
-        const moderationResult = await groqModeration.moderateContent(
-          type === 'url' ? `${url}\n${metadata.title || ''}\n${metadata.description || ''}` : content,
-          type
-        );
+      // Only perform moderation if GROQ_API_KEY is set and moderation service is available
+      if (process.env.GROQ_API_KEY && groqModeration) {
+        try {
+          const moderationResult = await groqModeration.moderateContent(
+            type === 'url' ? `${url}\n${metadata.title || ''}\n${metadata.description || ''}` : content,
+            type
+          );
 
-        // Update memory with moderation result
-        memory.status = moderationResult.flagged ? 'rejected' : 'approved';
-        memory.moderationResult = {
-          flagged: moderationResult.flagged,
-          category_scores: moderationResult.category_scores,
-          reason: moderationResult.reason
-        };
-
-        if (moderationResult.flagged) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({
-              message: 'Content rejected by moderation',
-              reason: moderationResult.reason,
-              category_scores: moderationResult.category_scores,
-              id: memory._id
-            })
+          // Update memory with moderation result
+          memory.status = moderationResult.flagged ? 'rejected' : 'approved';
+          memory.moderationResult = {
+            flagged: moderationResult.flagged,
+            category_scores: moderationResult.category_scores,
+            reason: moderationResult.reason
           };
+
+          if (moderationResult.flagged) {
+            return {
+              statusCode: 400,
+              headers,
+              body: JSON.stringify({
+                message: 'Content rejected by moderation',
+                reason: moderationResult.reason,
+                category_scores: moderationResult.category_scores,
+                id: memory._id
+              })
+            };
+          }
+        } catch (error) {
+          console.error('Moderation service error:', error);
+          // Continue without moderation if it fails
+          console.log('Continuing without content moderation');
         }
       }
 
