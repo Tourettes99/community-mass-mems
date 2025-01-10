@@ -171,7 +171,7 @@ async function testDatabaseHealth(client) {
       name: 'Connection Test',
       run: async () => {
         await client.db().admin().ping();
-        return { status: 'ok', message: 'Successfully connected to database' };
+        return { status: 'passed', message: 'Successfully connected to database' };
       }
     },
     {
@@ -183,7 +183,7 @@ async function testDatabaseHealth(client) {
           type: 'health_check'
         });
         await collection.deleteOne({ _id: result.insertedId });
-        return { status: 'ok', message: 'Write operations working correctly' };
+        return { status: 'passed', message: 'Write operations working correctly' };
       }
     },
     {
@@ -191,7 +191,7 @@ async function testDatabaseHealth(client) {
       run: async () => {
         const collection = client.db().collection('memories');
         await collection.find().limit(1).toArray();
-        return { status: 'ok', message: 'Read operations working correctly' };
+        return { status: 'passed', message: 'Read operations working correctly' };
       }
     },
     {
@@ -199,26 +199,32 @@ async function testDatabaseHealth(client) {
       run: async () => {
         const collection = client.db().collection('memories');
         await collection.indexes();
-        return { status: 'ok', message: 'Index operations working correctly' };
+        return { status: 'passed', message: 'Index operations working correctly' };
       }
     }
   ];
 
   const results = [];
+  let allPassed = true;
+
   for (const test of tests) {
     try {
       const result = await test.run();
       results.push({
         name: test.name,
-        status: 'passed',
-        ...result
+        status: result.status,
+        message: result.message
       });
+      if (result.status !== 'passed') {
+        allPassed = false;
+      }
     } catch (error) {
       results.push({
         name: test.name,
         status: 'failed',
         error: error.message
       });
+      allPassed = false;
       // Log the error but continue with other tests
       logDbError(error, { test: test.name });
     }
@@ -226,7 +232,7 @@ async function testDatabaseHealth(client) {
 
   return {
     timestamp: new Date().toISOString(),
-    overall_status: results.every(r => r.status === 'passed') ? 'healthy' : 'unhealthy',
+    overall_status: allPassed ? 'healthy' : 'unhealthy',
     tests: results
   };
 }
