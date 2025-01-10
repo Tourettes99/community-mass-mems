@@ -13,11 +13,14 @@ const routes = [
   }
 ];
 
-// Create router with future flags enabled
+// Create router with v7 features
 const router = createBrowserRouter(routes, {
+  // Enable v7 features
   future: {
-    v7_startTransition: true,
-    v7_relativeSplatPath: true
+    // Use React 18's startTransition for navigation updates
+    startTransition: true,
+    // Use new relative splat path resolution
+    relativeSplatPath: true
   }
 });
 
