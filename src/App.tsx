@@ -1,19 +1,31 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import TestUpload from './pages/TestUpload';
 
 const theme = createTheme();
 
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <TestUpload />
+  },
+  {
+    path: "/test-upload",
+    element: <TestUpload />
+  }
+], {
+  future: {
+    // These are the correct flag names in the latest version
+    startTransition: true,
+    relativeSplatPath: true
+  }
+});
+
 const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Routes>
-          <Route path="/" element={<TestUpload />} />
-          <Route path="/test-upload" element={<TestUpload />} />
-        </Routes>
-      </Router>
+      <RouterProvider router={router} />
     </ThemeProvider>
   );
 };
