@@ -1,9 +1,8 @@
 import { createBrowserRouter } from 'react-router-dom';
 import TestUpload from './pages/TestUpload';
-import routerConfig from './routerConfig';
 
-// Define routes
-const routes = [
+// Create router with basic configuration
+const router = createBrowserRouter([
   {
     path: "/",
     element: <TestUpload />
@@ -12,9 +11,9 @@ const routes = [
     path: "/test-upload",
     element: <TestUpload />
   }
-];
-
-// Create router with global configuration
-const router = createBrowserRouter(routes, routerConfig);
+], {
+  basename: '/',
+  window: typeof window === 'undefined' ? undefined : window
+});
 
 export default router;
