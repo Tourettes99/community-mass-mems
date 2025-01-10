@@ -10,7 +10,7 @@
   CI = "false"
   NODE_ENV = "production"
   NETLIFY = "true"
-  SITE_URL = "https://r1memories.com"
+  SITE_URL = "https://shiny-jalebi-9ccb2b.netlify.app"
   MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
 
 [[plugins]]
