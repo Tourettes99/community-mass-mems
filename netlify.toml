@@ -10,6 +10,7 @@
   CI = "false"
   NODE_ENV = "production"
   NETLIFY = "true"
+  SITE_URL = "https://r1memories.com"
   MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
 
 [[plugins]]
@@ -104,7 +105,13 @@
         https://api.tiktok.com
         https://*.mongodb.net
         https://*.mongodb-api.com
+        https://r1memories.com
+        https://www.r1memories.com
+        https://shiny-jalebi-9ccb2b.netlify.app
         data: blob: http: https:;"""
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
@@ -121,12 +128,5 @@
   status = 200
 
 [template.environment]
-  AZURE_TENANT_ID = "Azure AD tenant ID"
-  AZURE_CLIENT_ID = "Azure AD application client ID"
-  AZURE_CLIENT_SECRET = "Azure AD application client secret"
-  ONEDRIVE_DRIVE_ID = "OneDrive drive ID"
-  ONEDRIVE_FOLDER_ID = "OneDrive folder ID for storing files"
-  EMAIL_USER = "Email address for notifications"
-  EMAIL_PASSWORD = "Email password for notifications"
   MONGODB_URI = "Your MongoDB connection string"
   GROQ_API_KEY = "Your GROQ API key for content moderation"
