@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import TestUpload from './pages/TestUpload';
+import routerConfig from './routerConfig';
 
 // Define routes
 const routes = [
@@ -13,15 +14,7 @@ const routes = [
   }
 ];
 
-// Create router with v7 features
-const router = createBrowserRouter(routes, {
-  // Enable v7 features
-  future: {
-    // Use React 18's startTransition for navigation updates
-    startTransition: true,
-    // Use new relative splat path resolution
-    relativeSplatPath: true
-  }
-});
+// Create router with global configuration
+const router = createBrowserRouter(routes, routerConfig);
 
 export default router;
