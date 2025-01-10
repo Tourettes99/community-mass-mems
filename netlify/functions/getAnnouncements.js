@@ -1,21 +1,11 @@
-const { MongoClient } = require('mongodb');
+const { getCollection, DB_NAME } = require('./utils/db');
 const { getUrlMetadata } = require('./utils/urlMetadata');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
-  let client;
 
   try {
-    // Connect to MongoDB with increased timeouts
-    client = await MongoClient.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 75000,
-      connectTimeoutMS: 30000,
-      family: 4
-    });
-
-    const db = client.db('mass-mems');
-    const collection = db.collection('announcements');
+    const collection = await getCollection(DB_NAME, 'announcements');
 
     // Get announcements, sorted by date
     const announcements = await collection
@@ -86,20 +76,27 @@ exports.handler = async (event, context) => {
     };
   } catch (error) {
     console.error('Error:', error);
+    
+    // Determine if it's a connection error
+    const isConnectionError = error.message.includes('connect') || 
+                            error.message.includes('timeout') ||
+                            error.message.includes('network');
+    
+    const statusCode = isConnectionError ? 503 : 500;
+    const message = isConnectionError 
+      ? 'Database connection error. Please try again later.'
+      : 'Internal server error while fetching announcements.';
+
     return {
-      statusCode: 500,
+      statusCode,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({ 
-        error: 'Error fetching announcements',
-        details: error.message 
+        error: message,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 };
