@@ -1,11 +1,9 @@
 #!/bin/bash
-echo "Current directory: $(pwd)"
-echo "Directory contents:"
-ls -la
-echo "Node version: $(node -v)"
-echo "NPM version: $(npm -v)"
-echo "Installing dependencies..."
-npm config set legacy-peer-deps=true
-npm ci --prefer-offline
-echo "Building..."
-CI=false npm run build
+
+# Build the React app
+npm run build
+
+# Ensure _headers file is copied to build directory
+cp public/_headers build/
+
+echo "Build completed and _headers copied to build directory"
