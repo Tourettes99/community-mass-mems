@@ -118,6 +118,12 @@
     X-Frame-Options = "DENY"
 
 [[redirects]]
+  from = "https://r1memories.com/*"
+  to = "https://shiny-jalebi-9ccb2b.netlify.app/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
