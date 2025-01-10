@@ -1,46 +1,59 @@
-# Getting Started with Create React App
+# Community Mass Memories
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A platform for sharing and moderating community memories.
 
-## Available Scripts
+## Setup
 
-In the project directory, you can run:
+### Environment Variables
 
-### `npm start`
+The following environment variables need to be set in `netlify/functions/.env`:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```env
+# OpenAI API Key for content moderation
+OPENAI_API_KEY=your-openai-api-key
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+# SMTP Settings for email notifications
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM=your-email@gmail.com
+SMTP_TO=notifications@yourdomain.com
+```
 
-### `npm test`
+### Setting up Gmail SMTP
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+1. Go to your Google Account settings (https://myaccount.google.com/)
+2. Navigate to Security
+3. Enable 2-Step Verification if not already enabled
+4. Under "Signing in to Google", select App Passwords
+5. Generate a new App Password:
+   - Select app: Mail
+   - Select device: Other (Custom name)
+   - Enter name: "Netlify Functions"
+   - Click Generate
+6. Copy the 16-character password
+7. Update `SMTP_PASS` in your .env file with this password
+8. Update `SMTP_USER` and `SMTP_FROM` with your Gmail address
+9. Update `SMTP_TO` with the email where you want to receive notifications
 
-### `npm run build`
+### Testing
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Run the system tests to verify everything is working:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+node scripts/test-moderation-errors.js
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+This will test:
+- Database connectivity
+- Content moderation
+- Email notifications
 
-### `npm run eject`
+## Features
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Content moderation using OpenAI
+- Database health monitoring
+- Email notifications for moderation events
+- URL metadata extraction
+- Support for text and URL submissions
