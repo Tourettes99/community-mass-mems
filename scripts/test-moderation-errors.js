@@ -46,7 +46,7 @@ async function testModeration() {
     console.log(chalk.cyan('Content:'), testCase.type === 'url' ? testCase.url : testCase.content);
 
     try {
-      // Create mock event
+      // Create mock event and context
       const event = {
         httpMethod: 'POST',
         headers: {
@@ -59,8 +59,22 @@ async function testModeration() {
         })
       };
 
+      const context = {
+        callbackWaitsForEmptyEventLoop: true,
+        functionName: 'test',
+        functionVersion: '$LATEST',
+        invokedFunctionArn: 'test',
+        memoryLimitInMB: '128',
+        awsRequestId: 'test',
+        logGroupName: 'test',
+        logStreamName: 'test',
+        identity: null,
+        clientContext: null,
+        getRemainingTimeInMillis: () => 30000
+      };
+
       // Call appropriate handler
-      const response = await (testCase.type === 'url' ? uploadUrlHandler : uploadTextHandler)(event);
+      const response = await (testCase.type === 'url' ? uploadUrlHandler : uploadTextHandler)(event, context);
 
       console.log(chalk.magenta('\nResponse:'));
       console.log('Status Code:', chalk.cyan(response.statusCode));
