@@ -53,11 +53,13 @@ exports.handler = async (event, context) => {
     let { url, content } = body;
     
     // Check if we have either URL or content
-    if (type === 'url' && !url) {
-      return createErrorResponse('MISSING_URL');
-    }
-    if (type === 'text' && !content) {
-      return createErrorResponse('MISSING_CONTENT');
+    if (type === 'url') {
+      if (!content) {
+        return createErrorResponse('MISSING_URL', 'URL is required for URL type uploads');
+      }
+      url = content; // Use content field for URL
+    } else if (type === 'text' && !content) {
+      return createErrorResponse('MISSING_CONTENT', 'Content is required for text type uploads');
     }
 
     // Get metadata based on type
@@ -67,7 +69,7 @@ exports.handler = async (event, context) => {
         // Validate URL format
         const urlObj = new URL(url.trim());
         if (!urlObj.protocol.startsWith('http')) {
-          return createErrorResponse('INVALID_URL_PROTOCOL');
+          return createErrorResponse('INVALID_URL_PROTOCOL', 'URL must start with http:// or https://');
         }
 
         console.log('Fetching metadata for URL:', url);
