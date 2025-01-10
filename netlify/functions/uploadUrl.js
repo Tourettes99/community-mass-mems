@@ -1,10 +1,12 @@
 require('dotenv').config();
-const { getCollection, DB, COLLECTIONS } = require('./utils/db');
+const { getCollection, COLLECTIONS } = require('./utils/db');
 const { ObjectId } = require('mongodb');
 const fetch = require('node-fetch');
 const { getUrlMetadata } = require('./utils/urlMetadata');
-const groqModeration = require('./services/groqModeration');
+const openaiModeration = require('./services/openaiModeration');
 const fileStorage = require('./services/fileStorage');
+const { createErrorResponse, logError } = require('./utils/errors');
+const { createModerationError, logModerationDecision } = require('./utils/moderationErrors');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -36,22 +38,15 @@ exports.handler = async (event, context) => {
 
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
-      return {
-        statusCode: 405,
-        headers,
-        body: JSON.stringify({ error: 'Method not allowed' })
-      };
+      return createErrorResponse('INVALID_REQUEST_BODY', 'Only POST method is allowed', 405);
     }
 
     let body;
     try {
       body = JSON.parse(event.body);
     } catch (error) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid request body' })
-      };
+      logError('INVALID_REQUEST_BODY', error, { body: event.body });
+      return createErrorResponse('INVALID_REQUEST_BODY', 'Failed to parse JSON body');
     }
 
     const { type, tags } = body;
@@ -59,18 +54,10 @@ exports.handler = async (event, context) => {
     
     // Check if we have either URL or content
     if (type === 'url' && !url) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'URL is required for URL type' })
-      };
+      return createErrorResponse('MISSING_URL');
     }
     if (type === 'text' && !content) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Content is required for text type' })
-      };
+      return createErrorResponse('MISSING_CONTENT');
     }
 
     // Get metadata based on type
@@ -80,11 +67,7 @@ exports.handler = async (event, context) => {
         // Validate URL format
         const urlObj = new URL(url.trim());
         if (!urlObj.protocol.startsWith('http')) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ error: 'Invalid URL protocol. Only HTTP(S) URLs are allowed.' })
-          };
+          return createErrorResponse('INVALID_URL_PROTOCOL');
         }
 
         console.log('Fetching metadata for URL:', url);
@@ -110,7 +93,7 @@ exports.handler = async (event, context) => {
           author: urlMetadata.author
         };
       } catch (error) {
-        console.error('Error fetching metadata:', error);
+        logError('METADATA_FETCH_ERROR', error, { url });
         // Use basic metadata if fetch fails
         metadata = {
           title: url,
@@ -144,20 +127,14 @@ exports.handler = async (event, context) => {
         url = permanentUrl;
         metadata.isDiscordCdn = true;
       } catch (error) {
-        console.error('Error processing Discord CDN URL:', error);
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({ 
-            error: 'Failed to process Discord CDN URL',
-            details: error.message 
-          })
-        };
+        logError('DISCORD_CDN_ERROR', error, { url });
+        return createErrorResponse('DISCORD_CDN_ERROR', error.message);
       }
     }
 
     try {
-      const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
+      const collection = await getCollection(COLLECTIONS.MEMORIES);
+      const requestId = Math.random().toString(36).substring(2, 15);
 
       // Create new memory document
       const memory = {
@@ -166,50 +143,82 @@ exports.handler = async (event, context) => {
         url: type === 'url' ? url.trim() : undefined,
         content: type === 'text' ? content.trim() : undefined,
         tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-        status: 'approved', // Default to approved if no moderation
+        status: 'pending', // Default to pending until moderation
         metadata,
         submittedAt: new Date().toISOString(),
         votes: { up: 0, down: 0 },
-        userVotes: new Map()
+        userVotes: new Map(),
+        requestId
       };
 
-      // Only perform moderation if GROQ_API_KEY is set and moderation service is available
-      if (process.env.GROQ_API_KEY && groqModeration) {
-        try {
-          const moderationResult = await groqModeration.moderateContent(
-            type === 'url' ? `${url}\n${metadata.title || ''}\n${metadata.description || ''}` : content,
-            type
+      // Perform content moderation
+      try {
+        const moderationResult = await openaiModeration.moderateContent(
+          type === 'url' ? `${url}\n${metadata.title || ''}\n${metadata.description || ''}` : content,
+          type
+        );
+
+        // Log moderation decision
+        logModerationDecision(
+          type === 'url' ? url : content,
+          moderationResult,
+          {
+            type,
+            requestId,
+            userId: event.headers['x-user-id'],
+            metadata: {
+              title: metadata.title,
+              domain: metadata.domain
+            }
+          }
+        );
+
+        // Update memory with moderation result
+        memory.status = moderationResult.flagged ? 'rejected' : 'approved';
+        memory.moderationResult = {
+          flagged: moderationResult.flagged,
+          categories: moderationResult.categories,
+          category_scores: moderationResult.category_scores,
+          reason: moderationResult.reason
+        };
+
+        if (moderationResult.flagged) {
+          // Create user-friendly moderation error response
+          const moderationError = createModerationError(
+            moderationResult.categories,
+            moderationResult.category_scores
           );
 
-          // Update memory with moderation result
-          memory.status = moderationResult.flagged ? 'rejected' : 'approved';
-          memory.moderationResult = {
-            flagged: moderationResult.flagged,
-            category_scores: moderationResult.category_scores,
-            reason: moderationResult.reason
-          };
+          // Save to database for audit
+          await collection.insertOne(memory);
 
-          if (moderationResult.flagged) {
-            return {
-              statusCode: 400,
-              headers,
-              body: JSON.stringify({
-                message: 'Content rejected by moderation',
-                reason: moderationResult.reason,
-                category_scores: moderationResult.category_scores,
-                id: memory._id
-              })
-            };
-          }
-        } catch (error) {
-          console.error('Moderation service error:', error);
-          // Continue without moderation if it fails
-          console.log('Continuing without content moderation');
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({
+              error: moderationError,
+              id: memory._id,
+              requestId
+            })
+          };
         }
+      } catch (error) {
+        logError('MODERATION_FAILED', error, { type, content: type === 'url' ? url : content });
+        // Set status to pending if moderation fails
+        memory.status = 'pending';
+        memory.moderationResult = {
+          error: 'Moderation service unavailable',
+          timestamp: new Date().toISOString()
+        };
       }
 
       // Save to database
-      await collection.insertOne(memory);
+      try {
+        await collection.insertOne(memory);
+      } catch (error) {
+        logError('DB_WRITE_ERROR', error, { memoryId: memory._id });
+        return createErrorResponse('DB_WRITE_ERROR', error.message, 500);
+      }
 
       return {
         statusCode: 200,
@@ -217,47 +226,17 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
           message: 'Memory submitted successfully',
           id: memory._id,
-          metadata: metadata
+          metadata: metadata,
+          status: memory.status,
+          requestId
         })
       };
     } catch (error) {
-      console.error('Error:', error);
-      console.error('Error stack:', error.stack);
-      
-      // Determine if it's a connection error
-      const isConnectionError = error.message.includes('connect') || 
-                              error.message.includes('timeout') ||
-                              error.message.includes('network');
-      
-      const statusCode = isConnectionError ? 503 : 500;
-      const message = isConnectionError 
-        ? 'Database connection error. Please try again later.'
-        : 'Internal server error while saving memory.';
-
-      return {
-        statusCode,
-        headers,
-        body: JSON.stringify({
-          error: message,
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        })
-      };
+      logError('DB_CONNECTION_ERROR', error);
+      return createErrorResponse('DB_CONNECTION_ERROR', error.message, 503);
     }
   } catch (error) {
-    console.error('Error:', error);
-    console.error('Error stack:', error.stack);
-    
-    return {
-      statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({
-        error: 'Internal server error',
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      })
-    };
+    logError('INTERNAL_ERROR', error);
+    return createErrorResponse('INTERNAL_ERROR', error.message, 500);
   }
 };
