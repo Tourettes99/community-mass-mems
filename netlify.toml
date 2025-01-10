@@ -12,6 +12,7 @@
   NETLIFY = "true"
   SITE_URL = "https://shiny-jalebi-9ccb2b.netlify.app"
   MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
+  GROQ_API_KEY = "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"
 
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
