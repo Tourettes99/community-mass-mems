@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { getCollection, DB_NAME } = require('./utils/db');
+const { getCollection, DB, COLLECTIONS } = require('./utils/db');
 const { ObjectId } = require('mongodb');
 const fetch = require('node-fetch');
 const { getUrlMetadata } = require('./utils/urlMetadata');
@@ -244,7 +244,8 @@ exports.handler = async (event, context) => {
     }
 
     try {
-      const collection = await getCollection(DB_NAME, 'memories');
+      // Use mass-mems database for user uploads
+      const collection = await getCollection(DB.MASS_MEMS, COLLECTIONS.MEMORIES);
 
       // Create new memory document
       const memory = {
