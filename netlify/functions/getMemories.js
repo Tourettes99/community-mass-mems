@@ -1,70 +1,10 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const Memory = require('./models/Memory');
-
-let conn = null;
-
-const connectDb = async () => {
-  if (conn == null) {
-    const MONGODB_URI = process.env.MONGODB_URI;
-    if (!MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is not set');
-    }
-    
-    try {
-      conn = await mongoose.connect(MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        connectTimeoutMS: 10000,
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-      });
-      console.log('Successfully connected to MongoDB memories database');
-    } catch (err) {
-      console.error('MongoDB connection error:', err);
-      throw err;
-    }
-  }
-  return conn;
-};
-
-const formatDate = (date) => {
-  if (!date) return null;
-  try {
-    return date instanceof Date ? date.toISOString() : new Date(date).toISOString();
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return null;
-  }
-};
-
-const formatMemory = (memory) => {
-  if (!memory) return null;
-  try {
-    const formatted = {
-      ...memory,
-      submittedAt: formatDate(memory.submittedAt),
-      metadata: {
-        ...memory.metadata,
-        createdAt: formatDate(memory.submittedAt),
-        updatedAt: formatDate(memory.updatedAt)
-      },
-      votes: {
-        up: memory.votes?.up || 0,
-        down: memory.votes?.down || 0
-      }
-    };
-    delete formatted.__v;
-    return formatted;
-  } catch (error) {
-    console.error('Error formatting memory:', error);
-    return null;
-  }
-};
+const { MongoClient } = require('mongodb');
 
 exports.handler = async (event, context) => {
   // Prevent function from waiting for connections to close
   context.callbackWaitsForEmptyEventLoop = false;
+  let client;
   
   // Set default headers
   const headers = {
@@ -93,46 +33,52 @@ exports.handler = async (event, context) => {
   }
   
   try {
-    // Connect to database
-    await connectDb();
-    console.log('Connected to database, fetching memories...');
+    // Connect to MongoDB with increased timeouts
+    client = await MongoClient.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 75000,
+      connectTimeoutMS: 30000,
+      family: 4
+    });
+
+    const db = client.db('mass-mems');
+    const collection = db.collection('memories');
 
     // Fetch memories with proper error handling
-    let memories;
-    try {
-      // Only fetch approved memories
-      memories = await Memory.find({ status: 'approved' })
-        .sort({ submittedAt: -1 })
-        .lean()
-        .exec();
-      
-      // Format memories to ensure proper date handling
-      memories = memories.map(formatMemory).filter(Boolean);
-      
-      console.log(`Successfully fetched ${memories.length} approved memories`);
-    } catch (dbError) {
-      console.error('Database query error:', dbError);
-      throw new Error(`Database query failed: ${dbError.message}`);
-    }
+    const memories = await collection
+      .find({ status: 'approved' })
+      .sort({ submittedAt: -1 })
+      .toArray();
 
-    // Validate memories array
-    if (!Array.isArray(memories)) {
-      console.error('Invalid memories format:', memories);
-      throw new Error('Invalid data format returned from database');
-    }
+    // Format memories
+    const formattedMemories = memories.map(memory => ({
+      ...memory,
+      submittedAt: memory.submittedAt ? new Date(memory.submittedAt).toISOString() : null,
+      metadata: {
+        ...memory.metadata,
+        createdAt: memory.submittedAt ? new Date(memory.submittedAt).toISOString() : null,
+        updatedAt: memory.updatedAt ? new Date(memory.updatedAt).toISOString() : null
+      },
+      votes: {
+        up: memory.votes?.up || 0,
+        down: memory.votes?.down || 0
+      }
+    })).filter(Boolean);
+
+    console.log(`Successfully fetched ${formattedMemories.length} approved memories`);
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(memories)
+      body: JSON.stringify(formattedMemories)
     };
   } catch (error) {
     console.error('Error in getMemories function:', error);
     
     // Determine if it's a connection error
-    const isConnectionError = error.name === 'MongooseError' || 
-                            error.name === 'MongoError' ||
-                            error.message.includes('connect');
+    const isConnectionError = error.message.includes('connect') || 
+                            error.message.includes('timeout') ||
+                            error.message.includes('network');
     
     const statusCode = isConnectionError ? 503 : 500;
     const message = isConnectionError 
@@ -147,5 +93,9 @@ exports.handler = async (event, context) => {
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 };

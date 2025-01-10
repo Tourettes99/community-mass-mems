@@ -1,35 +1,19 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const Memory = require('./models/Memory');
+const { MongoClient, ObjectId } = require('mongodb');
 const fetch = require('node-fetch');
-const nodemailer = require('nodemailer');
-const emailNotification = require('./services/emailNotification');
 const { getUrlMetadata } = require('./utils/urlMetadata');
 const groqModeration = require('./services/groqModeration');
 const fileStorage = require('./services/fileStorage');
-
-// Create transporter for sending emails
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
-
-// Media file extensions
-const MEDIA_EXTENSIONS = {
-  images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff', 'avif'],
-  videos: ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'flv', 'm4v', 'mkv', '3gp'],
-  audio: ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac', 'wma', 'aiff'],
-  documents: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv', 'md', 'json']
-};
 
 // Initialize services
 let servicesInitialized = false;
 async function initializeServices() {
   if (!servicesInitialized) {
-    await groqModeration.initialize();
+    if (!process.env.GROQ_API_KEY) {
+      console.warn('GROQ_API_KEY not set, content moderation will be skipped');
+    } else {
+      await groqModeration.initialize();
+    }
     await fileStorage.initialize();
     servicesInitialized = true;
   }
@@ -139,37 +123,36 @@ exports.handler = async (event, context) => {
         console.log('Fetching metadata for URL:', url);
         metadata = await getUrlMetadata(url.trim());
         
-        // Moderate URL and metadata content
-        const urlModeration = await groqModeration.moderateContent(url, 'url');
-        const contentModeration = await groqModeration.moderateContent(
-          `Title: ${metadata.basicInfo?.title || ''}\nDescription: ${metadata.basicInfo?.description || ''}`,
-          'text'
-        );
+        // Only perform moderation if GROQ_API_KEY is set
+        if (process.env.GROQ_API_KEY) {
+          const urlModeration = await groqModeration.moderateContent(url, 'url');
+          const contentModeration = await groqModeration.moderateContent(
+            `Title: ${metadata.basicInfo?.title || ''}\nDescription: ${metadata.basicInfo?.description || ''}`,
+            'text'
+          );
 
-        // Check moderation results
-        if (urlModeration.flagged || contentModeration.flagged) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({
-              error: 'Content moderation failed',
-              reason: urlModeration.flagged ? urlModeration.reason : contentModeration.reason,
-              scores: {
-                url: urlModeration.category_scores,
-                content: contentModeration.category_scores
-              }
-            })
-          };
+          // Check moderation results
+          if (urlModeration.flagged || contentModeration.flagged) {
+            return {
+              statusCode: 400,
+              headers,
+              body: JSON.stringify({
+                error: 'Content moderation failed',
+                reason: urlModeration.flagged ? urlModeration.reason : contentModeration.reason,
+                scores: {
+                  url: urlModeration.category_scores,
+                  content: contentModeration.category_scores
+                }
+              })
+            };
+          }
         }
 
         // Check if the URL is accessible
         if (metadata.error) {
           return {
             statusCode: 400,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*'
-            },
+            headers,
             body: JSON.stringify({ 
               error: 'URL validation failed',
               details: metadata.error,
@@ -260,72 +243,69 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Connect to MongoDB
+    // Connect to MongoDB with increased timeouts
     try {
-      await mongoose.connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 10000,
+      client = await MongoClient.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 30000,
+        socketTimeoutMS: 75000,
+        connectTimeoutMS: 30000,
         family: 4
       });
 
-      // Create new memory document using Mongoose model
-      const memory = new Memory({
+      const db = client.db('mass-mems');
+      const collection = db.collection('memories');
+
+      // Create new memory document
+      const memory = {
+        _id: new ObjectId(),
         type: type,
         url: type === 'url' ? url.trim() : undefined,
         content: type === 'text' ? content.trim() : undefined,
         tags: Array.isArray(tags) ? tags.filter(t => t && typeof t === 'string') : [],
-        status: 'pending',
+        status: process.env.GROQ_API_KEY ? 'pending' : 'approved', // Auto-approve if no moderation
         metadata: metadata,
         votes: { up: 0, down: 0 },
         userVotes: {},
         submittedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date()
-      });
-
-      // Perform moderation
-      const moderationResult = await groqModeration.moderateContent(
-        type === 'url' ? `${url}\n${metadata.basicInfo?.title || ''}\n${metadata.basicInfo?.description || ''}` : content,
-        type
-      );
-
-      // Update memory with moderation result
-      memory.status = moderationResult.flagged ? 'rejected' : 'approved';
-      memory.moderationResult = {
-        flagged: moderationResult.flagged,
-        category_scores: moderationResult.category_scores,
-        reason: moderationResult.reason
       };
 
-      // Save using Mongoose
-      await memory.save();
+      // Perform moderation if GROQ_API_KEY is set
+      if (process.env.GROQ_API_KEY) {
+        const moderationResult = await groqModeration.moderateContent(
+          type === 'url' ? `${url}\n${metadata.basicInfo?.title || ''}\n${metadata.basicInfo?.description || ''}` : content,
+          type
+        );
 
-      // Send email notification
-      await emailNotification.sendModerationNotification(memory.toObject(), moderationResult);
-
-      // Return appropriate response
-      if (moderationResult.flagged) {
-        return {
-          statusCode: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            message: 'Content rejected by moderation',
-            reason: moderationResult.reason,
-            category_scores: moderationResult.category_scores,
-            id: memory._id
-          })
+        // Update memory with moderation result
+        memory.status = moderationResult.flagged ? 'rejected' : 'approved';
+        memory.moderationResult = {
+          flagged: moderationResult.flagged,
+          category_scores: moderationResult.category_scores,
+          reason: moderationResult.reason
         };
+
+        if (moderationResult.flagged) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({
+              message: 'Content rejected by moderation',
+              reason: moderationResult.reason,
+              category_scores: moderationResult.category_scores,
+              id: memory._id
+            })
+          };
+        }
       }
+
+      // Save to database
+      await collection.insertOne(memory);
 
       return {
         statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
+        headers,
         body: JSON.stringify({
           message: 'Memory submitted successfully',
           id: memory._id,
@@ -346,19 +326,20 @@ exports.handler = async (event, context) => {
         })
       };
     } finally {
-      // Always close the connection
-      await mongoose.disconnect();
+      if (client) {
+        await client.close();
+      }
     }
   } catch (error) {
     console.error('Error:', error);
     console.error('Error stack:', error.stack);
     
-    // Close MongoDB connection if it exists
-    await mongoose.disconnect();
-
     return {
       statusCode: 500,
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({
         error: 'Internal server error',
         message: error.message,
@@ -366,12 +347,14 @@ exports.handler = async (event, context) => {
       })
     };
   } finally {
-    // Clean up MongoDB connections
+    // Clean up resources
     try {
       await fileStorage.cleanup();
     } catch (error) {
       console.error('Error cleaning up file storage:', error);
     }
-    await mongoose.disconnect();
+    if (client) {
+      await client.close();
+    }
   }
 };
