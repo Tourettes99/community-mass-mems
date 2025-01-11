@@ -12,6 +12,14 @@
   NETLIFY = "true"
   SITE_URL = "https://shiny-jalebi-9ccb2b.netlify.app"
   MONGODB_URI = "mongodb+srv://davidpthomsen:Gamer6688@cluster0.rz2oj.mongodb.net/memories?authSource=admin&retryWrites=true&w=majority&appName=Cluster0"
+  SMTP_HOST = "smtp.gmail.com"
+  SMTP_PORT = "587"
+  SMTP_USER = "rabbitr18450@gmail.com"
+  SMTP_PASS = "jwiqjkbmiuzpldsk"
+  SMTP_FROM = "rabbitr18450@gmail.com"
+  SMTP_TO = "rabbitr18450@gmail.com"
+  EMAIL_SECURE = "false"
+  EMAIL_PASSWORD = "Gamer9999#"
 
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
@@ -56,3 +64,11 @@
 [template.environment]
   MONGODB_URI = "Your MongoDB connection string"
   OPENAI_API_KEY = "Your OpenAI API key for content moderation"
+  SMTP_HOST = "SMTP server hostname"
+  SMTP_PORT = "SMTP server port"
+  SMTP_USER = "SMTP username/email"
+  SMTP_PASS = "SMTP password/app password"
+  SMTP_FROM = "Sender email address"
+  SMTP_TO = "Recipient email address"
+  EMAIL_SECURE = "Whether to use TLS (true/false)"
+  EMAIL_PASSWORD = "Email account password"
