@@ -7,6 +7,7 @@ const openaiModeration = require('./services/openaiModeration');
 const fileStorage = require('./services/fileStorage');
 const { createErrorResponse, logError } = require('./utils/errors');
 const { createModerationError, logModerationDecision } = require('./utils/moderationErrors');
+const { sendModerationNotification } = require('./utils/emailConfig');
 
 exports.handler = async (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false;
@@ -174,6 +175,24 @@ exports.handler = async (event, context) => {
           category_scores: moderationResult.category_scores,
           reason: moderationResult.reason
         };
+
+        // Send email notification
+        try {
+          await sendModerationNotification(
+            type === 'url' ? url : content,
+            moderationResult,
+            {
+              type,
+              requestId,
+              userId: event.headers['x-user-id'],
+              title: metadata.title,
+              domain: metadata.domain
+            }
+          );
+        } catch (error) {
+          console.error('Error sending moderation notification email:', error);
+          // Continue even if email fails
+        }
 
         if (moderationResult.flagged) {
           // Create user-friendly moderation error response
