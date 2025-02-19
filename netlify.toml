@@ -1,5 +1,5 @@
 [build]
-  base = "community-mass-mems"
+  base = "."
   command = "npm install --legacy-peer-deps && CI=false DISABLE_ESLINT_PLUGIN=true bash ./build.sh"
   publish = "build"
   functions = "netlify/functions"
